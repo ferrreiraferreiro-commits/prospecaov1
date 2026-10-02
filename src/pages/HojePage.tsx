@@ -1,15 +1,17 @@
 import clsx from 'clsx'
-import { CalendarCheck, CalendarClock, Headphones, PhoneOutgoing, RotateCcw, Sparkles, Upload } from 'lucide-react'
+import { Archive, CalendarCheck, CalendarClock, Headphones, PhoneOutgoing, RotateCcw, Sparkles, Upload } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QuickActions, StatusMenu } from '../components/leadBits'
+import { HotTag, QuickActions, StatusMenu } from '../components/leadBits'
+import { MeetingResult } from '../components/MeetingResult'
 import { useLiguei } from '../components/OutcomeModal'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Progress, SectionTitle, StatusBadge } from '../components/ui'
 import { formatPhone } from '../lib/contact'
-import { formatDayLabel, formatLongToday, formatRelative, periodoLabel, timeHM } from '../lib/dates'
-import { buildTodayPlan, todayQueue } from '../lib/selectors'
-import type { Lead } from '../lib/types'
+import { formatDateKeyShort, formatDayLabel, formatLongToday, formatRelative, periodoLabel, timeHM } from '../lib/dates'
+import { needsResult } from '../lib/insights'
+import { buildTodayPlan, isHot, todayQueue } from '../lib/selectors'
+import type { Lead, Meeting } from '../lib/types'
 import { useIndex, useMetrics, useToday } from '../store/derived'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
@@ -19,6 +21,9 @@ export function HojePage() {
   const interactions = useApp((s) => s.interactions)
   const meetings = useApp((s) => s.meetings)
   const meta = useApp((s) => s.settings.meta_diaria)
+  const maxTentativas = useApp((s) => s.settings.max_tentativas)
+  const saveOutcome = useApp((s) => s.saveOutcome)
+  const toast = useApp((s) => s.toast)
   const setQueue = useApp((s) => s.setQueue)
   const setImportOpen = useUi((s) => s.setImportOpen)
   const index = useIndex()
@@ -27,7 +32,24 @@ export function HojePage() {
   const navigate = useNavigate()
   const [novosLimit, setNovosLimit] = useState(15)
 
-  const plan = useMemo(() => buildTodayPlan(leads, interactions, index, meetings, today), [leads, interactions, index, meetings, today])
+  const plan = useMemo(
+    () => buildTodayPlan(leads, interactions, index, meetings, today, maxTentativas),
+    [leads, interactions, index, meetings, today, maxTentativas],
+  )
+  // Reuniões que já passaram e ainda não têm resultado (mais antigas primeiro)
+  const semResultado = useMemo(() => {
+    const byId = new Map(leads.map((l) => [l.id, l]))
+    return meetings
+      .filter((m) => needsResult(m) && byId.has(m.lead_id))
+      .sort((a, b) => a.data.localeCompare(b.data))
+      .map((m) => ({ meeting: m, lead: byId.get(m.lead_id)! }))
+  }, [meetings, leads, today])
+  const encerrar = async (ids: string[]) => {
+    for (const id of ids) {
+      await saveOutcome({ leadId: id, mode: 'status', status: 'finalizado', observacao: `Encerrado após ${maxTentativas}+ tentativas sem resposta` })
+    }
+    toast(ids.length === 1 ? 'Lead encerrado.' : `${ids.length} leads encerrados.`)
+  }
   const queue = useMemo(() => todayQueue(plan), [plan])
 
   const feitas = metrics.hoje.ligacoes
@@ -140,6 +162,41 @@ export function HojePage() {
             {plan.tentarNovamente.length > 30 && <MoreLine>+{plan.tentarNovamente.length - 30} na fila</MoreLine>}
           </Block>
 
+          {plan.esgotados.length > 0 && (
+            <Block
+              title="Sugestão: encerrar"
+              count={plan.esgotados.length}
+              icon={<Archive className="size-3.5 text-orange-300" />}
+              right={
+                <Button size="xs" variant="ghost" onClick={() => encerrar(plan.esgotados.map((e) => e.lead.id))}>
+                  Encerrar todos
+                </Button>
+              }
+            >
+              <p className="border-b border-line-soft px-4 py-2 text-2xs text-fg-3">
+                {maxTentativas} ou mais tentativas seguidas sem resposta. Saíram da fila — encerre ou ligue mais uma vez se quiser.
+              </p>
+              {plan.esgotados.slice(0, 20).map(({ lead, tentativas, ultima }) => (
+                <TodayRow
+                  key={lead.id}
+                  lead={lead}
+                  onCallMode={() => start(lead.id)}
+                  aside={
+                    <span className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-2xs text-fg-3">
+                        {tentativas} tentativas{ultima && <span className="text-fg-4"> · {formatRelative(ultima)}</span>}
+                      </span>
+                      <Button size="xs" variant="subtle" onClick={() => encerrar([lead.id])}>
+                        Encerrar
+                      </Button>
+                    </span>
+                  }
+                />
+              ))}
+              {plan.esgotados.length > 20 && <MoreLine>+{plan.esgotados.length - 20}</MoreLine>}
+            </Block>
+          )}
+
           <Block title="Novos para ligar" count={plan.novos.length} icon={<Sparkles className="size-3.5 text-fg-3" />}>
             {plan.novos.length === 0 ? (
               <EmptyLine>Todos os leads já foram trabalhados. Importe mais quando quiser.</EmptyLine>
@@ -155,6 +212,14 @@ export function HojePage() {
         </div>
 
         <div className="space-y-5">
+          {semResultado.length > 0 && (
+            <Block title="Como foram as reuniões?" count={semResultado.length} icon={<CalendarCheck className="size-3.5 text-gold" />}>
+              {semResultado.map(({ lead, meeting }) => (
+                <ResultLine key={meeting.id} lead={lead} meeting={meeting} />
+              ))}
+            </Block>
+          )}
+
           <Block title="Reuniões" count={plan.reunioesHoje.length} icon={<CalendarCheck className="size-3.5 text-emerald-300" />}>
             {plan.reunioesHoje.length === 0 && plan.proximasReunioes.length === 0 && <EmptyLine>Nenhuma reunião marcada.</EmptyLine>}
             {plan.reunioesHoje.map(({ lead, meeting }) => (
@@ -201,12 +266,13 @@ function Count({ n, label, tone }: { n: number; label: string; tone?: string }) 
   )
 }
 
-function Block({ title, count, icon, children }: { title: string; count: number; icon: ReactNode; children: ReactNode }) {
+function Block({ title, count, icon, children, right }: { title: string; count: number; icon: ReactNode; children: ReactNode; right?: ReactNode }) {
   return (
     <section className="panel overflow-hidden">
       <div className="flex items-center gap-2 border-b border-line-soft px-4 py-2.5">
         {icon}
         <SectionTitle count={count}>{title}</SectionTitle>
+        {right && <div className="ml-auto">{right}</div>}
       </div>
       <div>{children}</div>
     </section>
@@ -232,7 +298,7 @@ function TodayRow({ lead, aside, note, showStatus, onCallMode }: { lead: Lead; a
       <div className="min-w-0 flex-1 basis-56">
         <div className="flex items-center gap-2">
           <span className="truncate text-[13px] font-semibold">{lead.empresa}</span>
-          {!lead.website && <span className="shrink-0 text-2xs font-medium text-gold/80">sem site</span>}
+          {isHot(lead) ? <HotTag lead={lead} /> : !lead.website && <span className="shrink-0 text-2xs font-medium text-gold/80">sem site</span>}
         </div>
         <div className="mt-0.5 truncate text-xs text-fg-3">
           <span className="num text-fg-2">{lead.telefone ? formatPhone(lead.telefone) : 'Sem telefone'}</span>
@@ -255,6 +321,24 @@ function TodayRow({ lead, aside, note, showStatus, onCallMode }: { lead: Lead; a
         <Button size="sm" variant="secondary" className="border-go/25 text-go hover:border-go/40 hover:bg-go/10" icon={<PhoneOutgoing className="size-3.5" />} onClick={() => liguei(lead.id)}>
           Liguei
         </Button>
+      </div>
+    </div>
+  )
+}
+
+function ResultLine({ lead, meeting }: { lead: Lead; meeting: Meeting }) {
+  const openLead = useUi((s) => s.openLead)
+  return (
+    <div className="border-b border-line-soft px-4 py-2.5 last:border-0">
+      <button onClick={() => openLead(lead.id)} className="flex w-full items-baseline gap-2 text-left">
+        <span className="num shrink-0 text-2xs text-fg-3">
+          {formatDateKeyShort(meeting.data)}
+          {meeting.horario && ` ${meeting.horario}`}
+        </span>
+        <span className="truncate text-xs font-medium text-fg hover:underline">{lead.empresa}</span>
+      </button>
+      <div className="mt-1.5">
+        <MeetingResult meeting={meeting} compact />
       </div>
     </div>
   )

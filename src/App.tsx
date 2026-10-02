@@ -8,6 +8,7 @@ import { SupabaseRepository } from './data/supabaseRepository'
 import { supabase } from './data/supabaseClient'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
+import { DisparoPage } from './pages/DisparoPage'
 import { HojePage } from './pages/HojePage'
 import { LoginPage } from './pages/LoginPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -23,6 +24,7 @@ function Routed() {
           <Route path="hoje" element={<HojePage />} />
           <Route path="ligacao" element={<CallModeEntry />} />
           <Route path="ligacao/:id" element={<CallModePage />} />
+          <Route path="disparo" element={<DisparoPage />} />
           <Route path="estatisticas" element={<StatsPage />} />
           <Route path="configuracoes" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -8,7 +8,7 @@ import type { NextAction } from '../lib/selectors'
 import { STATUS_MAP, TONE_CLASSES } from '../lib/statuses'
 import type { Interaction, Lead } from '../lib/types'
 import { useUi } from '../store/useUi'
-import { NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
+import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
 import { useLiguei } from './OutcomeModal'
 import { Button } from './ui'
 
@@ -68,6 +68,7 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
           <span className="truncate text-[13px] font-semibold text-fg" title={lead.empresa}>
             {lead.empresa}
           </span>
+          <HotTag lead={lead} />
           {duplicate && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-orange-400/10 px-1.5 text-[10px] leading-4 font-medium text-orange-300" title="Possível duplicado — abra o lead para decidir">
               <Copy className="size-2.5" /> Possível duplicado

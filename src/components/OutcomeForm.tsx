@@ -1,11 +1,14 @@
 import clsx from 'clsx'
-import { CalendarClock, Check, Plus, SkipForward, Undo2 } from 'lucide-react'
+import { Archive, CalendarClock, Check, Plus, SkipForward, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { consecutiveNoAnswer, nextAttempt, ordinal } from '../lib/attempts'
+import { whatsappTarget } from '../lib/contact'
 import { addDays, formatDateTime, todayKey } from '../lib/dates'
 import { CALL_RESULTS, SEM_RESPOSTA, STATUSES, STATUS_MAP, TONE_CLASSES } from '../lib/statuses'
 import type { Lead, StatusId } from '../lib/types'
 import { useApp } from '../store/useApp'
-import { defaultFollowup, draftToInput, FollowupPicker, type FollowupDraft } from './FollowupPicker'
+import { useUi } from '../store/useUi'
+import { defaultFollowup, draftToInput, FollowupPicker, type DayPreset, type FollowupDraft } from './FollowupPicker'
 import { Button, Kbd } from './ui'
 
 export interface OutcomeFormProps {
@@ -31,6 +34,15 @@ function isTyping(el: Element | null) {
 export function OutcomeForm({ lead, mode, callId, presetStatus, variant = 'modal', onSaved, onCancel, onDiscardCall, hasNext }: OutcomeFormProps) {
   const saveOutcome = useApp((s) => s.saveOutcome)
   const call = useApp((s) => (callId ? s.interactions.find((i) => i.id === callId) : undefined))
+  const interactions = useApp((s) => s.interactions)
+  const settings = useApp((s) => s.settings)
+  const toast = useApp((s) => s.toast)
+  const openMessage = useUi((s) => s.openMessage)
+  // Tentativas seguidas sem resposta antes desta ligação
+  const previousNoAnswer = useMemo(
+    () => consecutiveNoAnswer(interactions.filter((i) => i.lead_id === lead.id), callId),
+    [interactions, lead.id, callId],
+  )
 
   const [status, setStatus] = useState<StatusId | null>(presetStatus ?? null)
   const [falei, setFalei] = useState(lead.falei_com ?? '')
@@ -41,6 +53,9 @@ export function OutcomeForm({ lead, mode, callId, presetStatus, variant = 'modal
   const [followup, setFollowup] = useState<FollowupDraft>(() => defaultFollowup())
   const [meeting, setMeeting] = useState({ data: addDays(todayKey(), 1), horario: '', contato: '', observacao: '' })
   const [saving, setSaving] = useState(false)
+  /** Retorno sugerido sozinho (some se o resultado mudar) */
+  const [autoRetry, setAutoRetry] = useState(false)
+  const [encerrar, setEncerrar] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -50,12 +65,30 @@ export function OutcomeForm({ lead, mode, callId, presetStatus, variant = 'modal
   const needsMeeting = status === 'agendou_reuniao'
   const isPanel = variant === 'panel'
 
+  const semResposta = !!status && SEM_RESPOSTA.includes(status) && mode === 'call'
+  const tentativa = previousNoAnswer + 1
+  const esgotou = semResposta && tentativa >= settings.max_tentativas
+
   // Sugestão de retorno conforme o resultado escolhido
   function pick(s: StatusId) {
     setStatus(s)
     setError(null)
+    const noAnswer = SEM_RESPOSTA.includes(s) && mode === 'call'
+    if (noAnswer && settings.auto_tentativas && previousNoAnswer + 1 < settings.max_tentativas && (!wantsFollowup || autoRetry)) {
+      // Nova tentativa automática: dia seguinte, no período oposto ao desta ligação
+      const next = nextAttempt(call ? new Date(call.created_at) : new Date())
+      const days = Math.round((Date.parse(next.data) - Date.parse(todayKey())) / 86_400_000)
+      const preset: DayPreset = days === 1 ? 'amanha' : days === 2 ? '2d' : 'data'
+      setFollowup({ preset, data: next.data, timeMode: next.periodo, horario: '' })
+      setWantsFollowup(true)
+      setAutoRetry(true)
+    } else if (!noAnswer && autoRetry) {
+      setWantsFollowup(false)
+      setAutoRetry(false)
+    }
+    setEncerrar(noAnswer && previousNoAnswer + 1 >= settings.max_tentativas)
     if (s === 'follow_up' && !wantsFollowup) setFollowup(defaultFollowup('amanha', 'manha'))
-    if (SEM_RESPOSTA.includes(s) && !wantsFollowup) setFollowup(defaultFollowup('amanha', 'tarde'))
+    if (noAnswer && !wantsFollowup && !settings.auto_tentativas) setFollowup(defaultFollowup('amanha', 'tarde'))
     if (s === 'agendou_reuniao' && !meeting.contato && falei) setMeeting((m) => ({ ...m, contato: falei }))
   }
 
@@ -78,13 +111,21 @@ export function OutcomeForm({ lead, mode, callId, presetStatus, variant = 'modal
       cargo,
       observacao: obs,
       proxima_acao: isPanel ? proxima : undefined,
-      followup: showFollowup ? { ...draftToInput(followup), observacao: obs } : null,
+      followup: showFollowup && !(esgotou && encerrar)
+        ? { ...draftToInput(followup), observacao: obs || (autoRetry ? `Nova tentativa (${ordinal(tentativa + 1)})` : obs) }
+        : null,
       meeting: needsMeeting
         ? { data: meeting.data, horario: meeting.horario || null, contato: meeting.contato || falei || null, observacao: meeting.observacao || null }
         : null,
     })
+    if (esgotou && encerrar) {
+      await saveOutcome({ leadId: lead.id, mode: 'status', status: 'finalizado', observacao: `Encerrado após ${tentativa} tentativas seguidas sem resposta` })
+    }
     setSaving(false)
     onSaved(goNext)
+    if (status === 'pediu_whatsapp' && whatsappTarget(lead)) {
+      toast(`${lead.empresa} pediu WhatsApp.`, 'info', { label: 'Mandar mensagem', run: () => openMessage({ leadId: lead.id, templateId: 'pos_ligacao' }) })
+    }
   }
 
   // Atalhos: 1–0 escolhem o resultado; Ctrl+Enter salva.
@@ -190,17 +231,43 @@ export function OutcomeForm({ lead, mode, callId, presetStatus, variant = 'modal
         </div>
       )}
 
+      {/* Muitas tentativas sem resposta: sugere encerrar */}
+      {esgotou && (
+        <label className="anim-rise flex cursor-pointer items-start gap-2.5 rounded-lg border border-orange-400/25 bg-orange-400/[0.05] p-3 text-xs">
+          <input type="checkbox" className="mt-0.5 accent-orange-400" checked={encerrar} onChange={(e) => setEncerrar(e.target.checked)} />
+          <span>
+            <span className="flex items-center gap-1.5 font-medium text-orange-300">
+              <Archive className="size-3.5" /> {ordinal(tentativa)} tentativa seguida sem resposta
+            </span>
+            <span className="mt-0.5 block text-fg-3">Encerrar o lead (vai para Finalizados). Desmarque para continuar tentando.</span>
+          </span>
+        </label>
+      )}
+
       {/* Follow-up */}
-      {showFollowup ? (
+      {showFollowup && !(esgotou && encerrar) ? (
         <div className="anim-rise">
-          <FollowupPicker value={followup} onChange={setFollowup} />
+          <FollowupPicker
+            value={followup}
+            onChange={(v) => {
+              setFollowup(v)
+              setAutoRetry(false)
+            }}
+            title={autoRetry ? `Nova tentativa automática (${ordinal(tentativa + 1)} de ${settings.max_tentativas})` : undefined}
+          />
           {!needsFollowup && (
-            <button onClick={() => setWantsFollowup(false)} className="mt-1.5 text-2xs text-fg-3 hover:text-fg">
-              Remover retorno
+            <button
+              onClick={() => {
+                setWantsFollowup(false)
+                setAutoRetry(false)
+              }}
+              className="mt-1.5 text-2xs text-fg-3 hover:text-fg"
+            >
+              {autoRetry ? 'Não agendar nova tentativa' : 'Remover retorno'}
             </button>
           )}
         </div>
-      ) : (
+      ) : esgotou && encerrar ? null : (
         status &&
         !needsMeeting && (
           <button onClick={() => setWantsFollowup(true)} className="inline-flex items-center gap-1.5 text-xs text-sky-300/90 hover:text-sky-200">

@@ -64,6 +64,29 @@ export function useWhatsApp() {
   return open
 }
 
+/**
+ * Abre a conversa com a mensagem já escrita — a pessoa confere e aperta enviar no WhatsApp.
+ * Registra no histórico do lead. Nada é enviado automaticamente.
+ */
+export function useSendMessage() {
+  const logMessage = useApp((s) => s.logMessage)
+  const toast = useApp((s) => s.toast)
+  return useCallback(
+    (lead: Lead, text: string, modelo?: string | null): boolean => {
+      const target = whatsappTarget(lead)
+      if (!target) {
+        toast('Este lead não tem WhatsApp nem telefone válido no cadastro.', 'error')
+        return false
+      }
+      const destino = getWhatsAppDestino()
+      openUrl(whatsappChatUrl(target.number, destino, text.trim()), destino) // ainda dentro do clique
+      void logMessage(lead.id, text, modelo)
+      return true
+    },
+    [logMessage, toast],
+  )
+}
+
 export function useCopyPhone() {
   const toast = useApp((s) => s.toast)
   return useCallback(

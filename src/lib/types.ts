@@ -34,6 +34,9 @@ export interface Lead {
   observacoes: string | null
   dados_extras: Record<string, string> | null
   import_id: string | null
+  /** CNPJ (do arquivo ou informado à mão) e o resultado da consulta pública */
+  cnpj?: string | null
+  cnpj_info?: CnpjInfo | null
   // Trabalho de prospecção
   status: StatusId
   /** Segunda categoria de status (ex.: "Mensagem enviada"), livre e configurável */
@@ -48,7 +51,7 @@ export interface Lead {
   updated_at: string
 }
 
-export type InteractionTipo = 'ligacao' | 'status' | 'status2' | 'followup' | 'reuniao' | 'nota' | 'importacao'
+export type InteractionTipo = 'ligacao' | 'status' | 'status2' | 'followup' | 'reuniao' | 'nota' | 'importacao' | 'mensagem'
 
 export interface Interaction {
   id: string
@@ -77,6 +80,8 @@ export interface Followup {
   created_at: string
 }
 
+export type MeetingResultado = 'realizada' | 'nao_compareceu' | 'fechou' | 'perdeu'
+
 export interface Meeting {
   id: string
   lead_id: string
@@ -84,7 +89,40 @@ export interface Meeting {
   horario: string | null
   contato: string | null
   observacao: string | null
+  /** O que aconteceu na reunião (vazio = ainda não registrado) */
+  resultado?: MeetingResultado | null
+  /** Valor fechado em reais, quando `resultado = 'fechou'` */
+  valor?: number | null
+  resultado_em?: string | null
   created_at: string
+}
+
+export interface CnpjSocio {
+  nome: string
+  qualificacao: string
+}
+
+/** Dados públicos do CNPJ (BrasilAPI). `confere` diz se nome/telefone/cidade batem com o lead. */
+export interface CnpjInfo {
+  razao_social: string | null
+  nome_fantasia: string | null
+  situacao: string | null
+  abertura: string | null
+  atividade: string | null
+  municipio: string | null
+  uf: string | null
+  telefone: string | null
+  email: string | null
+  socios: CnpjSocio[]
+  confere: boolean
+  consultado_em: string
+}
+
+/** Modelo de mensagem de WhatsApp. Cada variação é usada em rodízio entre os leads. */
+export interface MessageTemplate {
+  id: string
+  nome: string
+  variacoes: string[]
 }
 
 export interface ImportRecord {
@@ -129,6 +167,14 @@ export interface Settings {
   avatar: string | null
   /** Métricas contam a partir desta data (botão "Zerar contadores") */
   metricas_desde: string | null
+  /** Mensagens prontas de WhatsApp */
+  mensagens: MessageTemplate[] | null
+  /** Agenda sozinho a próxima tentativa depois de "Não atendeu" */
+  auto_tentativas: boolean
+  /** Tentativas seguidas sem resposta antes de sugerir encerrar */
+  max_tentativas: number
+  /** Limite diário do disparo assistido */
+  disparo_limite_diario: number
 }
 
 export interface Snapshot {
@@ -151,4 +197,8 @@ export const DEFAULT_SETTINGS: Settings = {
   status2_opcoes: null,
   avatar: null,
   metricas_desde: null,
+  mensagens: null,
+  auto_tentativas: true,
+  max_tentativas: 5,
+  disparo_limite_diario: 30,
 }

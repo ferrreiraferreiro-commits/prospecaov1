@@ -64,7 +64,8 @@ export class SupabaseRepository implements Repository {
       leads: leads.map(normalizeLead),
       interactions,
       followups,
-      meetings,
+      // numeric volta como texto do Postgres
+      meetings: meetings.map((m) => ({ ...m, valor: m.valor === null || m.valor === undefined ? null : Number(m.valor) })),
       imports,
       settings: { ...DEFAULT_SETTINGS, ...s },
     }
@@ -115,6 +116,10 @@ export class SupabaseRepository implements Repository {
 
   async insertMeeting(item: Snapshot['meetings'][number]) {
     check(await this.db.from('meetings').insert(item))
+  }
+
+  async updateMeeting(id: string, patch: Partial<Snapshot['meetings'][number]>) {
+    check(await this.db.from('meetings').update(patch).eq('id', id))
   }
 
   async deleteMeeting(id: string) {

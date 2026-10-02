@@ -69,8 +69,10 @@ export function whatsappTarget(lead: { whatsapp: string | null; telefone: string
 
 export type WhatsAppDestino = 'web' | 'app'
 
-export function whatsappChatUrl(number: string, destino: WhatsAppDestino): string {
-  return destino === 'app' ? `whatsapp://send?phone=${number}` : `https://web.whatsapp.com/send?phone=${number}`
+/** Link da conversa; com `text`, a mensagem já chega escrita (a pessoa só aperta enviar). */
+export function whatsappChatUrl(number: string, destino: WhatsAppDestino, text?: string | null): string {
+  const base = destino === 'app' ? `whatsapp://send?phone=${number}` : `https://web.whatsapp.com/send?phone=${number}`
+  return text ? `${base}&text=${encodeURIComponent(text)}` : base
 }
 
 export function instagramHref(value: string | null | undefined): string | null {

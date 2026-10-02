@@ -5,8 +5,12 @@ import { getActiveRoteiro } from '../lib/script'
 import type { ParsedLead } from '../lib/parser'
 import { EMPTY_ADVANCED, type AdvancedFilters, type QuickFilter, type SortKey } from '../lib/selectors'
 import { STATUS_MAP } from '../lib/statuses'
+import { formatCnpj } from '../lib/cnpj'
+import { formatMoney, MEETING_RESULT_LABEL } from '../lib/insights'
 import {
   DEFAULT_SETTINGS,
+  type CnpjInfo,
+  type MeetingResultado,
   type Followup,
   type ImportRecord,
   type Interaction,
@@ -86,6 +90,10 @@ interface AppState extends Snapshot {
   completeFollowup(id: string): Promise<void>
   deleteFollowup(id: string): Promise<void>
   deleteMeeting(id: string): Promise<void>
+  /** Mensagem de WhatsApp aberta para envio (fica no histórico). Marca Status 2 se estiver vazio. */
+  logMessage(leadId: string, text: string, modelo?: string | null): Promise<void>
+  setMeetingResult(meetingId: string, resultado: MeetingResultado | null, valor?: number | null): Promise<void>
+  saveCnpj(leadId: string, cnpj: string | null, info: CnpjInfo | null): Promise<void>
   ignoreDuplicate(leadIds: string[]): Promise<void>
   deleteLeads(ids: string[]): Promise<void>
   saveSettings(settings: Settings): Promise<void>
@@ -451,6 +459,75 @@ export const useApp = create<AppState>()((set, get) => {
     async deleteMeeting(id) {
       set((s) => ({ meetings: s.meetings.filter((m) => m.id !== id) }))
       await persist((repo) => repo.deleteMeeting(id))
+    },
+
+    async logMessage(leadId, text, modelo) {
+      const lead = get().leads.find((l) => l.id === leadId)
+      if (!lead) return
+      const now = nowIso()
+      const log: Interaction = {
+        id: newId(),
+        lead_id: leadId,
+        tipo: 'mensagem',
+        status: null,
+        falei_com: null,
+        cargo: null,
+        observacao: modelo ? `[${modelo}] ${text.trim()}` : text.trim(),
+        created_at: now,
+      }
+      set((s) => ({ interactions: [...s.interactions, log] }))
+      await persist((repo) => repo.insertInteractions([log]))
+      if (!lead.status2) await get().setStatus2(leadId, 'Mensagem enviada')
+    },
+
+    async setMeetingResult(meetingId, resultado, valor = null) {
+      const meeting = get().meetings.find((m) => m.id === meetingId)
+      if (!meeting) return
+      const now = nowIso()
+      const patch: Partial<Meeting> = {
+        resultado,
+        valor: resultado === 'fechou' && valor && valor > 0 ? valor : null,
+        resultado_em: resultado ? now : null,
+      }
+      const texto = resultado
+        ? `Reunião de ${formatDateKey(meeting.data)}: ${MEETING_RESULT_LABEL[resultado].toLowerCase()}${patch.valor ? ` · ${formatMoney(patch.valor)}` : ''}`
+        : `Resultado da reunião de ${formatDateKey(meeting.data)} removido`
+      const log: Interaction = { id: newId(), lead_id: meeting.lead_id, tipo: 'reuniao', status: null, falei_com: meeting.contato, cargo: null, observacao: texto, created_at: now }
+      set((s) => ({
+        meetings: s.meetings.map((m) => (m.id === meetingId ? { ...m, ...patch } : m)),
+        interactions: [...s.interactions, log],
+      }))
+      await persist(async (repo) => {
+        await repo.updateMeeting(meetingId, patch)
+        await repo.insertInteractions([log])
+      })
+      // Fechou / não fechou também aparece no Status 2 do lead
+      if (resultado === 'fechou') await get().setStatus2(meeting.lead_id, 'Fechado')
+      if (resultado === 'perdeu') await get().setStatus2(meeting.lead_id, 'Perdido')
+    },
+
+    async saveCnpj(leadId, cnpj, info) {
+      const patch: Partial<Lead> = { cnpj, cnpj_info: info }
+      patchLead(leadId, patch)
+      const nome = info?.nome_fantasia || info?.razao_social
+      const log: Interaction | null =
+        cnpj && info
+          ? {
+              id: newId(),
+              lead_id: leadId,
+              tipo: 'nota',
+              status: null,
+              falei_com: null,
+              cargo: null,
+              observacao: `CNPJ ${formatCnpj(cnpj)} consultado${nome ? ` · ${nome}` : ''}${info.confere ? '' : ' (dados não conferem com o lead — revisar)'}`,
+              created_at: nowIso(),
+            }
+          : null
+      if (log) set((s) => ({ interactions: [...s.interactions, log] }))
+      await persist(async (repo) => {
+        await repo.updateLead(leadId, patch)
+        if (log) await repo.insertInteractions([log])
+      })
     },
 
     async ignoreDuplicate(leadIds) {

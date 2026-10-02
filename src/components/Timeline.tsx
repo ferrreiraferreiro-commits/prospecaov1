@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { CalendarCheck, CalendarClock, FileDown, PencilLine, Phone, RefreshCw, Tag } from 'lucide-react'
+import { CalendarCheck, CalendarClock, FileDown, MessageCircle, PencilLine, Phone, RefreshCw, Tag } from 'lucide-react'
 import { formatDateTime } from '../lib/dates'
 import { STATUS_MAP } from '../lib/statuses'
 import type { ImportRecord, Interaction, Lead } from '../lib/types'
@@ -14,6 +14,7 @@ const ICONS = {
   reuniao: CalendarCheck,
   nota: PencilLine,
   importacao: FileDown,
+  mensagem: MessageCircle,
 }
 
 const TITLES = {
@@ -24,6 +25,7 @@ const TITLES = {
   reuniao: 'Reunião agendada',
   nota: 'Anotação',
   importacao: 'Importado',
+  mensagem: 'Mensagem de WhatsApp',
 }
 
 export function Timeline({ lead, items, importRecord }: { lead: Lead; items: Interaction[]; importRecord?: ImportRecord }) {
@@ -41,7 +43,7 @@ export function Timeline({ lead, items, importRecord }: { lead: Lead; items: Int
             <span
               className={clsx(
                 'relative z-[1] mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border bg-panel',
-                it.tipo === 'ligacao' ? 'border-go/30 text-go' : it.tipo === 'reuniao' ? 'border-emerald-300/30 text-emerald-300' : it.tipo === 'followup' ? 'border-sky-300/30 text-sky-300' : 'border-line text-fg-3',
+                it.tipo === 'ligacao' ? 'border-go/30 text-go' : it.tipo === 'reuniao' ? 'border-emerald-300/30 text-emerald-300' : it.tipo === 'followup' ? 'border-sky-300/30 text-sky-300' : it.tipo === 'mensagem' ? 'border-teal-300/30 text-teal-300' : 'border-line text-fg-3',
               )}
             >
               <Icon className="size-3" />

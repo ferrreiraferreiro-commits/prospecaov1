@@ -1,9 +1,9 @@
 import clsx from 'clsx'
-import { CalendarCheck, CalendarClock, Check, Copy, Copy as CopyIcon, Headphones, PhoneOutgoing, Trash2, X } from 'lucide-react'
+import { CalendarCheck, CalendarClock, Check, Copy, Copy as CopyIcon, Headphones, MessageCircle, PhoneOutgoing, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatPhone, instagramHandle, instagramHref, mapsHref, telHref, websiteHref, websiteLabel, whatsappDigits, whatsappTarget } from '../lib/contact'
-import { formatDateKey, formatRelative, whenLabel } from '../lib/dates'
+import { formatDateKey, formatRelative, todayKey, whenLabel } from '../lib/dates'
 import { DUP_REASON_LABEL } from '../lib/duplicates'
 import { nextAction } from '../lib/selectors'
 import type { Lead } from '../lib/types'
@@ -11,8 +11,10 @@ import { useDuplicates, useIndex, useLead } from '../store/derived'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { defaultFollowup, draftToInput, FollowupPicker } from './FollowupPicker'
-import { NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
+import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
 import { useLiguei } from './OutcomeModal'
+import { CnpjSection } from './CnpjSection'
+import { MeetingResult } from './MeetingResult'
 import { Timeline } from './Timeline'
 import { Button, Drawer, Missing, WhatsAppIcon } from './ui'
 import { useCopyPhone, useWhatsApp } from './whatsapp'
@@ -98,6 +100,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const openWhatsApp = useWhatsApp()
   const copyPhone = useCopyPhone()
   const openOutcome = useUi((s) => s.openOutcome)
+  const openMessage = useUi((s) => s.openMessage)
   const navigate = useNavigate()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [scheduling, setScheduling] = useState(false)
@@ -134,6 +137,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           <Status2Menu lead={lead} alwaysVisible />
           <Rating lead={lead} className="text-xs" />
           <SiteTag lead={lead} className="text-xs" />
+          <HotTag lead={lead} />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
@@ -164,6 +168,9 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             }}
           >
             Modo Ligação
+          </Button>
+          <Button variant="secondary" size="sm" icon={<MessageCircle className="size-3.5" />} disabled={!whatsappTarget(lead)} onClick={() => openMessage({ leadId: lead.id })}>
+            Mensagem
           </Button>
           <QuickActions lead={lead} className="ml-auto" size="md" />
         </div>
@@ -334,8 +341,8 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
               </li>
             ))}
             {leadMeetings.map((m) => (
-              <li key={m.id} className="flex items-center gap-2 rounded-md border border-emerald-300/15 bg-emerald-300/[0.03] px-2.5 py-2 text-xs">
-                <CalendarCheck className="size-3.5 shrink-0 text-emerald-300" />
+              <li key={m.id} className="flex items-start gap-2 rounded-md border border-emerald-300/15 bg-emerald-300/[0.03] px-2.5 py-2 text-xs">
+                <CalendarCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-300" />
                 <div className="min-w-0 flex-1">
                   <span className="text-fg">
                     Reunião {formatDateKey(m.data)}
@@ -343,6 +350,11 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
                     {m.contato && <span className="text-fg-3"> com {m.contato}</span>}
                   </span>
                   {m.observacao && <p className="truncate text-fg-3">{m.observacao}</p>}
+                  {(m.data <= todayKey() || m.resultado) && (
+                    <div className="mt-1.5">
+                      <MeetingResult meeting={m} />
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => deleteMeeting(m.id)} className="rounded p-1 text-fg-4 hover:bg-hover hover:text-fg" aria-label="Remover reunião">
                   <X className="size-3.5" />
@@ -350,6 +362,10 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
               </li>
             ))}
           </ul>
+        </Section>
+
+        <Section title="CNPJ e sócios">
+          <CnpjSection lead={lead} />
         </Section>
 
         <Section title="Observações">

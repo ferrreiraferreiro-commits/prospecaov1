@@ -96,6 +96,11 @@ export class LocalRepository implements Repository {
     this.persist()
   }
 
+  async updateMeeting(id: string, patch: Partial<Snapshot['meetings'][number]>) {
+    this.data.meetings = this.patchWhere(this.data.meetings, new Set([id]), patch)
+    this.persist()
+  }
+
   async deleteMeeting(id: string) {
     this.data.meetings = this.data.meetings.filter((x) => x.id !== id)
     this.persist()

@@ -41,11 +41,12 @@ function NotificationBell() {
   const leads = useApp((s) => s.leads)
   const interactions = useApp((s) => s.interactions)
   const meetings = useApp((s) => s.meetings)
+  const max = useApp((s) => s.settings.max_tentativas)
   const openLead = useUi((s) => s.openLead)
   const index = useIndex()
   const today = useToday()
   const navigate = useNavigate()
-  const plan = useMemo(() => buildTodayPlan(leads, interactions, index, meetings, today), [leads, interactions, index, meetings, today])
+  const plan = useMemo(() => buildTodayPlan(leads, interactions, index, meetings, today, max), [leads, interactions, index, meetings, today, max])
   const count = plan.followups.length + plan.reunioesHoje.length
   const atrasados = plan.followups.filter((f) => f.atrasado).length
 

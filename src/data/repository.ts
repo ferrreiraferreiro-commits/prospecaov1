@@ -22,6 +22,7 @@ export interface Repository {
   deleteFollowup(id: string): Promise<void>
 
   insertMeeting(item: Meeting): Promise<void>
+  updateMeeting(id: string, patch: Partial<Meeting>): Promise<void>
   deleteMeeting(id: string): Promise<void>
 
   saveSettings(settings: Settings): Promise<void>

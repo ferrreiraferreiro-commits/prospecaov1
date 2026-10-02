@@ -1,18 +1,21 @@
 import clsx from 'clsx'
-import { ChartColumn, CheckCircle2, Headphones, Info, LayoutList, Settings, Sun, TriangleAlert, Upload, X } from 'lucide-react'
+import { ChartColumn, CheckCircle2, Headphones, Info, LayoutList, Send, Settings, Sun, TriangleAlert, Upload, X } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useMetrics } from '../store/derived'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { ImportModal } from './ImportModal'
 import { LeadDrawer } from './LeadDrawer'
+import { MessageModal } from './MessageModal'
 import { OutcomeModal } from './OutcomeModal'
 import { TopBar } from './TopBar'
+import { useReminders } from './useReminders'
 
 const NAV = [
   { to: '/', label: 'Central', icon: LayoutList, end: true },
   { to: '/hoje', label: 'Hoje', icon: Sun },
   { to: '/ligacao', label: 'Ligação', icon: Headphones },
+  { to: '/disparo', label: 'Disparo', icon: Send },
   { to: '/estatisticas', label: 'Números', icon: ChartColumn },
   { to: '/configuracoes', label: 'Ajustes', icon: Settings },
 ]
@@ -23,6 +26,7 @@ export function Layout() {
   const metrics = useMetrics()
   const setImportOpen = useUi((s) => s.setImportOpen)
   const badge = metrics.followupsHoje
+  useReminders()
 
   return (
     <div className="min-h-dvh lg:pl-[72px]">
@@ -101,6 +105,7 @@ export function Layout() {
       <ImportModal />
       <LeadDrawer />
       <OutcomeModal />
+      <MessageModal />
       <Toasts />
     </div>
   )

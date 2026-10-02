@@ -1,22 +1,22 @@
 import clsx from 'clsx'
-import { ChevronDown, Globe, MapPin, Phone, Plus, Settings2, Star, X } from 'lucide-react'
+import { ChevronDown, Flame, Globe, MapPin, Phone, Plus, Settings2, Star, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getStatus2Options } from '../lib/status2'
 import { useApp } from '../store/useApp'
 import { useRef, useState } from 'react'
 import { instagramHref, mapsHref, telHref, websiteHref, whatsappTarget } from '../lib/contact'
 import { formatDayLabel, periodoLabel } from '../lib/dates'
-import type { NextAction } from '../lib/selectors'
+import { isHot, type NextAction } from '../lib/selectors'
 import { fmtRating } from '../lib/script'
 import { STATUSES } from '../lib/statuses'
 import type { Lead, StatusId } from '../lib/types'
+import { useUi } from '../store/useUi'
 import { useChangeStatus } from './OutcomeModal'
-import { useWhatsApp } from './whatsapp'
 import { IconLink, InstagramIcon, MenuItem, Popover, StatusBadge, StatusDot, WhatsAppIcon } from './ui'
 
 export function QuickActions({ lead, className, size = 'sm' }: { lead: Lead; className?: string; size?: 'sm' | 'md' }) {
   const cls = size === 'md' ? 'size-8 [&_svg]:size-4' : undefined
-  const openWhatsApp = useWhatsApp()
+  const openMessage = useUi((s) => s.openMessage)
   const waTarget = whatsappTarget(lead)
   return (
     <div className={clsx('flex items-center', className)}>
@@ -27,10 +27,10 @@ export function QuickActions({ lead, className, size = 'sm' }: { lead: Lead; cla
         type="button"
         onClick={(e) => {
           e.stopPropagation()
-          void openWhatsApp(lead)
+          openMessage({ leadId: lead.id })
         }}
         disabled={!waTarget}
-        title={waTarget ? 'Abrir conversa no WhatsApp (não registra ligação)' : 'WhatsApp: sem número válido'}
+        title={waTarget ? 'Mandar mensagem no WhatsApp (não registra ligação)' : 'WhatsApp: sem número válido'}
         aria-label="WhatsApp"
         className={clsx(
           'inline-flex size-7 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-hover hover:text-fg disabled:cursor-not-allowed disabled:text-fg-4/60 disabled:hover:bg-transparent [&_svg]:size-[15px]',
@@ -60,6 +60,19 @@ export function Rating({ lead, className }: { lead: Lead; className?: string }) 
       <Star className={clsx('size-3', good ? 'fill-gold text-gold' : 'fill-fg-3/60 text-fg-3/60')} />
       <span className={good ? 'text-fg' : 'text-fg-2'}>{fmtRating(lead.avaliacao)}</span>
       {lead.numero_avaliacoes !== null && <span className="text-fg-4">({lead.numero_avaliacoes})</span>}
+    </span>
+  )
+}
+
+/** Sem site + bem avaliado + muitas avaliações: tem clientes e não tem site. */
+export function HotTag({ lead, className }: { lead: Lead; className?: string }) {
+  if (!isHot(lead)) return null
+  return (
+    <span
+      className={clsx('inline-flex shrink-0 items-center gap-1 rounded bg-gold/10 px-1.5 text-[10px] leading-4 font-medium text-gold', className)}
+      title="Sem site, bem avaliado e com muitas avaliações: tem clientes e ainda não tem site"
+    >
+      <Flame className="size-2.5" /> Alto potencial
     </span>
   )
 }

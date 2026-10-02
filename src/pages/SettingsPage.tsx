@@ -1,13 +1,16 @@
-import { Camera, Database, Download, LogOut, Trash2, Upload } from 'lucide-react'
+import { Bell, Camera, Database, Download, LogOut, Smartphone, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
+import { MessagesEditor } from '../components/MessagesEditor'
 import { RoteirosEditor } from '../components/RoteirosEditor'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
 import { supabase } from '../data/supabaseClient'
 import { formatDateTime } from '../lib/dates'
+import { getAvisosOn, notificationPermission, setAvisosOn, showSystemNotification } from '../lib/notify'
+import { isIos, isStandalone, useInstall } from '../lib/pwa'
 import { DEFAULT_STATUS2, getStatus2Options } from '../lib/status2'
 import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
@@ -50,6 +53,10 @@ export function SettingsPage() {
   const [confirmWipe, setConfirmWipe] = useState('')
   const [waDestino, setWaDestino] = useState(getWhatsAppDestino)
   const [busy, setBusy] = useState(false)
+  const [avisos, setAvisos] = useState(getAvisosOn)
+  const [permissao, setPermissao] = useState(notificationPermission)
+  const [maxTent, setMaxTent] = useState(String(settings.max_tentativas))
+  const [canInstall, install] = useInstall()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const saveProfile = async () => {
@@ -183,6 +190,118 @@ export function SettingsPage() {
           O WhatsApp Web abre sempre na mesma aba, trocando de conversa a cada lead. Para ligar, clique no ícone de telefone no topo da conversa. Se o
           seu WhatsApp Web não mostrar esse ícone, use o app do WhatsApp para Windows.
         </p>
+      </Card>
+
+      <Card
+        id="mensagens"
+        title="Mensagens de WhatsApp"
+        description="Modelos usados no botão Mensagem e no Disparo. Cada modelo pode ter várias variações — cada lead recebe uma, em rodízio, para os textos não saírem todos iguais."
+      >
+        <MessagesEditor />
+      </Card>
+
+      <Card id="tentativas" title="Novas tentativas automáticas" description="Quando a ligação não é atendida, o retorno já vem agendado para o dia seguinte, no período oposto (ligou de manhã → tenta à tarde).">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs">
+          <label className="flex cursor-pointer items-center gap-2 text-fg-2">
+            <input
+              type="checkbox"
+              className="accent-[var(--color-go)]"
+              checked={settings.auto_tentativas}
+              onChange={(e) => {
+                void saveSettings({ ...settings, auto_tentativas: e.target.checked })
+                toast(e.target.checked ? 'Novas tentativas automáticas ligadas.' : 'Novas tentativas automáticas desligadas.')
+              }}
+            />
+            Agendar a próxima tentativa sozinho
+          </label>
+          <label className="flex items-center gap-2 text-fg-2">
+            Sugerir encerrar depois de
+            <input
+              type="number"
+              min={2}
+              max={20}
+              className="input num h-7 w-14 px-2 text-center text-xs"
+              value={maxTent}
+              onChange={(e) => setMaxTent(e.target.value)}
+              onBlur={() => {
+                const n = Math.max(2, Math.min(20, Math.round(Number(maxTent) || 5)))
+                setMaxTent(String(n))
+                if (n !== settings.max_tentativas) void saveSettings({ ...settings, max_tentativas: n })
+              }}
+            />
+            tentativas seguidas sem resposta
+          </label>
+        </div>
+        <p className="mt-2.5 text-2xs leading-4 text-fg-3">
+          O retorno aparece no painel da ligação antes de salvar — dá para mudar o dia ou tirar. Leads que passam do limite saem da fila e aparecem em Hoje → “Sugestão: encerrar”.
+        </p>
+      </Card>
+
+      <Card id="avisos" title="Avisos de retorno e reunião" description="Na hora de um retorno marcado (e 10 minutos antes de uma reunião) aparece um aviso. Funciona enquanto o site ou o app estiver aberto.">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <label className="flex cursor-pointer items-center gap-2 text-fg-2">
+            <input
+              type="checkbox"
+              className="accent-[var(--color-go)]"
+              checked={avisos}
+              onChange={(e) => {
+                setAvisos(e.target.checked)
+                setAvisosOn(e.target.checked)
+              }}
+            />
+            Avisar neste dispositivo
+          </label>
+          {permissao === 'granted' ? (
+            <>
+              <span className="text-go">Notificações do sistema permitidas</span>
+              <Button size="xs" variant="ghost" onClick={() => showSystemNotification('Teste de aviso', 'Assim aparece um retorno na hora marcada.', 'teste')}>
+                Testar
+              </Button>
+            </>
+          ) : permissao === 'denied' ? (
+            <span className="text-fg-3">Notificações bloqueadas no navegador — libere no cadeado ao lado do endereço do site.</span>
+          ) : permissao === 'unsupported' ? (
+            <span className="text-fg-3">Este navegador não mostra notificações; o aviso aparece só dentro do site.</span>
+          ) : (
+            <Button
+              size="sm"
+              icon={<Bell className="size-3.5" />}
+              onClick={async () => {
+                const p = await Notification.requestPermission()
+                setPermissao(p)
+                if (p === 'granted') toast('Notificações ativadas.')
+              }}
+            >
+              Permitir notificações do sistema
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card id="app" title="Instalar como app" description="Abre em tela cheia, com ícone na tela inicial do celular ou na barra de tarefas do PC. Os dados continuam os mesmos.">
+        {isStandalone() ? (
+          <p className="text-xs text-go">Você já está usando o app instalado.</p>
+        ) : canInstall ? (
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Smartphone className="size-3.5" />}
+            onClick={async () => {
+              if (await install()) toast('App instalado.')
+            }}
+          >
+            Instalar agora
+          </Button>
+        ) : isIos() ? (
+          <p className="text-xs leading-5 text-fg-2">
+            No iPhone: abra este site no <span className="text-fg">Safari</span>, toque em <span className="text-fg">Compartilhar</span> e depois em{' '}
+            <span className="text-fg">Adicionar à Tela de Início</span>.
+          </p>
+        ) : (
+          <p className="text-xs leading-5 text-fg-2">
+            No Android (Chrome): menu <span className="text-fg">⋮</span> → <span className="text-fg">Instalar app</span> ou <span className="text-fg">Adicionar à tela inicial</span>. No PC (Chrome/Edge): ícone de instalar na barra de endereço.
+          </p>
+        )}
       </Card>
 
       <Card

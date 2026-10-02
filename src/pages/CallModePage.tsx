@@ -14,6 +14,7 @@ import { leadInsights, type InsightTone } from '../lib/script'
 import { buildTodayPlan, nextAction, todayQueue } from '../lib/selectors'
 import { useIndex, useLead, useMetrics, useToday } from '../store/derived'
 import { useApp } from '../store/useApp'
+import { useUi } from '../store/useUi'
 
 /** /ligacao sem id: abre o primeiro da fila atual ou da fila de hoje. */
 export function CallModeEntry() {
@@ -22,13 +23,14 @@ export function CallModeEntry() {
   const interactions = useApp((s) => s.interactions)
   const meetings = useApp((s) => s.meetings)
   const setQueue = useApp((s) => s.setQueue)
+  const max = useApp((s) => s.settings.max_tentativas)
   const index = useIndex()
   const today = useToday()
   const first = useMemo(() => {
     if (queue.ids.length) return { ids: queue.ids, label: queue.label }
-    const ids = todayQueue(buildTodayPlan(leads, interactions, index, meetings, today))
+    const ids = todayQueue(buildTodayPlan(leads, interactions, index, meetings, today, max))
     return { ids, label: 'Hoje' }
-  }, [queue, leads, interactions, meetings, index, today])
+  }, [queue, leads, interactions, meetings, index, today, max])
 
   useEffect(() => {
     if (!queue.ids.length && first.ids.length) setQueue(first.ids, first.label)
@@ -59,6 +61,7 @@ export function CallModePage() {
   const { registerCall, discardCall, toast } = useApp.getState()
   const openWhatsApp = useWhatsApp()
   const copyPhone = useCopyPhone()
+  const openMessage = useUi((s) => s.openMessage)
   const metrics = useMetrics()
   const index = useIndex()
   const [callId, setCallId] = useState<string | null>(null)
@@ -266,9 +269,9 @@ export function CallModePage() {
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
-              onClick={() => openWhatsApp(lead)}
+              onClick={() => openMessage({ leadId: lead.id })}
               disabled={!waTarget}
-              title="Abrir a conversa para mandar mensagem (não registra ligação)"
+              title="Mandar mensagem pronta no WhatsApp (não registra ligação)"
               className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-line bg-ink px-2.5 text-xs font-medium text-fg-2 transition-colors hover:border-line-strong hover:bg-hover hover:text-fg disabled:pointer-events-none disabled:border-line-soft disabled:text-fg-4 [&_svg]:size-3.5 [&_svg]:shrink-0"
             >
               <WhatsAppIcon />

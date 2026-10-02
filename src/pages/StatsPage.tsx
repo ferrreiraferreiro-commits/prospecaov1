@@ -1,9 +1,11 @@
 import clsx from 'clsx'
 import { RotateCcw } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
+import { BestHours } from '../components/BestHours'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Modal, Progress, StatusDot } from '../components/ui'
 import { formatDateKeyShort, formatDateTime, WEEKDAYS } from '../lib/dates'
+import { formatMoney, meetingStats } from '../lib/insights'
 import { getActiveRoteiro, getRoteiros } from '../lib/script'
 import { callsPerDay, statsByRoteiro } from '../lib/selectors'
 import { STATUSES } from '../lib/statuses'
@@ -15,6 +17,7 @@ const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%
 export function StatsPage() {
   const m = useMetrics()
   const interactions = useApp((s) => s.interactions)
+  const meetings = useApp((s) => s.meetings)
   const settings = useApp((s) => s.settings)
   const saveSettings = useApp((s) => s.saveSettings)
   const today = useToday()
@@ -28,6 +31,7 @@ export function StatsPage() {
     [interactions, settings, since],
   )
   const ativoId = getActiveRoteiro(settings).id
+  const vendas = useMemo(() => meetingStats(meetings, since), [meetings, since])
 
   const resetCounters = async () => {
     await saveSettings({ ...settings, metricas_desde: new Date().toISOString() })
@@ -145,6 +149,38 @@ export function StatsPage() {
           </section>
 
           <CallsChart days={days} today={today} />
+
+          <BestHours interactions={interactions} since={since} />
+
+          <section className="panel px-5 py-4">
+            <h2 className="mb-1 text-[13px] font-semibold">Reuniões e vendas</h2>
+            <p className="mb-3 text-2xs text-fg-3">
+              Registre como foi cada reunião (na tela Hoje ou na ficha do lead) para ver quantas viram venda.
+              {vendas.semResultado > 0 && <span className="text-gold"> {vendas.semResultado} sem resultado registrado.</span>}
+            </p>
+            <div className="mb-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+              <div>
+                <p className="text-2xs text-fg-3">Faturado</p>
+                <p className="num text-[24px] leading-8 font-semibold tracking-tight text-gold">{formatMoney(vendas.faturamento)}</p>
+              </div>
+              <div>
+                <p className="text-2xs text-fg-3">Taxa de fechamento</p>
+                <p className="num text-[24px] leading-8 font-semibold tracking-tight">{pct(vendas.taxaFechamento)}</p>
+              </div>
+              <div>
+                <p className="text-2xs text-fg-3">Ticket médio</p>
+                <p className="num text-[24px] leading-8 font-semibold tracking-tight">{vendas.ticketMedio === null ? '—' : formatMoney(vendas.ticketMedio)}</p>
+              </div>
+            </div>
+            <dl className="grid gap-x-10 sm:grid-cols-2">
+              <Stat label="Reuniões agendadas" value={vendas.agendadas} />
+              <Stat label="Realizadas" value={vendas.realizadas} />
+              <Stat label="Fecharam" value={vendas.fechadas} strong />
+              <Stat label="Não compareceram" value={vendas.naoCompareceu} />
+              <Stat label="Comparecimento" value={pct(vendas.taxaComparecimento)} />
+              <Stat label="Sem resultado" value={vendas.semResultado} />
+            </dl>
+          </section>
 
           <section className="panel px-5 py-4">
             <h2 className="mb-1 text-[13px] font-semibold">Desempenho por roteiro</h2>

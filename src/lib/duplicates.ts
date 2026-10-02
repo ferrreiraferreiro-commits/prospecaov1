@@ -23,11 +23,16 @@ export const DUP_REASON_LABEL: Record<DupReason, string> = {
   nome_endereco: 'mesmo nome e endereço',
 }
 
-/** Telefone comparável: últimos 10 dígitos (DDD + número), ignora DDI. */
+/**
+ * Telefone comparável: DDD + últimos 8 dígitos. Ignora o DDI e o nono dígito,
+ * então "(11) 97448-7416" e "(11) 7448-7416" contam como o mesmo número.
+ */
 export function phoneKey(tel: string | null): string | null {
-  const d = digits(tel)
+  let d = digits(tel)
   if (d.length < 8) return null
-  return d.slice(-10)
+  if (d.startsWith('55') && (d.length === 12 || d.length === 13)) d = d.slice(2)
+  if (d.length === 10 || d.length === 11) return `${d.slice(0, 2)}${d.slice(-8)}`
+  return d.slice(-8)
 }
 
 /** Identificador do lugar no Google Maps (place id / feature id), ignorando parâmetros de sessão. */

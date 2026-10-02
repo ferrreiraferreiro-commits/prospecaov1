@@ -1,3 +1,4 @@
+import { consecutiveNoAnswer } from './attempts'
 import { addDays, isoDateKey, sortTime, todayKey } from './dates'
 import { SEM_RESPOSTA, isContato } from './statuses'
 import type { Followup, Interaction, Lead, Meeting, StatusId } from './types'
@@ -200,10 +201,32 @@ export function matchesSearch(lead: Lead, query: string): boolean {
   return false
 }
 
-export type SortKey = 'importacao' | 'prioridade' | 'ultima_ligacao' | 'avaliacao' | 'empresa'
+// ---------------------------------------------------------------------------
+// Oportunidade: sem site + bem avaliado + muitas avaliações = cliente ideal
+// ---------------------------------------------------------------------------
+
+/** Pontos de oportunidade (0–8). Só usa dados do arquivo. */
+export function opportunityScore(lead: Pick<Lead, 'website' | 'avaliacao' | 'numero_avaliacoes'>): number {
+  let s = lead.website ? 0 : 3
+  const nota = lead.avaliacao
+  if (nota !== null) s += nota >= 4.5 ? 2 : nota >= 4 ? 1 : nota < 3.5 ? -1 : 0
+  const n = lead.numero_avaliacoes ?? 0
+  s += n >= 100 ? 3 : n >= 30 ? 2 : n >= 10 ? 1 : 0
+  return Math.max(0, s)
+}
+
+/** A partir daqui o lead ganha a etiqueta "Alto potencial" (ex.: sem site, nota 4,5+ e 30+ avaliações). */
+export const HOT_SCORE = 7
+
+export function isHot(lead: Pick<Lead, 'website' | 'avaliacao' | 'numero_avaliacoes'>): boolean {
+  return opportunityScore(lead) >= HOT_SCORE
+}
+
+export type SortKey = 'importacao' | 'prioridade' | 'oportunidade' | 'ultima_ligacao' | 'avaliacao' | 'empresa'
 
 export const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: 'prioridade', label: 'Prioridade' },
+  { id: 'oportunidade', label: 'Oportunidade (sem site + bem avaliado)' },
   { id: 'importacao', label: 'Ordem de importação' },
   { id: 'ultima_ligacao', label: 'Última ligação' },
   { id: 'avaliacao', label: 'Avaliação Google' },
@@ -231,7 +254,12 @@ export function sortLeads(leads: Lead[], key: SortKey, index: LeadIndex, today =
     case 'importacao':
       return arr.sort(importOrder)
     case 'prioridade':
-      return arr.sort((a, b) => priorityRank(a, index, today) - priorityRank(b, index, today) || importOrder(a, b))
+      // Mesmo nível de urgência: o lead com mais cara de cliente vem antes.
+      return arr.sort(
+        (a, b) => priorityRank(a, index, today) - priorityRank(b, index, today) || opportunityScore(b) - opportunityScore(a) || importOrder(a, b),
+      )
+    case 'oportunidade':
+      return arr.sort((a, b) => opportunityScore(b) - opportunityScore(a) || importOrder(a, b))
     case 'ultima_ligacao':
       return arr.sort((a, b) => (b.ultima_ligacao ?? '').localeCompare(a.ultima_ligacao ?? '') || importOrder(a, b))
     case 'avaliacao':
@@ -360,6 +388,8 @@ export interface TodayPlan {
   reunioesHoje: { lead: Lead; meeting: Meeting }[]
   proximasReunioes: { lead: Lead; meeting: Meeting }[]
   tentarNovamente: { lead: Lead; tentativas: number; ultima: string | null }[]
+  /** Muitas tentativas seguidas sem resposta: sugerir encerrar em vez de ligar de novo */
+  esgotados: { lead: Lead; tentativas: number; ultima: string | null }[]
   novos: Lead[]
   feitasHoje: { lead: Lead; call: Interaction }[]
 }
@@ -370,6 +400,8 @@ export function buildTodayPlan(
   index: LeadIndex,
   meetings: Meeting[],
   today = todayKey(),
+  /** Tentativas seguidas sem resposta a partir das quais o lead sai da fila */
+  maxTentativas = Infinity,
 ): TodayPlan {
   const byId = new Map(leads.map((l) => [l.id, l]))
   const followups: TodayPlan['followups'] = []
@@ -392,6 +424,7 @@ export function buildTodayPlan(
 
   const withFollowupToday = new Set(followups.map((f) => f.lead.id))
   const tentarNovamente: TodayPlan['tentarNovamente'] = []
+  const esgotados: TodayPlan['esgotados'] = []
   const novos: Lead[] = []
   for (const lead of leads) {
     if (withFollowupToday.has(lead.id)) continue
@@ -400,11 +433,17 @@ export function buildTodayPlan(
     if (ultima && isoDateKey(ultima) === today) continue // já ligou hoje → está em "Feitas hoje"
     if (lead.status === 'novo') novos.push(lead)
     else if (SEM_RESPOSTA.includes(lead.status)) {
-      tentarNovamente.push({ lead, tentativas: index.callsByLead.get(lead.id)?.length ?? 0, ultima })
+      const calls = index.callsByLead.get(lead.id) ?? []
+      const item = { lead, tentativas: calls.length, ultima }
+      if (consecutiveNoAnswer(calls) >= maxTentativas) esgotados.push(item)
+      else tentarNovamente.push(item)
     }
   }
-  novos.sort((a, b) => a.created_at.localeCompare(b.created_at))
-  tentarNovamente.sort((a, b) => a.tentativas - b.tentativas || (a.ultima ?? '').localeCompare(b.ultima ?? ''))
+  novos.sort((a, b) => opportunityScore(b) - opportunityScore(a) || a.created_at.localeCompare(b.created_at))
+  tentarNovamente.sort(
+    (a, b) => a.tentativas - b.tentativas || opportunityScore(b.lead) - opportunityScore(a.lead) || (a.ultima ?? '').localeCompare(b.ultima ?? ''),
+  )
+  esgotados.sort((a, b) => b.tentativas - a.tentativas)
 
   const feitasHoje: TodayPlan['feitasHoje'] = []
   for (const i of interactions) {
@@ -414,7 +453,7 @@ export function buildTodayPlan(
   }
   feitasHoje.sort((a, b) => b.call.created_at.localeCompare(a.call.created_at))
 
-  return { followups, reunioesHoje, proximasReunioes, tentarNovamente, novos, feitasHoje }
+  return { followups, reunioesHoje, proximasReunioes, tentarNovamente, esgotados, novos, feitasHoje }
 }
 
 /** Ordem da fila de ligações do dia: retornos → tentar novamente → novos. */
