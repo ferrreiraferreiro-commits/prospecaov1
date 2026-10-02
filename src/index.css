@@ -1,0 +1,181 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #08090b;
+  --color-panel: #101114;
+  --color-raised: #15161a;
+  --color-hover: #1b1c21;
+  --color-line: #23252a;
+  --color-line-soft: #1a1b1f;
+  --color-line-strong: #33363d;
+  /* Camadas sutis: branco no escuro, preto no claro (bg-tint/[0.04]) */
+  --color-tint: #ffffff;
+
+  --color-fg: #ecedef;
+  --color-fg-2: #a4a8b0;
+  --color-fg-3: #6f747d;
+  --color-fg-4: #4c5058;
+
+  --color-gold: #e3b341;
+  --color-go: #3fb97f;
+  --color-go-strong: #2fa56d;
+  --color-accent: #5b8def;
+  --color-bad: #e5534b;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Tema claro: mesmos tokens com outros valores. Os tons claros de texto do
+   Tailwind (200/300/400) viram os escuros (800/700/600) para ter contraste no branco.
+   --------------------------------------------------------------------------- */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-ink: #f3f4f6;
+  --color-panel: #ffffff;
+  --color-raised: #ffffff;
+  --color-hover: #eceef1;
+  --color-line: #d9dce1;
+  --color-line-soft: #e6e8ec;
+  --color-line-strong: #c3c7ce;
+  --color-tint: #000000;
+
+  --color-fg: #15171c;
+  --color-fg-2: #454a54;
+  --color-fg-3: #6a707b;
+  --color-fg-4: #9ba1ab;
+
+  --color-gold: #a87908;
+  --color-go: #1c9a60;
+  --color-go-strong: #168552;
+  --color-accent: #2f6fe0;
+  --color-bad: #d13b32;
+
+  --color-sky-200: oklch(44.3% 0.11 240.79);
+  --color-sky-300: oklch(50% 0.134 242.749);
+  --color-sky-400: oklch(58.8% 0.158 241.966);
+  --color-blue-200: oklch(42.4% 0.199 265.638);
+  --color-blue-300: oklch(48.8% 0.243 264.376);
+  --color-blue-400: oklch(54.6% 0.245 262.881);
+  --color-blue-500: oklch(54.6% 0.245 262.881);
+  --color-emerald-300: oklch(50.8% 0.118 165.612);
+  --color-emerald-400: oklch(59.6% 0.145 163.225);
+  --color-teal-300: oklch(51.1% 0.096 186.391);
+  --color-teal-400: oklch(60% 0.118 184.704);
+  --color-orange-300: oklch(55.3% 0.195 38.402);
+  --color-orange-400: oklch(64.6% 0.222 41.116);
+  --color-red-300: oklch(50.5% 0.213 27.518);
+  --color-red-400: oklch(57.7% 0.245 27.325);
+  --color-red-500: oklch(57.7% 0.245 27.325);
+  --color-amber-300: oklch(55.5% 0.163 48.998);
+  --color-amber-400: oklch(66.6% 0.179 58.318);
+  --color-yellow-200: oklch(47.6% 0.114 61.907);
+  --color-yellow-300: oklch(55.4% 0.135 66.442);
+  --color-yellow-400: oklch(68.1% 0.162 75.834);
+  --color-zinc-300: oklch(37% 0.013 285.805);
+  --color-zinc-400: oklch(55.2% 0.016 285.938);
+}
+
+:root[data-theme='light'] body {
+  -webkit-font-smoothing: auto;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-ink text-fg font-sans text-[13px] leading-5;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  ::selection {
+    background: rgb(91 141 239 / 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid rgb(91 141 239 / 0.7);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  input,
+  textarea,
+  select {
+    @apply text-fg;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-fg-4;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a2c32 transparent;
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .input {
+    @apply h-8 w-full rounded-md border border-line bg-ink px-2.5 text-[13px] transition-colors outline-none hover:border-[#2e3036] focus:border-accent/60 focus:ring-2 focus:ring-accent/15;
+  }
+  textarea.input {
+    @apply h-auto py-2 leading-5;
+  }
+  .label {
+    @apply mb-1 block text-2xs font-medium text-fg-3;
+  }
+  .panel {
+    @apply rounded-[10px] border border-line-soft bg-panel;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+.anim-rise {
+  animation: rise 160ms ease-out;
+}
+.anim-slide {
+  animation: slide-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.anim-fade {
+  animation: fade 140ms ease-out;
+}

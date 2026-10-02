@@ -1,0 +1,14 @@
+node_modules
+dist
+*.log
+*.tsbuildinfo
+
+# Variáveis de ambiente (chaves e token da Vercel) — só o exemplo vai para o git
+.env*
+!.env.example
+
+# Vercel CLI
+.vercel
+
+# Contém senhas: não versionar
+supabase/criar_usuarios.sql

@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "app", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5180 },
+    {
+      "name": "app-local-mode",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5181", "--strictPort"],
+      "env": { "VITE_SUPABASE_URL": "", "VITE_SUPABASE_ANON_KEY": "" },
+      "port": 5181
+    }
+  ]
+}
