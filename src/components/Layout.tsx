@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ChartColumn, CheckCircle2, Headphones, Info, LayoutList, Send, Settings, Sun, TriangleAlert, Upload, X } from 'lucide-react'
+import { ChartColumn, CheckCircle2, Headphones, Info, LayoutList, Settings, Sun, TriangleAlert, Upload, X } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useMetrics } from '../store/derived'
 import { useApp } from '../store/useApp'
@@ -15,7 +15,6 @@ const NAV = [
   { to: '/', label: 'Central', icon: LayoutList, end: true },
   { to: '/hoje', label: 'Hoje', icon: Sun },
   { to: '/ligacao', label: 'Ligação', icon: Headphones },
-  { to: '/disparo', label: 'Disparo', icon: Send },
   { to: '/estatisticas', label: 'Números', icon: ChartColumn },
   { to: '/configuracoes', label: 'Ajustes', icon: Settings },
 ]

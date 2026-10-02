@@ -34,7 +34,6 @@ Importe o repositório na Vercel (framework: Vite). Defina as duas variáveis `V
 - **Hoje**: retornos do dia (e atrasados), tentar novamente, novos, reuniões e o que já foi feito hoje. "Começar ligações" abre a fila no Modo Ligação.
 - **Modo Ligação**: empresa à esquerda, roteiro (teleprompter, `↑`/`↓`) e objeções no centro, anotações e resultado à direita. "Salvar e próximo lead" segue a fila.
 - **Mensagens**: modelos de WhatsApp com variáveis ({saudacao}, {responsavel}, {empresa}…) e variações em rodízio. O WhatsApp abre com o texto pronto; quem envia é você. Depois de "Pediu WhatsApp" o app oferece mandar a mensagem.
-- **Disparo**: disparo assistido — fila de leads filtrada, uma mensagem por vez, espera sorteada entre envios e limite por dia (sem robô, para não arriscar o número).
 - **Novas tentativas**: depois de "Não atendeu" a próxima tentativa já vem agendada (dia seguinte, período oposto). Depois de N tentativas seguidas sem resposta, o lead sai da fila e aparece em "Sugestão: encerrar".
 - **Reuniões**: resultado (fechou com valor, realizada, não fechou, não compareceu); Números mostra faturamento, ticket médio e taxa de fechamento.
 - **Números**: inclui o melhor horário para ligar (taxa de atendimento por dia × hora).

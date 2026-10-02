@@ -195,7 +195,7 @@ export function SettingsPage() {
       <Card
         id="mensagens"
         title="Mensagens de WhatsApp"
-        description="Modelos usados no botão Mensagem e no Disparo. Cada modelo pode ter várias variações — cada lead recebe uma, em rodízio, para os textos não saírem todos iguais."
+        description="Modelos usados no botão Mensagem. Cada modelo pode ter várias variações — cada lead recebe uma, em rodízio, para os textos não saírem todos iguais."
       >
         <MessagesEditor />
       </Card>

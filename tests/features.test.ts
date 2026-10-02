@@ -3,7 +3,6 @@ import { LocalRepository } from '../src/data/localRepository'
 import { consecutiveNoAnswer, nextAttempt } from '../src/lib/attempts'
 import { cnpjMatchesLead, extractCnpj, formatCnpj, isValidCnpj, leadCnpj, parseCnpjResponse, pickResponsavel } from '../src/lib/cnpj'
 import { whatsappChatUrl } from '../src/lib/contact'
-import { buildAudience, DEFAULT_AUDIENCE, messagesToday, randomDelay } from '../src/lib/disparo'
 import { phoneKey } from '../src/lib/duplicates'
 import { contactByHour, meetingStats, needsResult } from '../src/lib/insights'
 import { fillMessage, pickVariation, responsavelDoLead, saudacao } from '../src/lib/messages'
@@ -237,30 +236,6 @@ describe('avisos', () => {
     const meeting: Meeting = { id: 'm', lead_id: 'a', data: TODAY, horario: '16:00', contato: 'Carla', observacao: null, created_at: '' }
     expect(dueReminders([], [meeting], leads, new Set(), local(TODAY, '15:49'))).toHaveLength(0)
     expect(dueReminders([], [meeting], leads, new Set(), local(TODAY, '15:51'))[0].title).toContain('Reunião às 16:00')
-  })
-})
-
-describe('disparo assistido', () => {
-  it('monta o público sem bloqueados, sem número, sem repetidos e sem quem recebeu há pouco', () => {
-    const leads = [
-      lead('a', { status: 'pediu_whatsapp', whatsapp: '5511974487416', avaliacao: 4.9, numero_avaliacoes: 80 }),
-      lead('b', { status: 'pediu_whatsapp', telefone: '(11) 7448-7416' }), // mesmo número de "a" sem o 9
-      lead('c', { status: 'pediu_whatsapp' }), // sem número
-      lead('d', { status: 'pediu_whatsapp', telefone: '11988887777' }), // recebeu ontem
-      lead('e', { status: 'nao_tem_interesse', telefone: '11977776666' }),
-      lead('f', { status: 'pediu_whatsapp', telefone: '11966665555' }),
-    ]
-    const msg: Interaction = { id: 'm', lead_id: 'd', tipo: 'mensagem', status: null, falei_com: null, cargo: null, observacao: 'oi', created_at: local('2026-09-30').toISOString() }
-    const aud = buildAudience(leads, [msg], { ...DEFAULT_AUDIENCE, publico: 'todos' }, local(TODAY))
-    expect(aud.leads.map((l) => l.id)).toEqual(['a', 'f'])
-    expect(aud).toMatchObject({ semNumero: 1, recentes: 1, repetidos: 1, bloqueados: 1 })
-    expect(messagesToday([msg], local('2026-09-30', '18:00'))).toBe(1)
-  })
-
-  it('espera sorteada fica entre o mínimo e o máximo', () => {
-    expect(randomDelay(45, 120, () => 0)).toBe(45)
-    expect(randomDelay(45, 120, () => 1)).toBe(120)
-    expect(randomDelay(120, 45, () => 0.5)).toBe(83)
   })
 })
 

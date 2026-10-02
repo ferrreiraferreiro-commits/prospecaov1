@@ -173,8 +173,6 @@ export interface Settings {
   auto_tentativas: boolean
   /** Tentativas seguidas sem resposta antes de sugerir encerrar */
   max_tentativas: number
-  /** Limite diário do disparo assistido */
-  disparo_limite_diario: number
 }
 
 export interface Snapshot {
@@ -200,5 +198,4 @@ export const DEFAULT_SETTINGS: Settings = {
   mensagens: null,
   auto_tentativas: true,
   max_tentativas: 5,
-  disparo_limite_diario: 30,
 }
