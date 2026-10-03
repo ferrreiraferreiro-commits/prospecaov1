@@ -185,38 +185,83 @@
   animation: fade 140ms ease-out;
 }
 
-/* Mapa (Leaflet) com a cara do app */
-.xs-map.leaflet-container {
+/* Mapa (MapLibre) com a cara do app */
+.xs-map {
   background: var(--color-ink);
-  font-family: inherit;
 }
-.xs-map .leaflet-control-zoom a {
+.xs-map .maplibregl-ctrl-group {
   background: var(--color-raised);
-  color: var(--color-fg);
-  border-color: var(--color-line);
+  border: 1px solid var(--color-line);
+  box-shadow: none;
 }
-.xs-map .leaflet-control-zoom a:hover {
-  background: var(--color-hover);
+.xs-map .maplibregl-ctrl-group button + button {
+  border-top-color: var(--color-line);
 }
-.xs-map .leaflet-control-attribution {
+.xs-map .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: var(--xs-map-icon-filter, invert(1) brightness(0.85));
+}
+:root[data-theme='light'] .xs-map {
+  --xs-map-icon-filter: none;
+}
+.xs-map .maplibregl-ctrl-scale {
+  background: color-mix(in srgb, var(--color-ink) 70%, transparent);
+  border-color: var(--color-fg-3);
+  color: var(--color-fg-2);
+  font-size: 10px;
+}
+.xs-map .maplibregl-ctrl-attrib {
   background: color-mix(in srgb, var(--color-ink) 80%, transparent);
   color: var(--color-fg-4);
-  font-size: 9px;
+  font-size: 10px;
 }
-.xs-map .leaflet-control-attribution a {
+.xs-map .maplibregl-ctrl-attrib a {
   color: var(--color-fg-3);
 }
-.xs-map .leaflet-tooltip {
+.xs-map .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+.xs-popup .maplibregl-popup-content {
   background: var(--color-raised);
   color: var(--color-fg);
   border: 1px solid var(--color-line);
-  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.6);
+  border-radius: 8px;
+  padding: 6px 9px;
   font-size: 11px;
+  line-height: 15px;
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.6);
 }
-.xs-map .leaflet-tooltip-top::before {
-  border-top-color: var(--color-line);
+.xs-popup .maplibregl-popup-content span {
+  color: var(--color-fg-3);
+}
+.xs-popup .maplibregl-popup-tip {
+  display: none;
 }
 
-:root:not([data-theme='light']) .xs-map-tiles {
-  filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.92) saturate(0.6);
+/* Pino do centro: arrastável */
+.xs-pin {
+  width: 30px;
+  height: 30px;
+  cursor: grab;
+  display: grid;
+  place-items: center;
+}
+.xs-pin:active {
+  cursor: grabbing;
+}
+.xs-pin span {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow:
+    0 0 0 6px rgb(37 99 235 / 0.28),
+    0 4px 14px rgb(0 0 0 / 0.45);
+  transition: transform 120ms ease-out;
+}
+.xs-pin:hover span {
+  transform: scale(1.12);
+}
+.xs-pin.is-locked {
+  cursor: default;
 }

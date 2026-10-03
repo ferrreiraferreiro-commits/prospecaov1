@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { lazy, useEffect, useState } from 'react'
+import { lazy, useEffect, useState, type ComponentType } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LogoMark } from './components/Brand'
 import { Layout } from './components/Layout'
@@ -16,17 +16,49 @@ import type { Repository } from './data/repository'
 import { useApp } from './store/useApp'
 import { useBiz } from './store/useBiz'
 
+/**
+ * Depois de uma publicação nova, os arquivos antigos somem e a tela aberta falha ao
+ * carregar outra página. Nesse caso recarrega uma vez para pegar a versão nova.
+ */
+const RELOAD_KEY = 'xs-prospeccao:recarregou'
+
+function lazyPage<T extends ComponentType>(load: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    load()
+      .then((m) => {
+        try {
+          sessionStorage.removeItem(RELOAD_KEY)
+        } catch {
+          /* sem armazenamento */
+        }
+        return m
+      })
+      .catch((err) => {
+        let reloaded = true
+        try {
+          reloaded = sessionStorage.getItem(RELOAD_KEY) === '1'
+          if (!reloaded) sessionStorage.setItem(RELOAD_KEY, '1')
+        } catch {
+          /* sem armazenamento: não arrisca recarregar em loop */
+        }
+        if (reloaded) throw err
+        window.location.reload()
+        return new Promise<never>(() => {})
+      }),
+  )
+}
+
 // Telas carregadas sob demanda (o mapa e a gestão não pesam na abertura do app)
-const ClientesPage = lazy(() => import('./pages/ClientesPage').then((m) => ({ default: m.ClientesPage })))
-const DisparoPage = lazy(() => import('./pages/DisparoPage').then((m) => ({ default: m.DisparoPage })))
-const FinanceiroPage = lazy(() => import('./pages/FinanceiroPage').then((m) => ({ default: m.FinanceiroPage })))
-const FunisPage = lazy(() => import('./pages/FunisPage').then((m) => ({ default: m.FunisPage })))
-const MapsPage = lazy(() => import('./pages/MapsPage').then((m) => ({ default: m.MapsPage })))
-const PrecificacaoPage = lazy(() => import('./pages/PrecificacaoPage').then((m) => ({ default: m.PrecificacaoPage })))
-const ProjetosPage = lazy(() => import('./pages/ProjetosPage').then((m) => ({ default: m.ProjetosPage })))
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
-const StatsPage = lazy(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
-const WhatsAppPage = lazy(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
+const ClientesPage = lazyPage(() => import('./pages/ClientesPage').then((m) => ({ default: m.ClientesPage })))
+const DisparoPage = lazyPage(() => import('./pages/DisparoPage').then((m) => ({ default: m.DisparoPage })))
+const FinanceiroPage = lazyPage(() => import('./pages/FinanceiroPage').then((m) => ({ default: m.FinanceiroPage })))
+const FunisPage = lazyPage(() => import('./pages/FunisPage').then((m) => ({ default: m.FunisPage })))
+const MapsPage = lazyPage(() => import('./pages/MapsPage').then((m) => ({ default: m.MapsPage })))
+const PrecificacaoPage = lazyPage(() => import('./pages/PrecificacaoPage').then((m) => ({ default: m.PrecificacaoPage })))
+const ProjetosPage = lazyPage(() => import('./pages/ProjetosPage').then((m) => ({ default: m.ProjetosPage })))
+const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
+const WhatsAppPage = lazyPage(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
 
 function Routed() {
   return (

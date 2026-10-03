@@ -3,7 +3,7 @@ import { Check, CircleStop, Crosshair, Download, ExternalLink, Globe, LoaderCirc
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/kit'
-import { MapView, type MapPoint } from '../components/MapView'
+import { getMapStyle, MapView, saveMapStyle, type MapPoint, type MapStyle } from '../components/MapView'
 import { MotorOffline } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, InstagramIcon, Progress, Segmented } from '../components/ui'
@@ -69,6 +69,7 @@ export function MapsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [importing, setImporting] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
+  const [mapStyle, setMapStyle] = useState<MapStyle>(getMapStyle)
   const lastRun = useRef<string | null>(null)
 
   useEffect(() => {
@@ -234,7 +235,7 @@ export function MapsPage() {
             </div>
             <p className="flex items-center gap-1.5 text-2xs text-fg-3">
               <Crosshair className="size-3" />
-              {form.point ? `${form.point.label} · ${form.point.lat.toFixed(4)}, ${form.point.lng.toFixed(4)}` : 'Ou clique no mapa para escolher o centro.'}
+              {form.point ? `${form.point.label} · ${form.point.lat.toFixed(4)}, ${form.point.lng.toFixed(4)}` : 'Ou clique no mapa / arraste o pino azul para escolher o centro.'}
             </p>
           </div>
 
@@ -354,9 +355,23 @@ export function MapsPage() {
 
         {/* Mapa + progresso + resultados */}
         <div className="min-w-0 space-y-3">
-          <section className="panel relative h-[380px] overflow-hidden p-1 sm:h-[440px]">
-            <MapView center={center} radiusKm={form.radiusKm} results={results} onPick={(p) => void pick(p)} locked={active} />
-            <div className="pointer-events-none absolute right-3 bottom-3 z-[500] flex gap-2 rounded-md bg-ink/85 px-2.5 py-1.5 text-[10px] text-fg-2 backdrop-blur">
+          <section className="panel relative h-[380px] overflow-hidden p-1 sm:h-[520px]">
+            <MapView center={center} radiusKm={form.radiusKm} results={results} onPick={(p) => void pick(p)} locked={active} mapStyle={mapStyle} />
+            <div className="absolute top-3 right-3 z-10 flex rounded-md border border-line bg-panel/90 p-0.5 text-2xs font-medium backdrop-blur">
+              {(['claro', 'escuro'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setMapStyle(s)
+                    saveMapStyle(s)
+                  }}
+                  className={clsx('rounded px-2 py-1 capitalize', mapStyle === s ? 'bg-blue-600 text-white' : 'text-fg-3 hover:text-fg')}
+                >
+                  Mapa {s}
+                </button>
+              ))}
+            </div>
+            <div className="pointer-events-none absolute top-12 right-3 z-10 flex gap-2 rounded-md bg-ink/85 px-2.5 py-1.5 text-[10px] text-fg-2 backdrop-blur">
               <Legend color="#3fb97f">Sem site</Legend>
               <Legend color="#60a5fa">Com site</Legend>
               <Legend color="#a1a1aa">Já na base</Legend>
