@@ -88,7 +88,7 @@ export function CallScript({ lead, settings }: { lead: Lead; settings: Settings 
               ))}
             </select>
           ) : (
-            <Link to="/configuracoes#roteiros" className="text-2xs text-fg-3 hover:text-fg" title="Criar outros roteiros para testar">
+            <Link to="/roteiros" className="text-2xs text-fg-3 hover:text-fg" title="Criar outros roteiros para testar">
               {ativo.nome} · criar outro
             </Link>
           )}

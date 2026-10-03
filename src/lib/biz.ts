@@ -1,5 +1,5 @@
 /**
- * Gestão (módulos vindos do Caldeira Nexus): clientes, pagamentos, projetos,
+ * Gestão: clientes, pagamentos, projetos,
  * financeiro, precificação e funis de mensagens.
  */
 

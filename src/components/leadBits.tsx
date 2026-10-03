@@ -215,7 +215,7 @@ export function Status2Menu({ lead, className, alwaysVisible }: { lead: Lead; cl
             </MenuItem>
           )}
           <div className="my-1 border-t border-line-soft" />
-          <Link to="/configuracoes#status2" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-fg-3 hover:bg-tint/[0.06] hover:text-fg">
+          <Link to="/roteiros?aba=status" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-fg-3 hover:bg-tint/[0.06] hover:text-fg">
             <Settings2 className="size-3" /> Editar opções
           </Link>
         </div>

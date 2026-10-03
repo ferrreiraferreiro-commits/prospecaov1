@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
 import { MessagesEditor } from '../components/MessagesEditor'
-import { RoteirosEditor } from '../components/RoteirosEditor'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
@@ -11,16 +10,13 @@ import { supabase } from '../data/supabaseClient'
 import { formatDateTime } from '../lib/dates'
 import { getAvisosOn, notificationPermission, setAvisosOn, showSystemNotification } from '../lib/notify'
 import { isIos, isStandalone, useInstall } from '../lib/pwa'
-import { DEFAULT_STATUS2, getStatus2Options } from '../lib/status2'
 import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
-import { LogoMark } from '../components/Brand'
 import { BIZ_TABLES, emptyBiz, type BizSnapshot } from '../lib/biz'
 import { DEFAULT_MOTOR_URL, getMotorUrl, setMotorUrl, useMotor } from '../lib/motor'
 import { useBiz } from '../store/useBiz'
 
-const NL = '\n'
 
 function Card({ id, title, description, children, actions }: { id?: string; title: string; description?: string; children: ReactNode; actions?: ReactNode }) {
   return (
@@ -47,11 +43,10 @@ export function SettingsPage() {
   const [nome, setNome] = useState(settings.nome_vendedor)
   const [servico, setServico] = useState(settings.servico)
   const [meta, setMeta] = useState(String(settings.meta_diaria))
-  const [status2Text, setStatus2Text] = useState(() => getStatus2Options(settings).join(NL))
   const avatarRef = useRef<HTMLInputElement>(null)
   const { hash } = useLocation()
 
-  // Links como /configuracoes#roteiros levam direto à seção
+  // Links como /configuracoes#motor levam direto à seção
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [hash])
@@ -77,13 +72,6 @@ export function SettingsPage() {
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha ao trocar a foto.', 'error')
     }
-  }
-
-  const saveStatus2 = async () => {
-    const opcoes = [...new Set(status2Text.split(NL).map((l) => l.trim()).filter(Boolean))]
-    await saveSettings({ ...settings, status2_opcoes: opcoes.length ? opcoes : null })
-    setStatus2Text((opcoes.length ? opcoes : DEFAULT_STATUS2).join(NL))
-    toast('Opções do Status 2 salvas.')
   }
 
   const exportBackup = () => {
@@ -137,7 +125,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="Ajustes" subtitle="Perfil, roteiros, mensagens, Motor XS e backup." />
+      <PageHeader title="Ajustes" subtitle="Perfil, mensagens, avisos, Motor XS e backup." />
 
       <Card id="perfil" title="Meu perfil" description="O primeiro nome entra no roteiro como {nome}." actions={<Button variant="primary" size="sm" onClick={saveProfile}>Salvar perfil</Button>}>
         <div className="mb-4 flex items-center gap-3">
@@ -314,27 +302,6 @@ export function SettingsPage() {
         )}
       </Card>
 
-      <Card
-        id="roteiros"
-        title="Roteiros"
-        description="Crie versões diferentes para testar e escolha qual usar. Variáveis: {nome}, {servico}, {empresa}, {cidade}, {nicho}. Linhas começando com “- ” viram lista."
-      >
-        <RoteirosEditor />
-      </Card>
-
-      <Card
-        id="status2"
-        title="Status 2"
-        description="Segunda categoria de status, usada junto com o status principal. Uma opção por linha."
-        actions={
-          <Button variant="primary" size="sm" onClick={saveStatus2}>
-            Salvar opções
-          </Button>
-        }
-      >
-        <textarea className="input resize-y" rows={8} value={status2Text} onChange={(e) => setStatus2Text(e.target.value)} aria-label="Opções do Status 2" />
-      </Card>
-
       <Card title="Importações" description={`${imports.length} ${imports.length === 1 ? 'arquivo importado' : 'arquivos importados'}`}>
         {imports.length === 0 ? (
           <p className="text-xs text-fg-4">Nenhuma importação ainda.</p>
@@ -403,18 +370,6 @@ export function SettingsPage() {
 
       <MotorCard />
 
-      <Card id="sobre" title="Sobre o XS Prospecção">
-        <div className="flex items-start gap-3">
-          <LogoMark size={36} />
-          <div className="space-y-1.5 text-xs text-fg-2">
-            <p>
-              Prospecção por ligação (Central, Hoje, Modo Ligação) unida aos módulos do <strong className="text-fg">Caldeira Nexus</strong>: busca no Google Maps, funis e disparo de
-              WhatsApp, clientes, projetos, financeiro e precificação.
-            </p>
-            <p className="text-fg-3">Caldeira Nexus © Luis Caldeira — reconstruído e integrado ao XS Prospecção com autorização do autor.</p>
-          </div>
-        </div>
-      </Card>
     </div>
   )
 }

@@ -12,7 +12,7 @@ export interface MapPoint {
 
 /** Mapa vetorial gratuito (OpenFreeMap, dados do OpenStreetMap), sem chave de API. */
 const STYLE = {
-  /** Colorido e legível, o mesmo do Caldeira Nexus */
+  /** Colorido e legível */
   claro: 'https://tiles.openfreemap.org/styles/liberty',
   escuro: 'https://tiles.openfreemap.org/styles/dark',
 }
