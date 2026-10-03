@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import {
+  AlarmClock,
   BadgeDollarSign,
   Calculator,
   ChartColumn,
@@ -65,6 +66,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/funis', label: 'Funis', icon: MessagesSquare },
       { to: '/disparo', label: 'Disparo', icon: Send },
+      { to: '/agendamentos', label: 'Agendamentos', icon: AlarmClock },
       { to: '/whatsapp', label: 'Conexão', icon: Smartphone },
     ],
   },

@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { CalendarCheck, CalendarClock, Check, Copy, Copy as CopyIcon, Headphones, MessageCircle, PhoneOutgoing, Trash2, X } from 'lucide-react'
+import { AlarmClock, CalendarCheck, CalendarClock, Check, Copy, Copy as CopyIcon, Headphones, MessageCircle, PhoneOutgoing, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatPhone, instagramHandle, instagramHref, mapsHref, telHref, websiteHref, websiteLabel, whatsappDigits, whatsappTarget } from '../lib/contact'
@@ -172,6 +172,19 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           </Button>
           <Button variant="secondary" size="sm" icon={<MessageCircle className="size-3.5" />} disabled={!whatsappTarget(lead)} onClick={() => openMessage({ leadId: lead.id })}>
             Mensagem
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<AlarmClock className="size-3.5" />}
+            disabled={!whatsappTarget(lead)}
+            title="Deixar uma mensagem de WhatsApp marcada para um dia e hora"
+            onClick={() => {
+              onClose()
+              navigate(`/agendamentos?lead=${lead.id}`)
+            }}
+          >
+            Agendar
           </Button>
           <ClientLink lead={lead} />
           <QuickActions lead={lead} className="ml-auto" size="md" />

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { stepDelayMs, type Funnel } from './biz'
 import { digits } from './contact'
 import { fillMessage, saudacao } from './messages'
+import { syncAgenda } from './agenda'
 import { motorFetch, useMotor } from './motor'
 import type { Lead, Settings } from './types'
 import { useApp } from '../store/useApp'
@@ -148,6 +149,7 @@ export function useDisparoSync() {
       busy = true
       try {
         await syncCampaigns()
+        await syncAgenda()
       } catch {
         /* motor ocupado ou desligado: tenta de novo depois */
       } finally {

@@ -56,6 +56,7 @@ const FunisPage = lazyPage(() => import('./pages/FunisPage').then((m) => ({ defa
 const MapsPage = lazyPage(() => import('./pages/MapsPage').then((m) => ({ default: m.MapsPage })))
 const PrecificacaoPage = lazyPage(() => import('./pages/PrecificacaoPage').then((m) => ({ default: m.PrecificacaoPage })))
 const ProjetosPage = lazyPage(() => import('./pages/ProjetosPage').then((m) => ({ default: m.ProjetosPage })))
+const AgendamentosPage = lazyPage(() => import('./pages/AgendamentosPage').then((m) => ({ default: m.AgendamentosPage })))
 const RoteirosPage = lazyPage(() => import('./pages/RoteirosPage').then((m) => ({ default: m.RoteirosPage })))
 const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
@@ -75,6 +76,7 @@ function Routed() {
           <Route path="maps" element={<MapsPage />} />
           <Route path="funis" element={<FunisPage />} />
           <Route path="disparo" element={<DisparoPage />} />
+          <Route path="agendamentos" element={<AgendamentosPage />} />
           <Route path="whatsapp" element={<WhatsAppPage />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />

@@ -64,6 +64,9 @@ export interface MotorHealth {
   whatsapp: { status: WaStatus; user: { id: string; name: string } | null }
   maps: { active: boolean; phase: string }
   disparo: { running: number }
+  agenda?: { pendentes: number }
+  /** O motor está impedindo o Windows de suspender */
+  acordado?: boolean
 }
 
 interface MotorState {

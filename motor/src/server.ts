@@ -5,12 +5,14 @@
  * Baseado no Caldeira Nexus, de Luis Caldeira, reconstruído com a autorização dele.
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
+import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
 import { createCampaign, deleteCampaign, getCampaign, listCampaigns, markSynced, pauseCampaign, runningCount, sentPhones, startCampaign, summary } from './disparo.js'
 import { ackMaps, chromeExecutable, geocode, getMapsState, reverseGeocode, startMaps, stopMaps } from './maps.js'
+import { keepAwakeActive } from './keepAwake.js'
 import { storageDir } from './store.js'
 import { connect, disconnect, getWa, resumeStoredSession, sendText, shutdown } from './whatsapp.js'
 
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 const PORT = Number(process.env.XS_PORT ?? 3077)
 
 const EXTRA_ORIGINS = (process.env.XS_ORIGINS ?? '')
@@ -73,6 +75,8 @@ app.get(
       whatsapp: { status: wa.status, user: wa.user },
       maps: { active: maps.active, phase: maps.phase },
       disparo: { running: runningCount() },
+      agenda: { pendentes: agendaPending() },
+      acordado: keepAwakeActive(),
     }
   }),
 )
@@ -131,6 +135,14 @@ app.post('/disparo/campanhas/:id/pausar', wrap((req) => pauseCampaign(String(req
 app.post('/disparo/campanhas/:id/sincronizado', wrap((req) => markSynced(String(req.params.id), Array.isArray(req.body?.itens) ? req.body.itens : [])))
 app.delete('/disparo/campanhas/:id', wrap((req) => deleteCampaign(String(req.params.id))))
 app.get('/disparo/enviados', wrap(() => sentPhones()))
+
+// ---------------------------------------------------------------- Agendamentos
+app.get('/agenda', wrap(() => listAgenda()))
+app.post('/agenda', wrap((req) => createAgenda(req.body ?? {})))
+app.post('/agenda/:id/editar', wrap((req) => updateAgenda(String(req.params.id), req.body ?? {})))
+app.post('/agenda/:id/cancelar', wrap((req) => cancelAgenda(String(req.params.id))))
+app.delete('/agenda/:id', wrap((req) => deleteAgenda(String(req.params.id))))
+app.post('/agenda/sincronizado', wrap((req) => markAgendaSynced(Array.isArray(req.body?.itens) ? req.body.itens : [])))
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(400).json({ error: err?.message || 'Erro no Motor XS.' })
