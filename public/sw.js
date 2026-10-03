@@ -1,7 +1,7 @@
 // Service worker do XS Prospecção: deixa o app instalável, abre rápido
 // e mostra a última versão da tela quando a internet cai. Os dados (Supabase)
 // nunca passam por aqui — só arquivos do próprio site.
-const CACHE = 'xs-v1'
+const CACHE = 'xs-v2'
 
 self.addEventListener('install', () => self.skipWaiting())
 

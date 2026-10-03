@@ -24,6 +24,7 @@
     "@types/qrcode": "^1.5.5",
     "esbuild": "^0.28.2",
     "postject": "^1.0.0-alpha.6",
+    "rcedit": "^4.0.1",
     "typescript": "^5.9.0"
   }
 }

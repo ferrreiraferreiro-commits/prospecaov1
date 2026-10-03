@@ -139,7 +139,7 @@ export function Layout() {
         aria-label="Navegação"
       >
         <div className={clsx('flex h-14 items-center gap-2.5 border-b border-line-soft', collapsed ? 'justify-center px-0' : 'px-4')}>
-          <LogoMark size={30} />
+          <LogoMark size={collapsed ? 28 : 34} />
           {!collapsed && <Wordmark />}
         </div>
 
@@ -193,10 +193,8 @@ export function Layout() {
         {!full && (
           <div className="mb-3 flex items-center justify-between gap-3 sm:mb-1">
             <div className="flex items-center gap-2 lg:invisible">
-              <LogoMark size={28} />
-              <span className="text-[13px] font-semibold">
-                XS <span className="text-blue-400">Prospecção</span>
-              </span>
+              <LogoMark size={30} />
+              <span className="text-[13px] font-semibold">Prospecção</span>
             </div>
             <TopBar />
           </div>

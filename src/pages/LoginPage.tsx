@@ -22,12 +22,10 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
       <form onSubmit={submit} className="panel w-full max-w-sm space-y-4 px-6 py-7">
-        <div className="flex items-center gap-3">
-          <LogoMark size={40} />
+        <div className="flex flex-col items-center gap-3 pb-1 text-center">
+          <LogoMark size={72} />
           <div>
-            <h1 className="text-lg leading-6 font-semibold tracking-[-0.01em]">
-              XS <span className="text-blue-400">Prospecção</span>
-            </h1>
+            <h1 className="text-lg leading-6 font-semibold tracking-[-0.01em]">XS Prospecção</h1>
             <p className="text-xs text-fg-3">Entre para acessar seus leads e sua gestão.</p>
           </div>
         </div>

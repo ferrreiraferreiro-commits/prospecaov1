@@ -98,7 +98,7 @@ function initAll(repo: Repository) {
 function Splash({ text }: { text: string }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4">
-      <LogoMark size={44} />
+      <LogoMark size={64} className="animate-pulse" />
       <div className="flex items-center gap-2 text-xs text-fg-3">
         <Spinner /> {text}
       </div>

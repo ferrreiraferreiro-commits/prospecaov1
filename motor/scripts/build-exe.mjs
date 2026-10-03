@@ -41,6 +41,21 @@ execFileSync(process.execPath, ['--experimental-sea-config', seaConfig], { stdio
 // 3) Cópia do node.exe com o motor injetado
 const exe = path.join(out, process.platform === 'win32' ? 'Motor XS.exe' : 'motor-xs')
 fs.copyFileSync(process.execPath, exe)
+// Ícone XS e nome do programa (antes de injetar o motor)
+if (process.platform === 'win32') {
+  const rcedit = path.join(root, 'node_modules', 'rcedit', 'bin', process.arch === 'x64' ? 'rcedit-x64.exe' : 'rcedit.exe')
+  execFileSync(rcedit, [
+    exe,
+    '--set-icon', path.join(root, 'assets', 'icon.ico'),
+    '--set-version-string', 'ProductName', 'Motor XS',
+    '--set-version-string', 'FileDescription', 'Motor XS - XS Prospecção',
+    '--set-version-string', 'CompanyName', 'XS Prospecção',
+    '--set-version-string', 'OriginalFilename', 'Motor XS.exe',
+    '--set-version-string', 'InternalName', 'Motor XS',
+    '--set-file-version', version,
+    '--set-product-version', version,
+  ])
+}
 const postject = path.join(root, 'node_modules', 'postject', 'dist', 'cli.js')
 execFileSync(
   process.execPath,
