@@ -1,8 +1,6 @@
 /**
  * Motor XS — servidor local do XS Prospecção.
  * Escuta só em 127.0.0.1 e só aceita chamadas do próprio app (localhost ou o domínio na Vercel).
- *
- * Baseado no Caldeira Nexus, de Luis Caldeira, reconstruído com a autorização dele.
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'

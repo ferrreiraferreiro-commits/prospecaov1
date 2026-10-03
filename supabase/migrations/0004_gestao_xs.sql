@@ -1,4 +1,4 @@
--- XS Prospecção — gestão (módulos reconstruídos do Caldeira Nexus):
+-- XS Prospecção — gestão:
 -- clientes, pagamentos, anotações, projetos, financeiro, precificação e funis.
 -- Só cria tabelas/colunas novas; nada existente é alterado.
 

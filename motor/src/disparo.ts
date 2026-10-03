@@ -1,7 +1,6 @@
 /**
  * Disparo de WhatsApp em campanhas: fila, intervalo aleatório entre leads,
  * trava de duplicidade, confirmações de entrega e respostas recebidas.
- * Reconstruído do "Disparador WhatsApp Resiliente" do Caldeira Nexus (Luis Caldeira).
  *
  * Diferenças intencionais: uma campanha por vez (mais seguro para o número) e o
  * estado fica em motor/storage/*.json — os leads continuam no XS Prospecção.

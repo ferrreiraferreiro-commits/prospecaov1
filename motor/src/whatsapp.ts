@@ -1,6 +1,6 @@
 /**
  * Sessão do WhatsApp (Baileys): conexão por QR Code, envio, confirmações de
- * entrega e mensagens recebidas. Reconstruído do Caldeira Nexus (Luis Caldeira).
+ * entrega e mensagens recebidas.
  */
 import fs from 'node:fs'
 import path from 'node:path'

@@ -1,7 +1,6 @@
 /**
  * Busca de empresas no Google Maps com cobertura territorial (malha polar),
  * qualificação por telefone/site/Instagram e enriquecimento de CNPJ.
- * Reconstruído do módulo "Prospecção pelo Maps" do Caldeira Nexus (Luis Caldeira).
  */
 import fs from 'node:fs'
 import path from 'node:path'

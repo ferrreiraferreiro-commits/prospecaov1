@@ -2,8 +2,6 @@
 
 Prospecção por ligação e WhatsApp, busca de empresas no Google Maps e gestão do negócio (clientes, projetos, financeiro e precificação) num lugar só.
 
-O XS Prospecção junta a antiga **Central de Prospecção** com os módulos do **Caldeira Nexus**, de Luis Caldeira, reconstruídos e integrados com a autorização dele (o código-fonte original se perdeu; esta é uma reescrita a partir do pacote compilado, com melhorias).
-
 ## Como funciona
 
 ```

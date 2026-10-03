@@ -1,6 +1,5 @@
 /**
  * Enriquecimento de leads: links externos, telefone, CNPJ e responsável (QSA).
- * Reconstruído a partir do Caldeira Nexus (Luis Caldeira), com autorização dele.
  */
 import dns from 'node:dns/promises'
 import net from 'node:net'
