@@ -1,10 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ArrowLeft, CalendarClock, Headphones, MailCheck, Wallet } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
 import { Button } from '../components/ui'
 import { authErrorPt, signIn } from '../lib/auth'
+
+const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 
 /** Moldura das telas de conta: marca à esquerda (no PC) e o formulário à direita. */
 function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
@@ -16,15 +18,15 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
           <Wordmark />
         </Link>
         <div className="relative max-w-md space-y-8">
-          <h2 className="text-[34px] leading-[1.1] font-semibold tracking-[-0.03em] text-fg">
+          <h2 className="land-in text-[34px] leading-[1.1] font-semibold tracking-[-0.03em] text-fg" style={delay(80)}>
             Mais ligações feitas.
             <br />
             <span className="text-fg-3">Mais sites vendidos.</span>
           </h2>
           <ul className="space-y-4 text-sm text-fg-2">
-            <Point icon={<Headphones />}>Fila de ligações do dia, roteiro e objeções na tela enquanto você fala.</Point>
-            <Point icon={<CalendarClock />}>Retornos e reuniões lembrados na hora certa, sem planilha.</Point>
-            <Point icon={<Wallet />}>Clientes, projetos e financeiro no mesmo lugar dos leads.</Point>
+            <Point d={220} icon={<Headphones />}>Fila de ligações do dia, roteiro e objeções na tela enquanto você fala.</Point>
+            <Point d={320} icon={<CalendarClock />}>Retornos e reuniões lembrados na hora certa, sem planilha.</Point>
+            <Point d={420} icon={<Wallet />}>Clientes, projetos e financeiro no mesmo lugar dos leads.</Point>
           </ul>
         </div>
         <p className="relative text-2xs text-fg-4">XS Prospecção</p>
@@ -34,7 +36,7 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
         <Link to="/" className="inline-flex items-center gap-1.5 self-start text-xs text-fg-3 hover:text-fg">
           <ArrowLeft className="size-3.5" /> Início
         </Link>
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
+        <div className="land-in mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10" style={delay(40)}>
           <div className="mb-7 space-y-1.5">
             <div className="mb-5 lg:hidden">
               <LogoMark size={48} />
@@ -50,9 +52,9 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
   )
 }
 
-function Point({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+function Point({ icon, children, d }: { icon: ReactNode; children: ReactNode; d: number }) {
   return (
-    <li className="flex gap-3">
+    <li className="land-in flex gap-3" style={delay(d)}>
       <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300 [&>svg]:size-4">{icon}</span>
       <span className="leading-6">{children}</span>
     </li>

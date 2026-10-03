@@ -185,6 +185,69 @@
   animation: fade 140ms ease-out;
 }
 
+/* Landing e telas de conta: entrada em sequência (--d = atraso) e revelação ao rolar */
+@keyframes land-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.land-in {
+  animation: land-up 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 760ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 760ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--d, 0ms);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+.caret {
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: caret 1s steps(1) infinite;
+}
+@keyframes press {
+  0%,
+  100% {
+    transform: none;
+  }
+  45% {
+    transform: scale(0.96);
+  }
+}
+.press {
+  animation: press 420ms ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+  .caret {
+    display: none;
+  }
+}
+
 /* Mapa (MapLibre) com a cara do app */
 .xs-map {
   background: var(--color-ink);

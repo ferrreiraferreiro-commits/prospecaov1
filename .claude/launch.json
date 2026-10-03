@@ -2,6 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     { "name": "app", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5180, "autoPort": true },
+    { "name": "app-deslogado", "runtimeExecutable": "npx", "runtimeArgs": ["vite"], "port": 5182, "autoPort": true },
     {
       "name": "app-local-mode",
       "runtimeExecutable": "npx",
