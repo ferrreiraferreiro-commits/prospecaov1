@@ -1,9 +1,10 @@
 import clsx from 'clsx'
-import { AlertTriangle, ClipboardPaste, Copy, FileText, Upload } from 'lucide-react'
+import { AlertTriangle, ClipboardPaste, Copy, FileText, Plus, Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { formatPhone } from '../lib/contact'
 import { buildDupIndex, DUP_REASON_LABEL, findMatches, type DupMatch } from '../lib/duplicates'
-import { decodeFile, parseLeadsTxt, type ParseResult } from '../lib/parser'
+import { decodeFile, splitCity, type ParseResult } from '../lib/parser'
+import { parseLeadsAny } from '../lib/sheet'
 import { fmtRating } from '../lib/script'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
@@ -28,7 +29,7 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
   const toast = useApp((s) => s.toast)
   const [parsed, setParsed] = useState<Parsed | null>(null)
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
-  const [pasteMode, setPasteMode] = useState(false)
+  const [mode, setMode] = useState<'arquivo' | 'colar' | 'manual'>('arquivo')
   const [pasted, setPasted] = useState('')
   const [dragging, setDragging] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -36,7 +37,7 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   function load(text: string, arquivo: string) {
-    const result = parseLeadsTxt(text)
+    const result = parseLeadsAny(text)
     setError(result.leads.length ? null : result.warnings[0] ?? 'Nenhum lead encontrado no arquivo.')
     if (result.leads.length) {
       setParsed({ ...result, arquivo })
@@ -193,9 +194,17 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
 
   // ---- Seleção do arquivo -------------------------------------------------
   return (
-    <Modal open onClose={onClose} title="Importar leads" subtitle="Arquivo TXT exportado da sua busca de leads." width="max-w-xl">
+    <Modal
+      open
+      onClose={onClose}
+      title={mode === 'manual' ? 'Novo lead' : 'Importar leads'}
+      subtitle={mode === 'manual' ? 'Cadastre uma empresa à mão.' : 'Planilha (CSV), linhas copiadas da planilha ou relatório em TXT.'}
+      width="max-w-xl"
+    >
       <div className="space-y-3 p-5">
-        {!pasteMode ? (
+        {mode === 'manual' ? (
+          <ManualLead onDone={onClose} />
+        ) : mode === 'arquivo' ? (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -217,17 +226,17 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
           >
             <Upload className="mb-3 size-5 text-fg-3" />
             <span className="text-sm font-medium">Arraste o arquivo aqui ou clique para escolher</span>
-            <span className="mt-1 text-xs text-fg-3">Blocos numerados como “[001] EMPRESA” viram leads</span>
+            <span className="mt-1 text-xs text-fg-3">CSV com uma linha de títulos (Empresa, Telefone, Cidade…) ou o relatório em TXT</span>
           </button>
         ) : (
           <div>
             <textarea
               className="input min-h-48 resize-y font-mono text-xs"
-              placeholder={'[001] NOME DA EMPRESA\n  Categoria / Nicho : …\n  Telefone          : …'}
+              placeholder={'Copie as linhas da planilha, junto com a linha dos títulos, e cole aqui:\n\nEmpresa\tTelefone\tCidade\nPadaria Sol\t(35) 99999-0000\tPoços de Caldas - MG'}
               value={pasted}
               onChange={(e) => setPasted(e.target.value)}
               autoFocus
-              aria-label="Conteúdo do arquivo"
+              aria-label="Linhas da planilha"
             />
             <div className="mt-2 flex justify-end">
               <Button variant="primary" disabled={!pasted.trim()} onClick={() => load(pasted, 'texto colado')}>
@@ -239,7 +248,7 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
         <input
           ref={inputRef}
           type="file"
-          accept=".txt,text/plain"
+          accept=".csv,.tsv,.txt,text/csv,text/plain"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -252,11 +261,107 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> {error}
           </p>
         )}
-        <button onClick={() => setPasteMode((p) => !p)} className="inline-flex items-center gap-1.5 text-xs text-fg-3 hover:text-fg">
-          {pasteMode ? <Upload className="size-3.5" /> : <ClipboardPaste className="size-3.5" />}
-          {pasteMode ? 'Escolher arquivo' : 'Colar o conteúdo do arquivo'}
-        </button>
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {mode !== 'arquivo' && (
+            <button onClick={() => setMode('arquivo')} className="inline-flex items-center gap-1.5 text-xs text-fg-3 hover:text-fg">
+              <Upload className="size-3.5" /> Escolher arquivo
+            </button>
+          )}
+          {mode !== 'colar' && (
+            <button onClick={() => setMode('colar')} className="inline-flex items-center gap-1.5 text-xs text-fg-3 hover:text-fg">
+              <ClipboardPaste className="size-3.5" /> Colar da planilha
+            </button>
+          )}
+          {mode !== 'manual' && (
+            <button onClick={() => setMode('manual')} className="inline-flex items-center gap-1.5 text-xs text-fg-3 hover:text-fg">
+              <Plus className="size-3.5" /> Cadastrar um lead à mão
+            </button>
+          )}
+        </div>
       </div>
     </Modal>
+  )
+}
+
+/** Um lead cadastrado à mão (sem arquivo). */
+function ManualLead({ onDone }: { onDone: () => void }) {
+  const importLeads = useApp((s) => s.importLeads)
+  const toast = useApp((s) => s.toast)
+  const [f, setF] = useState({ empresa: '', telefone: '', nicho: '', cidade: '', instagram: '', website: '' })
+  const [saving, setSaving] = useState(false)
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((s) => ({ ...s, [k]: e.target.value }))
+  const v = (s: string) => s.trim() || null
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    if (!f.empresa.trim()) return
+    setSaving(true)
+    try {
+      const { cidade, estado } = splitCity(v(f.cidade))
+      await importLeads(
+        [
+          {
+            index: 1,
+            empresa: f.empresa.trim(),
+            nicho: v(f.nicho),
+            telefone: v(f.telefone),
+            whatsapp: null,
+            instagram: v(f.instagram),
+            website: v(f.website),
+            endereco: null,
+            cidade,
+            estado,
+            avaliacao: null,
+            numero_avaliacoes: null,
+            pasta: null,
+            etapa: null,
+            maps_url: null,
+            observacoes: null,
+            dados_extras: null,
+            status: 'novo',
+          },
+        ],
+        'Cadastro manual',
+      )
+      toast(`${f.empresa.trim()} entrou nos seus leads.`)
+      onDone()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Falha ao salvar.', 'error')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="grid gap-3 sm:grid-cols-2">
+      <div className="sm:col-span-2">
+        <label className="label" htmlFor="ml-empresa">Empresa</label>
+        <input id="ml-empresa" className="input h-9" value={f.empresa} onChange={set('empresa')} required autoFocus />
+      </div>
+      <div>
+        <label className="label" htmlFor="ml-tel">Telefone / WhatsApp</label>
+        <input id="ml-tel" className="input h-9" value={f.telefone} onChange={set('telefone')} inputMode="tel" placeholder="(35) 99999-0000" />
+      </div>
+      <div>
+        <label className="label" htmlFor="ml-nicho">Nicho</label>
+        <input id="ml-nicho" className="input h-9" value={f.nicho} onChange={set('nicho')} placeholder="Ex.: Barbearia" />
+      </div>
+      <div>
+        <label className="label" htmlFor="ml-cidade">Cidade</label>
+        <input id="ml-cidade" className="input h-9" value={f.cidade} onChange={set('cidade')} placeholder="Cidade - UF" />
+      </div>
+      <div>
+        <label className="label" htmlFor="ml-insta">Instagram</label>
+        <input id="ml-insta" className="input h-9" value={f.instagram} onChange={set('instagram')} placeholder="@perfil" />
+      </div>
+      <div className="sm:col-span-2">
+        <label className="label" htmlFor="ml-site">Site</label>
+        <input id="ml-site" className="input h-9" value={f.website} onChange={set('website')} placeholder="Deixe vazio se não tiver" />
+      </div>
+      <div className="flex justify-end sm:col-span-2">
+        <Button type="submit" variant="primary" loading={saving} disabled={!f.empresa.trim()}>
+          Salvar lead
+        </Button>
+      </div>
+    </form>
   )
 }

@@ -19,6 +19,7 @@ import {
   Send,
   Settings,
   Smartphone,
+  Sparkles,
   Sun,
   TriangleAlert,
   Upload,
@@ -32,6 +33,7 @@ import { useDisparoSync } from '../lib/disparo'
 import { useMapsAutoImport } from '../lib/mapsAutoImport'
 import { useMotor, useMotorPolling } from '../lib/motor'
 import { useMetrics } from '../store/derived'
+import { accessOf, useAccount, useHasMotor } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { LogoMark, Wordmark } from './Brand'
@@ -48,6 +50,8 @@ interface NavItem {
   label: string
   icon: LucideIcon
   end?: boolean
+  /** Só aparece para contas com o Motor XS */
+  motor?: boolean
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
@@ -59,16 +63,16 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/hoje', label: 'Hoje', icon: Sun },
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
-      { to: '/maps', label: 'Buscar no Maps', icon: MapPinned },
+      { to: '/maps', label: 'Buscar no Maps', icon: MapPinned, motor: true },
     ],
   },
   {
     title: 'WhatsApp',
     items: [
-      { to: '/funis', label: 'Funis', icon: MessagesSquare },
-      { to: '/disparo', label: 'Disparo', icon: Send },
-      { to: '/agendamentos', label: 'Agendamentos', icon: AlarmClock },
-      { to: '/whatsapp', label: 'Conexão', icon: Smartphone },
+      { to: '/funis', label: 'Funis', icon: MessagesSquare, motor: true },
+      { to: '/disparo', label: 'Disparo', icon: Send, motor: true },
+      { to: '/agendamentos', label: 'Agendamentos', icon: AlarmClock, motor: true },
+      { to: '/whatsapp', label: 'Conexão', icon: Smartphone, motor: true },
     ],
   },
   {
@@ -96,6 +100,20 @@ const MOBILE: NavItem[] = [
   { to: '/ligacao', label: 'Ligação', icon: Headphones },
 ]
 
+/** Menu da conta: sem o Motor, somem os itens que dependem dele (e grupos vazios). */
+function useGroups() {
+  const motor = useHasMotor()
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => motor || !i.motor) })).filter((g) => g.items.length)
+}
+
+/** Conversa com o Motor XS no computador: status, buscas do Maps e disparos. */
+function MotorSync() {
+  useMotorPolling()
+  useMapsAutoImport()
+  useDisparoSync()
+  return null
+}
+
 const COLLAPSE_KEY = 'xs-prospeccao:menu-recolhido'
 
 function readCollapsed(): boolean {
@@ -114,10 +132,9 @@ export function Layout() {
   const badge = metrics.followupsHoje
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [sheet, setSheet] = useState(false)
+  const motor = useHasMotor()
+  const groups = useGroups()
   useReminders()
-  useMotorPolling()
-  useMapsAutoImport()
-  useDisparoSync()
 
   useEffect(() => setSheet(false), [pathname])
 
@@ -148,7 +165,7 @@ export function Layout() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2.5 py-3">
-          {GROUPS.map((group) => (
+          {groups.map((group) => (
             <div key={group.title} className="mb-3">
               {collapsed ? (
                 <div className="mx-auto my-2 h-px w-6 bg-line-soft first:hidden" />
@@ -167,7 +184,7 @@ export function Layout() {
         </div>
 
         <div className="space-y-1 border-t border-line-soft p-2.5">
-          <MotorPill collapsed={collapsed} />
+          {motor ? <MotorPill collapsed={collapsed} /> : <TrialPill collapsed={collapsed} />}
           <button
             onClick={() => setImportOpen(true)}
             title="Importar leads"
@@ -198,7 +215,7 @@ export function Layout() {
           <div className="mb-3 flex items-center justify-between gap-3 sm:mb-1">
             <div className="flex items-center gap-2 lg:invisible">
               <LogoMark size={30} />
-              <span className="text-[13px] font-semibold">Prospecção</span>
+              <span className="text-[13px] font-semibold">XS Prospecção</span>
             </div>
             <TopBar />
           </div>
@@ -238,7 +255,8 @@ export function Layout() {
         </button>
       </nav>
 
-      {sheet && <MobileSheet onClose={() => setSheet(false)} onImport={() => setImportOpen(true)} />}
+      {sheet && <MobileSheet groups={groups} onClose={() => setSheet(false)} onImport={() => setImportOpen(true)} />}
+      {motor && <MotorSync />}
 
       <ImportModal />
       <LeadDrawer />
@@ -307,7 +325,21 @@ function MotorPill({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function MobileSheet({ onClose, onImport }: { onClose: () => void; onImport: () => void }) {
+/** No teste grátis, mostra quantos dias faltam. */
+function TrialPill({ collapsed }: { collapsed: boolean }) {
+  const profile = useAccount((s) => s.profile)
+  const access = accessOf(profile)
+  if (!access.ok || access.diasDeTeste === null) return null
+  const label = access.diasDeTeste === 1 ? 'Teste grátis · último dia' : `Teste grátis · ${access.diasDeTeste} dias`
+  return (
+    <div title={label} className={clsx('flex h-9 items-center gap-2.5 rounded-lg text-xs text-amber-200/80', collapsed ? 'justify-center' : 'px-2.5')}>
+      <Sparkles className="size-4 shrink-0" strokeWidth={1.75} />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </div>
+  )
+}
+
+function MobileSheet({ groups, onClose, onImport }: { groups: typeof GROUPS; onClose: () => void; onImport: () => void }) {
   return (
     <div className="anim-fade fixed inset-0 z-40 bg-black/60 lg:hidden" onMouseDown={onClose}>
       <div
@@ -321,7 +353,7 @@ function MobileSheet({ onClose, onImport }: { onClose: () => void; onImport: () 
             <X className="size-4" />
           </button>
         </div>
-        {GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.title} className="mb-3">
             <p className="pb-1.5 text-[10px] font-semibold tracking-[0.08em] text-fg-4 uppercase">{group.title}</p>
             <div className="grid grid-cols-3 gap-1.5">

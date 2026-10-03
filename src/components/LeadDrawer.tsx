@@ -9,6 +9,7 @@ import { nextAction } from '../lib/selectors'
 import type { Lead } from '../lib/types'
 import { useDuplicates, useIndex, useLead } from '../store/derived'
 import { useApp } from '../store/useApp'
+import { useHasMotor } from '../store/useAccount'
 import { useUi } from '../store/useUi'
 import { defaultFollowup, draftToInput, FollowupPicker } from './FollowupPicker'
 import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
@@ -103,6 +104,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const openOutcome = useUi((s) => s.openOutcome)
   const openMessage = useUi((s) => s.openMessage)
   const navigate = useNavigate()
+  const motor = useHasMotor()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [scheduling, setScheduling] = useState(false)
   const [draft, setDraft] = useState(() => defaultFollowup())
@@ -173,6 +175,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           <Button variant="secondary" size="sm" icon={<MessageCircle className="size-3.5" />} disabled={!whatsappTarget(lead)} onClick={() => openMessage({ leadId: lead.id })}>
             Mensagem
           </Button>
+          {motor && (
           <Button
             variant="secondary"
             size="sm"
@@ -186,6 +189,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           >
             Agendar
           </Button>
+          )}
           <ClientLink lead={lead} />
           <QuickActions lead={lead} className="ml-auto" size="md" />
         </div>

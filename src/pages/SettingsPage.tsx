@@ -16,6 +16,7 @@ import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
 import { BIZ_TABLES, emptyBiz, type BizSnapshot } from '../lib/biz'
 import { DEFAULT_MOTOR_URL, getMotorUrl, setMotorUrl, useMotor } from '../lib/motor'
+import { useHasMotor } from '../store/useAccount'
 import { useBiz } from '../store/useBiz'
 
 
@@ -35,6 +36,7 @@ function Card({ id, title, description, children, actions }: { id?: string; titl
 }
 
 export function SettingsPage() {
+  const motor = useHasMotor()
   const settings = useApp((s) => s.settings)
   const imports = useApp((s) => s.imports)
   const leads = useApp((s) => s.leads)
@@ -126,7 +128,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="Ajustes" subtitle="Perfil, mensagens, avisos, Motor XS e backup." />
+      <PageHeader title="Ajustes" subtitle={motor ? 'Perfil, mensagens, avisos, Motor XS e backup.' : 'Perfil, mensagens, avisos e backup.'} />
 
       <Card id="perfil" title="Meu perfil" description="O primeiro nome entra no roteiro como {nome}." actions={<Button variant="primary" size="sm" onClick={saveProfile}>Salvar perfil</Button>}>
         <div className="mb-4 flex items-center gap-3">
@@ -369,7 +371,7 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      <MotorCard />
+      {motor && <MotorCard />}
 
     </div>
   )

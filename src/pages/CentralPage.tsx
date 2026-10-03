@@ -19,6 +19,7 @@ import {
   type SortKey,
 } from '../lib/selectors'
 import { useDuplicates, useIndex, useMetrics, useToday } from '../store/derived'
+import { useHasMotor } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 
@@ -36,6 +37,7 @@ export function CentralPage() {
   const metrics = useMetrics()
   const today = useToday()
   const navigate = useNavigate()
+  const motor = useHasMotor()
 
   const [limit, setLimit] = useState(PAGE_SIZE)
   const dupIds = useMemo(() => new Set(dupMap.keys()), [dupMap])
@@ -89,23 +91,27 @@ export function CentralPage() {
   if (!leads.length) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Leads" subtitle="Busque empresas no Maps ou traga a sua lista e comece a ligar." />
+        <PageHeader title="Leads" subtitle={motor ? 'Busque empresas no Maps ou traga a sua lista e comece a ligar.' : 'Traga a sua lista e comece a ligar.'} />
         <div className="panel">
           <Empty
-            icon={<MapPinned />}
+            icon={motor ? <MapPinned /> : <Upload />}
             title="Nenhum lead ainda"
             action={
               <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="primary" icon={<MapPinned className="size-3.5" />} onClick={() => navigate('/maps')}>
-                  Buscar leads
-                </Button>
-                <Button variant="secondary" icon={<Upload className="size-3.5" />} onClick={() => setImportOpen(true)}>
-                  Importar lista
+                {motor && (
+                  <Button variant="primary" icon={<MapPinned className="size-3.5" />} onClick={() => navigate('/maps')}>
+                    Buscar leads
+                  </Button>
+                )}
+                <Button variant={motor ? 'secondary' : 'primary'} icon={<Upload className="size-3.5" />} onClick={() => setImportOpen(true)}>
+                  {motor ? 'Importar lista' : 'Adicionar leads'}
                 </Button>
               </div>
             }
           >
-            Escolha a cidade e os nichos: as empresas que a busca achar entram direto aqui, prontas para ligar.
+            {motor
+              ? 'Escolha a cidade e os nichos: as empresas que a busca achar entram direto aqui, prontas para ligar.'
+              : 'Importe uma planilha, cole as linhas copiadas dela ou cadastre as empresas à mão.'}
           </Empty>
         </div>
       </div>
@@ -119,10 +125,18 @@ export function CentralPage() {
         subtitle={`${metrics.totalLeads} leads · ${metrics.hoje.ligacoes} ligações hoje`}
         actions={
           <>
-            <Button variant="secondary" icon={<MapPinned className="size-3.5" />} onClick={() => navigate('/maps')}>
-              Buscar leads
-            </Button>
-            <Button variant="ghost" icon={<Upload className="size-3.5" />} onClick={() => setImportOpen(true)} aria-label="Importar lista" title="Importar lista" />
+            {motor ? (
+              <>
+                <Button variant="secondary" icon={<MapPinned className="size-3.5" />} onClick={() => navigate('/maps')}>
+                  Buscar leads
+                </Button>
+                <Button variant="ghost" icon={<Upload className="size-3.5" />} onClick={() => setImportOpen(true)} aria-label="Importar lista" title="Importar lista" />
+              </>
+            ) : (
+              <Button variant="secondary" icon={<Upload className="size-3.5" />} onClick={() => setImportOpen(true)}>
+                Adicionar leads
+              </Button>
+            )}
             <Button variant="primary" icon={<Headphones className="size-3.5" />} onClick={startSequence} disabled={!filtered.length}>
               Ligar em sequência
             </Button>

@@ -13,6 +13,7 @@ import { needsResult } from '../lib/insights'
 import { buildTodayPlan, isHot, todayQueue } from '../lib/selectors'
 import type { Lead, Meeting } from '../lib/types'
 import { useIndex, useMetrics, useToday } from '../store/derived'
+import { useHasMotor } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 
@@ -29,6 +30,8 @@ export function HojePage() {
   const metrics = useMetrics()
   const today = useToday()
   const navigate = useNavigate()
+  const motor = useHasMotor()
+  const setImportOpen = useUi((s) => s.setImportOpen)
   const [novosLimit, setNovosLimit] = useState(15)
 
   const plan = useMemo(
@@ -68,8 +71,22 @@ export function HojePage() {
       <div className="space-y-6">
         <PageHeader title="Hoje" subtitle={formatLongToday()} />
         <div className="panel">
-          <Empty icon={<MapPinned />} title="Sua lista de hoje aparece aqui" action={<Button variant="primary" icon={<MapPinned className="size-3.5" />} onClick={() => navigate('/maps')}>Buscar leads</Button>}>
-            Busque empresas no Maps para montar a fila de ligações do dia.
+          <Empty
+            icon={<MapPinned />}
+            title="Sua lista de hoje aparece aqui"
+            action={
+              motor ? (
+                <Button variant="primary" icon={<MapPinned className="size-3.5" />} onClick={() => navigate('/maps')}>
+                  Buscar leads
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => setImportOpen(true)}>
+                  Adicionar leads
+                </Button>
+              )
+            }
+          >
+            {motor ? 'Busque empresas no Maps para montar a fila de ligações do dia.' : 'Adicione seus leads para montar a fila de ligações do dia.'}
           </Empty>
         </div>
       </div>

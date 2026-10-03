@@ -1,8 +1,9 @@
 import type { Session } from '@supabase/supabase-js'
-import { lazy, useEffect, useState, type ComponentType } from 'react'
+import { lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LogoMark } from './components/Brand'
 import { Layout } from './components/Layout'
+import { Welcome } from './components/Welcome'
 import { Button, Spinner } from './components/ui'
 import { LocalRepository } from './data/localRepository'
 import { SupabaseRepository } from './data/supabaseRepository'
@@ -13,6 +14,7 @@ import { HojePage } from './pages/HojePage'
 import { LoginPage } from './pages/LoginPage'
 import { PainelPage } from './pages/PainelPage'
 import type { Repository } from './data/repository'
+import { accessOf, useAccount, useHasMotor } from './store/useAccount'
 import { useApp } from './store/useApp'
 import { useBiz } from './store/useBiz'
 
@@ -63,6 +65,9 @@ const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ defa
 const WhatsAppPage = lazyPage(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
 
 function Routed() {
+  const motor = useHasMotor()
+  // Telas que dependem do Motor XS só existem para contas com esse recurso
+  const m = (el: ReactNode) => (motor ? el : <Navigate to="/" replace />)
   return (
     <BrowserRouter>
       <Routes>
@@ -73,11 +78,11 @@ function Routed() {
           <Route path="ligacao" element={<CallModeEntry />} />
           <Route path="ligacao/:id" element={<CallModePage />} />
           <Route path="roteiros" element={<RoteirosPage />} />
-          <Route path="maps" element={<MapsPage />} />
-          <Route path="funis" element={<FunisPage />} />
-          <Route path="disparo" element={<DisparoPage />} />
-          <Route path="agendamentos" element={<AgendamentosPage />} />
-          <Route path="whatsapp" element={<WhatsAppPage />} />
+          <Route path="maps" element={m(<MapsPage />)} />
+          <Route path="funis" element={m(<FunisPage />)} />
+          <Route path="disparo" element={m(<DisparoPage />)} />
+          <Route path="agendamentos" element={m(<AgendamentosPage />)} />
+          <Route path="whatsapp" element={m(<WhatsAppPage />)} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
@@ -87,6 +92,7 @@ function Routed() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
+      <Welcome />
     </BrowserRouter>
   )
 }
@@ -114,7 +120,9 @@ function Loaded() {
   const loadError = useApp((s) => s.loadError)
   const bizError = useBiz((s) => s.error)
   const repo = useApp((s) => s.repo)
-  if (!ready || !bizReady) return <Splash text="Carregando o XS Prospecção…" />
+  const accountReady = useAccount((s) => s.ready)
+  const profile = useAccount((s) => s.profile)
+  if (!ready || !bizReady || !accountReady) return <Splash text="Carregando o XS Prospecção…" />
   if (loadError || bizError) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
@@ -124,12 +132,32 @@ function Loaded() {
       </div>
     )
   }
+  const access = accessOf(profile)
+  if (!access.ok) return <Blocked motivo={access.motivo} />
   return <Routed />
+}
+
+function Blocked({ motivo }: { motivo: 'teste_acabou' | 'cancelado' }) {
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
+      <LogoMark size={64} />
+      <div className="space-y-1">
+        <p className="text-base font-semibold text-fg">{motivo === 'teste_acabou' ? 'Seu teste grátis terminou' : 'Sua assinatura está pausada'}</p>
+        <p className="max-w-sm text-xs text-fg-3">Seus leads e sua gestão continuam guardados. Fale com a gente para liberar o acesso de novo.</p>
+      </div>
+      {supabase && (
+        <Button variant="secondary" onClick={() => void supabase!.auth.signOut()}>
+          Sair
+        </Button>
+      )}
+    </div>
+  )
 }
 
 function LocalApp() {
   useEffect(() => {
     initAll(new LocalRepository())
+    void useAccount.getState().init(null)
   }, [])
   return <Loaded />
 }
@@ -146,7 +174,9 @@ function SupabaseApp() {
 
   const userId = session?.user.id
   useEffect(() => {
-    if (userId) initAll(new SupabaseRepository(client))
+    if (!userId) return
+    initAll(new SupabaseRepository(client))
+    void useAccount.getState().init(client, userId)
   }, [userId, client])
 
   if (session === undefined) return <Splash text="Conectando…" />
