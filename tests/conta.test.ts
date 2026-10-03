@@ -46,14 +46,15 @@ describe('acesso da conta', () => {
   const now = Date.parse('2026-10-03T12:00:00Z')
 
   it('teste grátis conta os dias que faltam', () => {
-    expect(accessOf(base, now)).toEqual({ ok: true, diasDeTeste: 7 })
+    expect(accessOf(base, now)).toEqual({ ok: true, diasDeTeste: 7, horasDeTeste: 168 })
+    expect(accessOf({ ...base, teste_ate: '2026-10-03T21:30:00Z' }, now)).toEqual({ ok: true, diasDeTeste: 1, horasDeTeste: 10 })
   })
   it('teste vencido e conta cancelada bloqueiam', () => {
     expect(accessOf({ ...base, teste_ate: '2026-10-01T00:00:00Z' }, now)).toEqual({ ok: false, motivo: 'teste_acabou' })
     expect(accessOf({ ...base, plano: 'cancelado' }, now)).toEqual({ ok: false, motivo: 'cancelado' })
   })
   it('assinante e vitalício entram sem contagem; sem perfil não bloqueia', () => {
-    expect(accessOf({ ...base, plano: 'ativo', teste_ate: '2020-01-01T00:00:00Z' }, now)).toEqual({ ok: true, diasDeTeste: null })
-    expect(accessOf(null, now)).toEqual({ ok: true, diasDeTeste: null })
+    expect(accessOf({ ...base, plano: 'ativo', teste_ate: '2020-01-01T00:00:00Z' }, now)).toEqual({ ok: true, diasDeTeste: null, horasDeTeste: null })
+    expect(accessOf(null, now)).toEqual({ ok: true, diasDeTeste: null, horasDeTeste: null })
   })
 })

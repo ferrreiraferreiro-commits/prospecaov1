@@ -28,9 +28,10 @@ export function Welcome() {
   const saveSettings = useApp((s) => s.saveSettings)
   const toast = useApp((s) => s.toast)
 
-  const [nome, setNome] = useState(profile?.nome ?? settings.nome_vendedor ?? '')
-  const [servico, setServico] = useState(settings.servico ?? '')
-  const [cidade, setCidade] = useState(profile?.cidade ?? '')
+  // Tudo começa em branco: quem preenche é a pessoa
+  const [nome, setNome] = useState('')
+  const [servico, setServico] = useState('')
+  const [cidade, setCidade] = useState('')
   const [meta, setMeta] = useState(settings.meta_diaria || 30)
   const [saving, setSaving] = useState(false)
 
@@ -40,7 +41,7 @@ export function Welcome() {
     e?.preventDefault()
     setSaving(true)
     try {
-      const n = nome.trim()
+      const n = nome.trim() || profile?.nome?.trim() || ''
       const c = cidade.trim()
       await saveSettings({
         ...settings,

@@ -336,7 +336,7 @@ function TrialPill({ collapsed }: { collapsed: boolean }) {
   const profile = useAccount((s) => s.profile)
   const access = accessOf(profile)
   if (!access.ok || access.diasDeTeste === null) return null
-  const label = access.diasDeTeste === 1 ? 'Teste grátis · último dia' : `Teste grátis · ${access.diasDeTeste} dias`
+  const label = access.diasDeTeste === 1 ? `Teste grátis · ${access.horasDeTeste}h restantes` : `Teste grátis · ${access.diasDeTeste} dias`
   return (
     <div title={label} className={clsx('flex h-9 items-center gap-2.5 rounded-lg text-xs text-amber-200/80', collapsed ? 'justify-center' : 'px-2.5')}>
       <Sparkles className="size-4 shrink-0" strokeWidth={1.75} />

@@ -202,7 +202,7 @@ export interface Snapshot {
 export const DEFAULT_SETTINGS: Settings = {
   meta_diaria: 50,
   nome_vendedor: '',
-  servico: 'desenvolvimento de sites',
+  servico: '',
   roteiro: null,
   objecoes: null,
   roteiros: null,

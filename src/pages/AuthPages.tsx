@@ -98,7 +98,7 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
         <>
           Ainda não tem conta?{' '}
           <Link to="/criar-conta" className="font-medium text-blue-300 hover:text-blue-200">
-            Teste grátis por 14 dias
+            Teste 1 dia grátis
           </Link>
         </>
       }
@@ -169,7 +169,7 @@ export function SignupPage({ client }: { client: SupabaseClient }) {
   return (
     <AuthShell
       title="Criar sua conta"
-      subtitle="14 dias grátis. Sem cartão."
+      subtitle="1 dia grátis com tudo liberado. Sem cartão."
       footer={
         <>
           Já tem conta?{' '}

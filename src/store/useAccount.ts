@@ -90,14 +90,14 @@ export function useHasMotor(): boolean {
   return useAccount((s) => !s.profile || s.profile.recursos.includes('motor'))
 }
 
-export type Access = { ok: true; diasDeTeste: number | null } | { ok: false; motivo: 'teste_acabou' | 'cancelado' }
+export type Access = { ok: true; diasDeTeste: number | null; horasDeTeste: number | null } | { ok: false; motivo: 'teste_acabou' | 'cancelado' }
 
 /** Pode entrar no app? No teste, quantos dias faltam. */
 export function accessOf(profile: Profile | null, now = Date.now()): Access {
-  if (!profile) return { ok: true, diasDeTeste: null }
+  if (!profile) return { ok: true, diasDeTeste: null, horasDeTeste: null }
   if (profile.plano === 'cancelado') return { ok: false, motivo: 'cancelado' }
-  if (profile.plano !== 'teste') return { ok: true, diasDeTeste: null }
+  if (profile.plano !== 'teste') return { ok: true, diasDeTeste: null, horasDeTeste: null }
   const left = Date.parse(profile.teste_ate) - now
   if (left <= 0) return { ok: false, motivo: 'teste_acabou' }
-  return { ok: true, diasDeTeste: Math.ceil(left / 86_400_000) }
+  return { ok: true, diasDeTeste: Math.ceil(left / 86_400_000), horasDeTeste: Math.ceil(left / 3_600_000) }
 }

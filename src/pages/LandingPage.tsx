@@ -9,13 +9,14 @@ import {
   ChevronDown,
   FolderKanban,
   Headphones,
+  MapPinned,
   MessageCircle,
   PhoneOff,
   PhoneOutgoing,
   RotateCcw,
+  Send,
   Smartphone,
   Sun,
-  Upload,
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -96,13 +97,13 @@ function Hero() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link to="/criar-conta" className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-[#3b7bf6]">
-              Testar 14 dias grátis <ArrowRight className="size-4" />
+              Testar 1 dia grátis <ArrowRight className="size-4" />
             </Link>
             <Link to="/entrar" className="inline-flex h-11 items-center rounded-lg border border-line px-5 text-sm font-medium text-fg-2 hover:border-line-strong hover:text-fg">
               Já tenho conta
             </Link>
           </div>
-          <p className="mt-4 text-2xs text-fg-4">Sem cartão de crédito. Nada para instalar.</p>
+          <p className="mt-4 text-2xs text-fg-4">Um dia com tudo liberado. Sem cartão de crédito.</p>
         </div>
         <CallMock />
       </div>
@@ -195,7 +196,7 @@ function SectionHead({ eyebrow, title, children }: { eyebrow: string; title: Rea
 
 function Steps() {
   const steps = [
-    { icon: <Upload />, title: 'Traga seus leads', text: 'Importe a planilha, cole as linhas copiadas dela ou cadastre à mão. Duplicados são avisados antes de entrar.' },
+    { icon: <MapPinned />, title: 'Ache os leads', text: 'Busque empresas no Google Maps por cidade e nicho, ou traga a sua planilha. Quem já está na lista é pulado.' },
     { icon: <Headphones />, title: 'Ligue em sequência', text: 'Um lead atrás do outro, com roteiro e respostas para as objeções. Registrar o resultado leva um clique.' },
     { icon: <FolderKanban />, title: 'Feche e acompanhe', text: 'Reunião marcada, cliente fechado, projeto andando e pagamento recebido, tudo ligado ao mesmo lead.' },
   ]
@@ -222,6 +223,8 @@ function Steps() {
 
 function Features() {
   const items = [
+    { icon: <MapPinned />, title: 'Busca no Maps', text: 'Empresas da sua cidade com telefone, site, Instagram e o sócio pelo CNPJ. Filtre só quem não tem site.' },
+    { icon: <Send />, title: 'Disparo no WhatsApp', text: 'Funis de mensagens com intervalo entre envios, mensagens agendadas e as respostas no histórico do lead.' },
     { icon: <Sun />, title: 'Hoje', text: 'A fila do dia montada sozinha: retornos, reuniões, quem tentar de novo e leads novos.' },
     { icon: <RotateCcw />, title: 'Tentativas automáticas', text: 'Não atendeu de manhã? O retorno já fica marcado para a tarde do dia seguinte.' },
     { icon: <MessageCircle />, title: 'WhatsApp com modelos', text: 'Mensagens prontas com o nome da empresa e do responsável, abertas no seu WhatsApp.' },
@@ -279,10 +282,10 @@ function ForSites() {
 
 function Faq() {
   const items = [
-    { q: 'Preciso instalar alguma coisa?', a: 'Não. O XS funciona no navegador do PC e do celular. Se quiser, dá para instalar como app, com ícone na tela inicial.' },
-    { q: 'De onde vêm os leads?', a: 'De onde você já tem: importe uma planilha (CSV), cole as linhas copiadas do Excel ou do Google Planilhas, ou cadastre as empresas à mão.' },
+    { q: 'Preciso instalar alguma coisa?', a: 'Para ligar, organizar e gerir, não: o XS funciona no navegador do PC e do celular. Para buscar empresas no Maps e disparar no WhatsApp, você baixa o Motor XS no Windows (um arquivo só, abre com dois cliques).' },
+    { q: 'De onde vêm os leads?', a: 'Da busca no Google Maps do próprio XS, ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.' },
     { q: 'Meus dados ficam guardados?', a: 'Sim, na nuvem e protegidos. Cada conta só enxerga os próprios leads e a própria gestão. Você pode baixar um backup quando quiser.' },
-    { q: 'Como funciona o teste grátis?', a: 'São 14 dias com tudo liberado, sem cartão. No fim do teste você escolhe se quer continuar.' },
+    { q: 'Como funciona o teste grátis?', a: 'Você tem 1 dia com tudo liberado, inclusive a busca no Maps e o WhatsApp, sem cartão. No fim do teste você escolhe se quer continuar.' },
     { q: 'Funciona para outros serviços além de site?', a: 'Funciona para qualquer serviço vendido por ligação: tráfego pago, social media, identidade visual, sistemas. O roteiro é seu.' },
   ]
   return (
@@ -322,7 +325,7 @@ function FinalCta() {
             <p className="mt-2 text-sm text-fg-3">Crie a conta em 1 minuto e faça a primeira ligação hoje.</p>
           </div>
           <Link to="/criar-conta" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-[#3b7bf6]">
-            Testar 14 dias grátis <ArrowRight className="size-4" />
+            Testar 1 dia grátis <ArrowRight className="size-4" />
           </Link>
         </div>
       </div>
