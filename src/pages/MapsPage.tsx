@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Check, CircleStop, Crosshair, Download, ExternalLink, Globe, LoaderCircle, MapPinned, Phone, Plus, Radar, Search, Star, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/kit'
 import { getMapStyle, MapView, saveMapStyle, type MapPoint, type MapStyle } from '../components/MapView'
@@ -8,7 +8,8 @@ import { MotorOffline } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, InstagramIcon, Progress, Segmented } from '../components/ui'
 import { formatPhone } from '../lib/contact'
-import { formatElapsed, knownKeys, mapsToParsed, PHASE_LABEL, POPULAR_NICHES, type MapsSearchInput, type MapsState, type Mode } from '../lib/mapsSearch'
+import { addMapsRunToLeads } from '../lib/mapsAutoImport'
+import { formatElapsed, knownKeys, PHASE_LABEL, POPULAR_NICHES, type MapsSearchInput, type MapsState, type Mode } from '../lib/mapsSearch'
 import { motorFetch, useMotor } from '../lib/motor'
 import { useApp } from '../store/useApp'
 
@@ -59,18 +60,15 @@ function placeLabel(a: Record<string, string> | undefined, fallback: string): st
 export function MapsPage() {
   const online = useMotor((s) => s.online)
   const leads = useApp((s) => s.leads)
-  const importLeads = useApp((s) => s.importLeads)
   const toast = useApp((s) => s.toast)
   const [form, setForm] = useState<Form>(loadForm)
   const [state, setState] = useState<MapsState | null>(null)
   const [nicheInput, setNicheInput] = useState('')
   const [locating, setLocating] = useState(false)
   const [starting, setStarting] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [importing, setImporting] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
   const [mapStyle, setMapStyle] = useState<MapStyle>(getMapStyle)
-  const lastRun = useRef<string | null>(null)
 
   useEffect(() => {
     try {
@@ -96,16 +94,10 @@ export function MapsPage() {
     return () => clearInterval(id)
   }, [online, active, refresh])
 
-  // Ao terminar uma busca nova, pré-seleciona os leads que ainda não estão na base
-  useEffect(() => {
-    if (!state || state.phase !== 'completed' || state.runId === lastRun.current) return
-    lastRun.current = state.runId
-    setSelected(new Set(state.results.filter((r) => !r.recurring).map((r) => r.id)))
-  }, [state])
-
   const center: MapPoint | null = state?.active && state.center ? state.center : (form.point ?? state?.center ?? null)
   const results = state?.results ?? []
-  const pendingImport = state?.phase === 'completed' && !state.imported && results.length > 0
+  // Normalmente vai sozinho para os leads (useMapsAutoImport); isto cobre uma falha ao salvar
+  const pendingSave = !!state && !state.active && !state.imported && results.length > 0
 
   async function locate() {
     const q = form.location.trim()
@@ -148,9 +140,10 @@ export function MapsPage() {
   async function start() {
     if (!form.niches.length) return toast('Escolha ao menos um nicho.', 'error')
     if (!form.point && !form.location.trim()) return toast('Informe a cidade ou clique no mapa.', 'error')
-    if (pendingImport && !window.confirm('A busca anterior ainda não foi importada. Começar outra descarta aqueles resultados. Continuar?')) return
     setStarting(true)
     try {
+      // Garante que a busca anterior está nos leads antes de o motor trocá-la pela nova
+      if (pendingSave && state) await addMapsRunToLeads(state)
       const body: MapsSearchInput & { known: { phones: string[]; maps: string[] } } = {
         niches: form.niches,
         location: form.point?.label ?? form.location,
@@ -164,7 +157,6 @@ export function MapsPage() {
         known: knownKeys(leads),
       }
       await motorFetch('/maps/iniciar', { method: 'POST', json: body })
-      setSelected(new Set())
       await refresh()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha ao iniciar.', 'error')
@@ -178,24 +170,17 @@ export function MapsPage() {
     await refresh()
   }
 
-  async function importSelected() {
+  async function saveNow() {
     if (!state) return
-    const chosen = results.filter((r) => selected.has(r.id) && !r.recurring)
-    if (!chosen.length) return toast('Selecione ao menos um lead novo.', 'error')
-    setImporting(true)
+    setSaving(true)
     try {
-      const nichos = [...new Set(chosen.map((r) => r.niche))].join(', ')
-      const n = await importLeads(
-        chosen.map((r, i) => mapsToParsed(r, i)),
-        `Maps · ${nichos} · ${state.center?.label ?? form.location}`,
-      )
-      await motorFetch('/maps/ack', { method: 'POST', json: { runId: state.runId } }).catch(() => undefined)
+      const n = await addMapsRunToLeads(state)
       await refresh()
-      toast(`${n} lead(s) adicionados à sua lista.`, 'success', { label: 'Ver leads', run: () => (window.location.href = '/leads') })
+      if (n !== null) toast(n ?`${n} lead(s) entraram na sua lista.` : 'Essas empresas já estavam nos seus leads.', 'success', { label: 'Ver leads', run: () => (window.location.href = '/leads') })
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Falha ao importar.', 'error')
+      toast(err instanceof Error ? err.message : 'Falha ao salvar nos leads.', 'error')
     } finally {
-      setImporting(false)
+      setSaving(false)
     }
   }
 
@@ -421,35 +406,26 @@ export function MapsPage() {
                     {stats.semSite} sem site · {stats.whatsapp} com celular (WhatsApp) · {stats.cnpj} com responsável confirmado pelo CNPJ
                   </p>
                 </div>
-                {state?.imported && !active ? (
+                {active ? (
+                  <span className="text-2xs text-fg-3">Entram nos seus leads quando a busca terminar.</span>
+                ) : pendingSave ? (
+                  <Button variant="primary" icon={<Download className="size-3.5" />} loading={saving} onClick={() => void saveNow()}>
+                    Salvar nos leads
+                  </Button>
+                ) : (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
-                    <Check className="size-3.5" /> Importados ·{' '}
+                    <Check className="size-3.5" /> Já estão nos seus leads ·{' '}
                     <Link to="/leads" className="underline underline-offset-2">
                       ver leads
                     </Link>
                   </span>
-                ) : (
-                  !active && (
-                    <Button variant="primary" icon={<Download className="size-3.5" />} loading={importing} disabled={!selected.size} onClick={() => void importSelected()}>
-                      Adicionar {selected.size} aos leads
-                    </Button>
-                  )
                 )}
               </header>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-xs">
+                <table className="w-full min-w-[720px] text-xs">
                   <thead>
                     <tr className="border-b border-line-soft text-left text-2xs text-fg-3">
-                      <th className="w-8 px-4 py-2">
-                        <input
-                          type="checkbox"
-                          aria-label="Selecionar todos"
-                          disabled={state?.imported}
-                          checked={selected.size > 0 && selected.size === results.filter((r) => !r.recurring).length}
-                          onChange={(e) => setSelected(e.target.checked ? new Set(results.filter((r) => !r.recurring).map((r) => r.id)) : new Set())}
-                        />
-                      </th>
-                      <th className="py-2 font-medium">Empresa</th>
+                      <th className="py-2 pl-4 font-medium">Empresa</th>
                       <th className="px-2 py-2 font-medium">Telefone</th>
                       <th className="px-2 py-2 font-medium">Presença</th>
                       <th className="px-2 py-2 font-medium">Responsável</th>
@@ -459,23 +435,7 @@ export function MapsPage() {
                   <tbody className="divide-y divide-line-soft">
                     {results.map((r) => (
                       <tr key={r.id} className={clsx('align-top', r.recurring && 'opacity-55')}>
-                        <td className="px-4 py-2.5">
-                          <input
-                            type="checkbox"
-                            disabled={r.recurring || state?.imported}
-                            checked={selected.has(r.id)}
-                            onChange={(e) =>
-                              setSelected((s) => {
-                                const n = new Set(s)
-                                if (e.target.checked) n.add(r.id)
-                                else n.delete(r.id)
-                                return n
-                              })
-                            }
-                            aria-label={`Selecionar ${r.name}`}
-                          />
-                        </td>
-                        <td className="py-2.5 pr-2">
+                        <td className="py-2.5 pr-2 pl-4">
                           <a href={r.mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-fg hover:text-blue-300">
                             {r.name} <ExternalLink className="size-3 text-fg-4" />
                           </a>
@@ -549,7 +509,7 @@ export function MapsPage() {
           {(!state || state.phase === 'idle') && online && (
             <div className="panel flex items-center gap-3 px-4 py-3 text-xs text-fg-3">
               <MapPinned className="size-4 shrink-0 text-blue-400" />
-              Escolha a cidade, o raio e os nichos ao lado. O Motor abre o Google Maps escondido no seu computador e preenche a lista aqui.
+              Escolha a cidade, o raio e os nichos ao lado. O Motor abre o Google Maps escondido no seu computador, e as empresas que ele achar entram direto nos seus leads.
             </div>
           )}
         </div>

@@ -29,6 +29,6 @@ function maplibreWorker(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), maplibreWorker()],
-  server: { port: 5180 },
+  server: { port: Number(process.env.PORT) || 5180 },
   test: { environment: 'node', include: ['tests/**/*.test.ts'] },
 })

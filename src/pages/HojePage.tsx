@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Archive, CalendarCheck, CalendarClock, Headphones, PhoneOutgoing, RotateCcw, Sparkles, Upload } from 'lucide-react'
+import { Archive, CalendarCheck, CalendarClock, Headphones, PhoneOutgoing, RotateCcw, MapPinned, Sparkles } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HotTag, QuickActions, StatusMenu } from '../components/leadBits'
@@ -25,7 +25,6 @@ export function HojePage() {
   const saveOutcome = useApp((s) => s.saveOutcome)
   const toast = useApp((s) => s.toast)
   const setQueue = useApp((s) => s.setQueue)
-  const setImportOpen = useUi((s) => s.setImportOpen)
   const index = useIndex()
   const metrics = useMetrics()
   const today = useToday()
@@ -69,8 +68,8 @@ export function HojePage() {
       <div className="space-y-6">
         <PageHeader title="Hoje" subtitle={formatLongToday()} />
         <div className="panel">
-          <Empty icon={<Upload />} title="Sua lista de hoje aparece aqui" action={<Button variant="primary" onClick={() => setImportOpen(true)}>Importar leads</Button>}>
-            Importe seus leads para montar a fila de ligações do dia.
+          <Empty icon={<MapPinned />} title="Sua lista de hoje aparece aqui" action={<Button variant="primary" icon={<MapPinned className="size-3.5" />} onClick={() => navigate('/maps')}>Buscar leads</Button>}>
+            Busque empresas no Maps para montar a fila de ligações do dia.
           </Empty>
         </div>
       </div>

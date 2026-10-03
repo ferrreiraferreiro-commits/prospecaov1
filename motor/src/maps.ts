@@ -659,6 +659,7 @@ async function run(input: SearchInput, signal: AbortSignal) {
           const lead = await enrichLead(detail, leads[k], input.analyzeSites, signal)
           if (accept(lead)) {
             collected.set(lead.id, lead)
+            state.results = [...collected.values()]
             approvedHere++
           } else state.discarded++
           state.approvedCount = Math.min(input.targetLeads, collected.size)
@@ -672,6 +673,7 @@ async function run(input: SearchInput, signal: AbortSignal) {
             approvedHere++
           } else state.discarded++
         }
+        state.results = [...collected.values()]
         state.approvedCount = Math.min(input.targetLeads, collected.size)
       }
       log(`${niche} · ${approvedHere} aprovado(s)${state.discarded ? `, ${state.discarded} descartado(s) pelos filtros até aqui` : ''}.`)
@@ -685,18 +687,19 @@ async function run(input: SearchInput, signal: AbortSignal) {
     if (state.results.length < input.targetLeads) log(`O Maps mostrou ${state.results.length} de ${input.targetLeads} empresas que passam nos filtros nesta área.`)
     state.phase = 'completed'
     state.progress = 100
-    state.imported = state.results.length === 0
-    log(`Busca concluída: ${state.results.length} lead(s) prontos para importar.`)
+    log(`Busca concluída: ${state.results.length} lead(s) encontrados.`)
   } catch (err) {
     if (signal.aborted || (err as Error)?.message === STOPPED) {
       state.phase = 'cancelled'
-      state.message = 'Busca interrompida com segurança.'
+      state.message = state.results.length ? `Busca interrompida. ${state.results.length} lead(s) encontrados até aqui.` : 'Busca interrompida com segurança.'
     } else {
       state.phase = 'error'
       state.error = (err as Error)?.message || 'Falha ao executar a busca.'
       log(state.error)
     }
   } finally {
+    // O que foi aprovado (busca completa, parada ou com erro) fica esperando o app levar para os leads
+    state.imported = state.results.length === 0
     state.finishedAt = new Date().toISOString()
     if (state.startedAt) state.elapsedMs = Date.now() - Date.parse(state.startedAt)
     state.active = false

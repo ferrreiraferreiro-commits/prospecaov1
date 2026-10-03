@@ -29,6 +29,7 @@ import {
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
+import { useMapsAutoImport } from '../lib/mapsAutoImport'
 import { useMotor, useMotorPolling } from '../lib/motor'
 import { useMetrics } from '../store/derived'
 import { useApp } from '../store/useApp'
@@ -115,6 +116,7 @@ export function Layout() {
   const [sheet, setSheet] = useState(false)
   useReminders()
   useMotorPolling()
+  useMapsAutoImport()
   useDisparoSync()
 
   useEffect(() => setSheet(false), [pathname])

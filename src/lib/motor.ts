@@ -62,7 +62,8 @@ export interface MotorHealth {
   versao: string
   navegador: boolean
   whatsapp: { status: WaStatus; user: { id: string; name: string } | null }
-  maps: { active: boolean; phase: string }
+  /** `pendente`/`runId` só vêm do motor 1.2+: há resultados que ainda não foram para os leads */
+  maps: { active: boolean; phase: string; runId?: string | null; pendente?: boolean }
   disparo: { running: number }
   agenda?: { pendentes: number }
   /** O motor está impedindo o Windows de suspender */

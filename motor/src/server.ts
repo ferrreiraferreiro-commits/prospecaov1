@@ -12,7 +12,7 @@ import { keepAwakeActive } from './keepAwake.js'
 import { storageDir } from './store.js'
 import { connect, disconnect, getWa, resumeStoredSession, sendText, shutdown } from './whatsapp.js'
 
-const VERSION = '1.1.0'
+const VERSION = '1.2.0'
 const PORT = Number(process.env.XS_PORT ?? 3077)
 
 const EXTRA_ORIGINS = (process.env.XS_ORIGINS ?? '')
@@ -73,7 +73,7 @@ app.get(
       versao: VERSION,
       navegador: Boolean(chromeExecutable()),
       whatsapp: { status: wa.status, user: wa.user },
-      maps: { active: maps.active, phase: maps.phase },
+      maps: { active: maps.active, phase: maps.phase, runId: maps.runId, pendente: !maps.active && !maps.imported && maps.results.length > 0 },
       disparo: { running: runningCount() },
       agenda: { pendentes: agendaPending() },
       acordado: keepAwakeActive(),
