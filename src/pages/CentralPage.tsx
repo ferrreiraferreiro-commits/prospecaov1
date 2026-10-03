@@ -101,7 +101,7 @@ export function CentralPage() {
   if (!leads.length) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Leads" subtitle="Busque empresas no Maps ou traga a sua lista e comece a ligar." />
+        <PageHeader title="Leads" subtitle="Busque empresas da sua cidade ou traga a sua lista e comece a ligar." />
         <div className="panel">
           <Empty
             icon={<MapPinned />}

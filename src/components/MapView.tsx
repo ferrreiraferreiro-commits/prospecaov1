@@ -100,6 +100,7 @@ export function MapView({
   onPick,
   locked,
   mapStyle = 'claro',
+  hideCircle,
 }: {
   center: MapPoint | null
   radiusKm: number
@@ -107,6 +108,8 @@ export function MapView({
   onPick: (p: MapPoint) => void
   locked?: boolean
   mapStyle?: MapStyle
+  /** Só enquadra a área, sem desenhar o círculo (a busca por cidade/bairro não usa raio) */
+  hideCircle?: boolean
 }) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<MlMap | null>(null)
@@ -251,7 +254,7 @@ export function MapView({
     const step = (now: number) => {
       const t = duration ? Math.min(1, (now - start) / duration) : 1
       animRadius.current = from + (to - from) * (1 - (1 - t) ** 3)
-      if (ready.current) (m.getSource(AREA) as GeoJSONSource | undefined)?.setData(circle(center, animRadius.current))
+      if (ready.current) (m.getSource(AREA) as GeoJSONSource | undefined)?.setData(hideCircle ? { type: 'FeatureCollection', features: [] } : circle(center, animRadius.current))
       if (t < 1) raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
@@ -262,7 +265,7 @@ export function MapView({
       cancelAnimationFrame(raf)
       clearTimeout(fit)
     }
-  }, [center?.lat, center?.lng, radiusKm]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [center?.lat, center?.lng, radiusKm, hideCircle]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Empresas encontradas
   useEffect(() => {

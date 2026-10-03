@@ -1,13 +1,13 @@
 import clsx from 'clsx'
-import { CalendarCheck, CalendarClock, Check, CheckCheck, ChevronDown, Loader2, MousePointerClick, Phone, RotateCcw, Search, Star, Undo2 } from 'lucide-react'
+import { CalendarCheck, CalendarClock, Check, CheckCheck, ChevronDown, Loader2, MousePointerClick, Phone, RotateCcw, Search, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 const FEATURES = [
   {
     id: 'maps',
-    tab: 'Maps',
-    title: 'Captura no Maps',
-    text: 'Encontre empresas por cidade e nicho e filtre as oportunidades, como quem tem telefone e ainda não tem site. Tudo entra direto na sua lista.',
+    tab: 'Busca',
+    title: 'Busca de empresas',
+    text: 'Encontre empresas por cidade, bairro e nicho e filtre as oportunidades, como quem tem celular e ainda não tem site. Tudo entra direto na sua lista.',
     Mock: MapsMock,
   },
   {
@@ -139,30 +139,30 @@ function Tag({ children, tone }: { children: ReactNode; tone?: 'go' | 'muted' })
 }
 
 // ---------------------------------------------------------------------------
-// Captura no Maps
+// Busca de empresas
 // ---------------------------------------------------------------------------
 
-type Place = { nome: string; bairro: string; nota: string; site: boolean; base: boolean; insta: boolean; socio: boolean }
+type Place = { nome: string; bairro: string; cel: boolean; site: boolean; base: boolean; insta: boolean; socio: boolean }
 
 const PLACES: Record<string, Place[]> = {
   Dentista: [
-    { nome: 'Clínica Sorriso Leve', bairro: 'Cambuí', nota: '4,9', site: false, base: false, insta: true, socio: true },
-    { nome: 'Odonto Vida', bairro: 'Centro', nota: '4,7', site: false, base: false, insta: true, socio: false },
-    { nome: 'Instituto Dental Norte', bairro: 'Taquaral', nota: '4,8', site: true, base: false, insta: true, socio: true },
-    { nome: 'Sorriso Kids', bairro: 'Guanabara', nota: '4,6', site: false, base: true, insta: false, socio: false },
-    { nome: 'Consultório Bem Estar', bairro: 'Castelo', nota: '4,5', site: false, base: false, insta: false, socio: true },
+    { nome: 'Clínica Sorriso Leve', bairro: 'Cambuí', cel: true, site: false, base: false, insta: true, socio: true },
+    { nome: 'Odonto Vida', bairro: 'Centro', cel: true, site: false, base: false, insta: true, socio: false },
+    { nome: 'Instituto Dental Norte', bairro: 'Taquaral', cel: true, site: true, base: false, insta: true, socio: true },
+    { nome: 'Sorriso Kids', bairro: 'Guanabara', cel: false, site: false, base: true, insta: false, socio: false },
+    { nome: 'Consultório Bem Estar', bairro: 'Castelo', cel: false, site: false, base: false, insta: false, socio: true },
   ],
   Barbearia: [
-    { nome: 'Barbearia Navalha', bairro: 'Centro', nota: '4,8', site: false, base: true, insta: true, socio: false },
-    { nome: 'Dom Bigode', bairro: 'Cambuí', nota: '4,9', site: true, base: false, insta: true, socio: true },
-    { nome: 'Corte Fino', bairro: 'Bosque', nota: '4,6', site: false, base: false, insta: true, socio: true },
-    { nome: 'Barbearia do Zé', bairro: 'Taquaral', nota: '4,7', site: false, base: false, insta: false, socio: false },
+    { nome: 'Barbearia Navalha', bairro: 'Centro', cel: true, site: false, base: true, insta: true, socio: false },
+    { nome: 'Dom Bigode', bairro: 'Cambuí', cel: true, site: true, base: false, insta: true, socio: true },
+    { nome: 'Corte Fino', bairro: 'Bosque', cel: false, site: false, base: false, insta: true, socio: true },
+    { nome: 'Barbearia do Zé', bairro: 'Taquaral', cel: true, site: false, base: false, insta: false, socio: false },
   ],
   'Pet shop': [
-    { nome: 'Pet Shop Amigo', bairro: 'Jardim Europa', nota: '4,6', site: false, base: false, insta: true, socio: true },
-    { nome: 'Banho & Tosa Patinhas', bairro: 'Cambuí', nota: '4,8', site: false, base: false, insta: true, socio: false },
-    { nome: 'Mundo Pet', bairro: 'Centro', nota: '4,5', site: true, base: false, insta: true, socio: true },
-    { nome: 'Cão Feliz', bairro: 'Guanabara', nota: '4,4', site: false, base: true, insta: false, socio: false },
+    { nome: 'Pet Shop Amigo', bairro: 'Jardim Europa', cel: false, site: false, base: false, insta: true, socio: true },
+    { nome: 'Banho & Tosa Patinhas', bairro: 'Cambuí', cel: true, site: false, base: false, insta: true, socio: false },
+    { nome: 'Mundo Pet', bairro: 'Centro', cel: false, site: true, base: false, insta: true, socio: true },
+    { nome: 'Cão Feliz', bairro: 'Guanabara', cel: false, site: false, base: true, insta: false, socio: false },
   ],
 }
 
@@ -190,10 +190,10 @@ function MapsMock() {
 
   return (
     <Frame
-      title="Buscar no Maps"
+      title="Buscar empresas"
       meta={
         <span className="flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-go" /> Resultados em segundos
+          <span className="size-1.5 rounded-full bg-go" /> Resultado na hora
         </span>
       }
     >
@@ -235,7 +235,7 @@ function MapsMock() {
               <div className="h-full rounded-full bg-accent transition-[width] duration-150" style={{ width: `${(progress / 19) * 100}%` }} />
             </div>
             <p className="num mt-3 text-center text-2xs text-fg-3">
-              Buscando no Google · Campinas - SP
+              Buscando na base do CNPJ · Campinas - SP
             </p>
           </div>
         </div>
@@ -252,9 +252,7 @@ function MapsMock() {
                       {nicho} · {r.bairro}
                     </p>
                   </div>
-                  <span className="num hidden items-center gap-1 text-2xs text-fg-2 sm:flex">
-                    <Star className="size-3 fill-gold text-gold" /> {r.nota}
-                  </span>
+                  <span className={clsx('hidden text-2xs sm:inline', r.cel ? 'text-emerald-300' : 'text-fg-3')}>{r.cel ? 'celular' : 'fixo'}</span>
                   {r.base ? <Tag>já na lista</Tag> : r.site ? <Tag>tem site</Tag> : <Tag tone="go">sem site</Tag>}
                   <ChevronDown className={clsx('size-3.5 shrink-0 text-fg-3 transition-transform', isOpen && 'rotate-180')} />
                 </button>

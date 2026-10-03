@@ -61,7 +61,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/hoje', label: 'Hoje', icon: Sun },
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
-      { to: '/maps', label: 'Buscar no Maps', icon: MapPinned },
+      { to: '/maps', label: 'Buscar empresas', icon: MapPinned },
     ],
   },
   {

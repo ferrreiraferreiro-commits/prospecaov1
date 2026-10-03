@@ -5,23 +5,21 @@ import { knownKeys, type MapsResult, type MapsSearchInput, type MapsState } from
 import { useApp } from './useApp'
 
 /**
- * Busca no Maps pelo servidor da XS (Google Places), sem o Motor.
+ * Busca de empresas pelo servidor da XS (base pública do CNPJ), sem o Motor.
  * Fica fora da tela: trocar de página no meio não perde a busca, e o resultado
  * vai direto para os leads quando termina.
  */
-
-type Enriched = Pick<MapsResult, 'id' | 'instagram' | 'cnpj' | 'responsibleName' | 'responsibleRole' | 'enrichmentConfidence' | 'enrichmentSource'>
 
 interface Stats {
   found: number
   approved: number
   recurring: number
   blocked: number
-  calls: number
+  mes?: string
   elapsedMs: number
 }
 
-async function api<T>(body: unknown, signal: AbortSignal): Promise<T> {
+export async function mapsApi<T>(body: unknown, signal?: AbortSignal): Promise<T> {
   const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null
   const res = await fetch('/api/maps', {
     method: 'POST',
@@ -34,12 +32,11 @@ async function api<T>(body: unknown, signal: AbortSignal): Promise<T> {
   return data
 }
 
-const passes = (mode: number, has: boolean) => mode === 0 || (mode === 1 ? has : !has)
 const now = () => new Date().toLocaleTimeString('pt-BR')
 
 interface MapsSearchStore {
   state: MapsState | null
-  run(input: MapsSearchInput & { lat: number; lng: number }): Promise<void>
+  run(input: MapsSearchInput & { lat?: number; lng?: number }): Promise<void>
   stop(): void
   /** Salva nos leads uma busca que não conseguiu ir sozinha (ex.: falha de rede). */
   save(): Promise<number | null>
@@ -66,13 +63,54 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
       log(runId, added ? `${added} lead(s) entraram na sua lista.` : 'Essas empresas já estavam nos seus leads.')
       useApp
         .getState()
-        .toast(added ? `${added} lead(s) da busca no Maps entraram na sua lista.` : 'Essas empresas já estavam nos seus leads.', 'success', {
+        .toast(added ? `${added} lead(s) da busca entraram na sua lista.` : 'Essas empresas já estavam nos seus leads.', 'success', {
           label: 'Ver leads',
           run: () => (window.location.href = '/leads'),
         })
     } catch (err) {
       useApp.getState().toast(err instanceof Error ? `Não consegui salvar a busca nos leads: ${err.message}` : 'Não consegui salvar a busca nos leads.', 'error')
     }
+  }
+
+  /** Confere os sites de quem tem e-mail com domínio próprio e completa site/Instagram nos leads já salvos. */
+  async function checkSites(runId: string, toCheck: MapsResult[]) {
+    const queue: MapsResult[][] = []
+    for (let i = 0; i < toCheck.length; i += 6) queue.push(toCheck.slice(i, i + 6))
+    let sites = 0
+    let insta = 0
+    await Promise.all(
+      Array.from({ length: Math.min(4, queue.length) }, async () => {
+        while (queue.length) {
+          const batch = queue.shift()!
+          try {
+            const { itens } = await mapsApi<{ itens: { id: string; website: string; instagram: string }[] }>({
+              acao: 'enriquecer',
+              itens: batch.map((r) => ({ id: r.id, site: r.siteGuess })),
+            })
+            const byId = new Map(itens.map((e) => [e.id, e]))
+            set((s) =>
+              s.state?.runId === runId
+                ? { state: { ...s.state, results: s.state.results.map((r) => (byId.has(r.id) ? { ...r, website: byId.get(r.id)!.website, instagram: byId.get(r.id)!.instagram || r.instagram } : r)) } }
+                : s,
+            )
+            const app = useApp.getState()
+            for (const e of itens) {
+              if (e.website) sites++
+              if (e.instagram) insta++
+              if (!e.website && !e.instagram) continue
+              // O id do resultado é o CNPJ, que o lead também guarda
+              const lead = app.leads.find((l) => (l.cnpj ?? '').replace(/\D/g, '') === e.id)
+              if (lead) await app.fillLeadLinks(lead.id, { website: e.website || null, instagram: e.instagram || null })
+            }
+          } catch {
+            /* site lento ou fora do ar: o lead fica sem site/Instagram */
+          }
+        }
+      }),
+    )
+    log(runId, `Sites conferidos: ${sites} no ar, ${insta} com Instagram.`)
+    const st = get().state
+    if (st?.runId === runId) patch(runId, { message: st.message.replace(/ Conferindo .*$/, ` ${sites} site(s) no ar, ${insta} com Instagram.`) })
   }
 
   return {
@@ -86,14 +124,13 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
       ctrl = c
       const startedAt = new Date().toISOString()
       const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-
       set({
         state: {
           runId,
           active: true,
           phase: 'connecting',
-          message: 'Buscando as empresas no Google…',
-          progress: 15,
+          message: 'Buscando as empresas…',
+          progress: 20,
           cardsFound: 0,
           approvedCount: 0,
           discarded: 0,
@@ -101,7 +138,7 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
           recurringBlocked: 0,
           currentSector: 0,
           totalSectors: 0,
-          center: { lat: input.lat, lng: input.lng, label: input.location },
+          center: input.lat !== undefined && input.lng !== undefined ? { lat: input.lat, lng: input.lng, label: input.location } : null,
           input,
           results: [],
           logs: [],
@@ -112,14 +149,28 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
           imported: false,
         },
       })
-      log(runId, `Busca: ${input.niches.join(', ')} · ${input.radiusKm} km de ${input.location}`)
+      const where = input.bairros.length ? `${input.bairros.join(', ')} · ${input.location}` : input.location
+      log(runId, `Busca: ${input.niches.join(', ')} · ${where}`)
 
       let results: MapsResult[] = []
       try {
-        const data = await api<{ results: MapsResult[]; stats: Stats }>({ acao: 'buscar', ...input, known: knownKeys(useApp.getState().leads) }, c.signal)
+        const known = knownKeys(useApp.getState().leads)
+        const data = await mapsApi<{ results: MapsResult[]; stats: Stats }>(
+          {
+            acao: 'buscar',
+            cidade: input.location,
+            nichos: input.niches,
+            bairros: input.bairros,
+            filtros: { telefone: input.qualification.phone, celular: input.qualification.mobile, site: input.qualification.website },
+            meta: input.targetLeads,
+            conhecidos: { telefones: known.phones, cnpjs: known.cnpjs },
+            pular: input.existingPolicy === 'block',
+          },
+          c.signal,
+        )
         results = data.results
         const fresh = results.filter((r) => !r.recurring).length
-        log(runId, `Google: ${data.stats.found} empresas na área, ${data.stats.approved} passaram nos filtros (${(data.stats.elapsedMs / 1000).toFixed(1)} s, ${data.stats.calls} consulta(s)).`)
+        log(runId, `${data.stats.found} empresas ativas nesse nicho e região; ${fresh} passaram nos filtros (${data.stats.elapsedMs} ms${data.stats.mes ? ` · base de ${data.stats.mes}` : ''}).`)
         if (data.stats.blocked) log(runId, `${data.stats.blocked} já estavam nos seus leads e foram puladas.`)
         patch(runId, {
           results,
@@ -137,48 +188,16 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
         return void finish(runId, 'error', { error: msg, message: msg })
       }
 
-      // Instagram e CNPJ: abre o site de quem tem (em paralelo, alguns segundos)
-      const toCheck = input.analyzeSites ? results.filter((r) => r.website && !r.instagram && !r.recurring) : []
-      if (toCheck.length) {
-        patch(runId, { phase: 'enriching', message: `Conferindo ${toCheck.length} site(s): Instagram e CNPJ…` })
-        const batches: MapsResult[][] = []
-        for (let i = 0; i < toCheck.length; i += 8) batches.push(toCheck.slice(i, i + 8))
-        let done = 0
-        const queue = [...batches]
-        await Promise.all(
-          Array.from({ length: Math.min(4, queue.length) }, async () => {
-            while (queue.length && !c.signal.aborted) {
-              const batch = queue.shift()!
-              try {
-                const { itens } = await api<{ itens: Enriched[] }>(
-                  { acao: 'enriquecer', itens: batch.map((r) => ({ id: r.id, website: r.website, name: r.name, phone: r.phone, city: r.city })) },
-                  c.signal,
-                )
-                const byId = new Map(itens.map((e) => [e.id, e]))
-                results = results.map((r) => {
-                  const e = byId.get(r.id)
-                  return e ? { ...r, ...e, instagram: e.instagram || r.instagram } : r
-                })
-              } catch {
-                /* site fora do ar ou lento: o lead entra sem Instagram/CNPJ */
-              }
-              done += batch.length
-              patch(runId, { results, progress: 60 + Math.round((done / toCheck.length) * 35) })
-            }
-          }),
-        )
-        log(runId, `Sites conferidos: ${results.filter((r) => r.instagram).length} com Instagram, ${results.filter((r) => r.enrichmentConfidence === 'confirmed').length} com sócio pelo CNPJ.`)
-      }
-
-      // Filtro de Instagram só agora (depende dos sites) e corte na meta
-      const fresh = results.filter((r) => !r.recurring && passes(input.qualification.instagram, !!r.instagram)).slice(0, input.targetLeads)
-      results = [...fresh, ...results.filter((r) => r.recurring)]
+      // Os leads entram na hora; a conferência dos sites vem depois, em segundo plano
+      const fresh = results.filter((r) => !r.recurring).length
       const secs = (Date.now() - Date.parse(startedAt)) / 1000
-      await finish(runId, c.signal.aborted ? 'cancelled' : 'completed', {
+      const toCheck = input.analyzeSites ? results.filter((r) => r.siteGuess && !r.recurring) : []
+      await finish(runId, 'completed', {
         results,
-        approvedCount: fresh.length,
-        message: c.signal.aborted ? 'Busca interrompida.' : `${fresh.length} empresa(s) em ${secs.toFixed(1)} s.`,
+        approvedCount: fresh,
+        message: `${fresh} empresa(s) em ${secs < 1 ? 'menos de 1 segundo' : `${secs.toFixed(1).replace('.', ',')} s`}.${toCheck.length ? ` Conferindo ${toCheck.length} site(s) em segundo plano…` : ''}`,
       })
+      if (toCheck.length) void checkSites(runId, toCheck)
     },
 
     stop() {

@@ -2,7 +2,7 @@ import { mapsKey, phoneKey } from './duplicates'
 import type { ParsedLead } from './parser'
 import type { Lead } from './types'
 
-/** Resultado de uma busca no Maps (Google Places, pelo servidor da XS). */
+/** Empresa encontrada pela busca da XS (base pública do CNPJ, pelo servidor de busca). */
 export interface MapsResult {
   id: string
   name: string
@@ -25,18 +25,26 @@ export interface MapsResult {
   enrichmentSource: string
   hasWhatsapp: boolean
   recurring: boolean
+  /** Campos que vêm da base do CNPJ */
+  email?: string
+  phone2?: string
+  /** Domínio do e-mail próprio: candidato a site (conferido se "Conferir os sites" estiver ligado) */
+  siteGuess?: string
+  razao?: string
+  openedAt?: string
+  neighborhood?: string
+  cep?: string
 }
 
 export type Mode = 1 | 0 | -1
 
 export interface MapsSearchInput {
   niches: string[]
+  /** "Cidade, UF" */
   location: string
-  lat?: number
-  lng?: number
-  radiusKm: number
+  bairros: string[]
   targetLeads: number
-  qualification: { phone: Mode; website: Mode; instagram: Mode }
+  qualification: { phone: Mode; website: Mode; mobile: Mode }
   analyzeSites: boolean
   existingPolicy: 'block' | 'allow'
 }
@@ -70,7 +78,7 @@ export interface MapsState {
 export const PHASE_LABEL: Record<MapsPhase, string> = {
   idle: 'Pronto',
   geocoding: 'Localizando a área',
-  connecting: 'Buscando no Google',
+  connecting: 'Buscando empresas',
   scrolling: 'Varrendo os setores',
   enriching: 'Conferindo os sites',
   processing: 'Finalizando',
@@ -102,10 +110,11 @@ export const POPULAR_NICHES = [
   'Fisioterapia',
 ]
 
-/** Chaves (telefone e lugar no Maps) dos leads que já estão no app — a busca pula esses. */
-export function knownKeys(leads: Pick<Lead, 'telefone' | 'whatsapp' | 'maps_url'>[]): { phones: string[]; maps: string[] } {
+/** Chaves (telefone, lugar no Maps e CNPJ) dos leads que já estão no app — a busca pula esses. */
+export function knownKeys(leads: Pick<Lead, 'telefone' | 'whatsapp' | 'maps_url' | 'cnpj'>[]): { phones: string[]; maps: string[]; cnpjs: string[] } {
   const phones = new Set<string>()
   const maps = new Set<string>()
+  const cnpjs = new Set<string>()
   for (const l of leads) {
     for (const t of [l.telefone, l.whatsapp]) {
       const k = phoneKey(t)
@@ -113,15 +122,22 @@ export function knownKeys(leads: Pick<Lead, 'telefone' | 'whatsapp' | 'maps_url'
     }
     const m = mapsKey(l.maps_url)
     if (m) maps.add(m)
+    const c = (l.cnpj ?? '').replace(/\D/g, '')
+    if (c.length === 14) cnpjs.add(c)
   }
-  return { phones: [...phones], maps: [...maps] }
+  return { phones: [...phones], maps: [...maps], cnpjs: [...cnpjs] }
 }
 
 const NICHE_CASE = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 
 /** Converte um resultado do Maps no formato de importação dos leads. */
 export function mapsToParsed(r: MapsResult, index: number): ParsedLead {
-  const extras: Record<string, string> = { Origem: 'Busca no Maps (XS)' }
+  const fromReceita = r.enrichmentSource.startsWith('Receita')
+  const extras: Record<string, string> = { Origem: fromReceita ? 'Busca de empresas (base pública do CNPJ)' : 'Busca no Maps (XS)' }
+  if (r.razao && r.razao !== r.name) extras['Razão social'] = r.razao
+  if (r.email) extras['E-mail'] = r.email
+  if (r.phone2) extras['Telefone 2'] = r.phone2
+  if (r.openedAt) extras['Aberta em'] = r.openedAt.split('-').reverse().join('/')
   if (r.responsibleName && r.enrichmentConfidence === 'confirmed') {
     extras['Responsável'] = r.responsibleName
     if (r.responsibleRole) extras['Cargo do responsável'] = r.responsibleRole
@@ -146,7 +162,8 @@ export function mapsToParsed(r: MapsResult, index: number): ParsedLead {
     observacoes: null,
     dados_extras: extras,
     status: 'novo',
-    cnpj: r.enrichmentConfidence === 'confirmed' ? r.cnpj : null,
+    // Na base do CNPJ o número é da própria empresa; no site, só quando a identidade conferiu
+    cnpj: fromReceita || r.enrichmentConfidence === 'confirmed' ? r.cnpj || null : null,
   }
 }
 

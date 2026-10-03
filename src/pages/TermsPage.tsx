@@ -9,7 +9,7 @@ const sections: LegalSection[] = [
       <>
         <p>
           A XS Prospecção é uma ferramenta online para prospectar e acompanhar clientes, feita principalmente para quem vende sites e serviços digitais
-          para empresas. Ele reúne busca de empresas no Google Maps, lista de leads, Modo Ligação com roteiro e objeções, retornos, reuniões, mensagens
+          para empresas. Ele reúne busca de empresas (base pública do CNPJ), lista de leads, Modo Ligação com roteiro e objeções, retornos, reuniões, mensagens
           de WhatsApp, clientes, projetos, financeiro, precificação e métricas.
         </p>
         <p>
@@ -44,7 +44,7 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          Toda conta nova começa com <strong>1 dia de teste grátis com todos os recursos liberados</strong>, inclusive a busca no Maps e o disparo
+          Toda conta nova começa com <strong>1 dia de teste grátis com todos os recursos liberados</strong>, inclusive a busca de empresas e o disparo
           automático no WhatsApp. O teste não pede cartão de crédito e não vira cobrança automática.
         </p>
         <p>
@@ -97,8 +97,8 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          A XS depende de serviços de terceiros, como Supabase (banco de dados e login), Vercel (hospedagem), Google Maps Platform (busca de
-          empresas), BrasilAPI (consulta de CNPJ) e OpenStreetMap (mapas). A lista completa está na <a href="/privacidade#terceiros">Política de Privacidade</a>.
+          A XS depende de serviços de terceiros, como Supabase (banco de dados e login), Vercel (hospedagem), Oracle Cloud (servidor da busca de
+          empresas), Receita Federal (base pública do CNPJ), BrasilAPI (consulta de CNPJ) e OpenStreetMap (mapas). A lista completa está na <a href="/privacidade#terceiros">Política de Privacidade</a>.
         </p>
         <p>
           Não temos controle sobre esses serviços. Mudanças, limites ou falhas neles podem afetar algumas funções da XS, e o uso deles também segue os
@@ -114,7 +114,7 @@ const sections: LegalSection[] = [
       <>
         <p>
           O disparo automático no WhatsApp (envios em massa, funis e mensagens agendadas) funciona pelo <strong>Motor XS</strong>, um programa opcional
-          para Windows que você baixa dentro do app e roda no seu computador. Todo o resto, inclusive a busca no Google Maps, funciona direto no
+          para Windows que você baixa dentro do app e roda no seu computador. Todo o resto, inclusive a busca de empresas, funciona direto no
           navegador, no computador ou no celular.
         </p>
         <Dash
@@ -129,11 +129,11 @@ const sections: LegalSection[] = [
   },
   {
     id: 'whatsapp-maps',
-    title: 'WhatsApp e Google Maps',
+    title: 'WhatsApp e dados públicos',
     body: (
       <>
         <p>
-          A XS não é afiliada, patrocinada nem aprovada pelo Google, pelo WhatsApp ou pela Meta. Os nomes são usados apenas para indicar com quais
+          A XS não é afiliada, patrocinada nem aprovada pelo Google, pelo WhatsApp ou pela Meta, nem pela Receita Federal. Os nomes são usados apenas para indicar com quais
           serviços a XS funciona.
         </p>
         <p>
@@ -143,10 +143,9 @@ const sections: LegalSection[] = [
           conteúdo das mensagens são de sua responsabilidade.
         </p>
         <p>
-          <strong>Google Maps</strong>: a busca usa a plataforma oficial do Google (Google Maps Platform) para trazer as informações que as empresas
-          deixam públicas. Você deve
-          usar essas informações de forma compatível com a lei e com os termos do Google. A XS não garante que os dados de uma ficha estejam corretos
-          ou atualizados.
+          <strong>Base pública do CNPJ</strong>: a busca usa os dados abertos que a Receita Federal publica todo mês. Telefones e e-mails
+          podem estar desatualizados ou ser do escritório de contabilidade da empresa, e a XS não garante que estejam corretos. Use essas
+          informações de forma compatível com a LGPD, para contato entre empresas, e respeite quem pedir para não ser contatado.
         </p>
       </>
     ),

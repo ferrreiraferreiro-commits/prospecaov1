@@ -94,6 +94,8 @@ interface AppState extends Snapshot {
   logMessage(leadId: string, text: string, modelo?: string | null): Promise<void>
   setMeetingResult(meetingId: string, resultado: MeetingResultado | null, valor?: number | null): Promise<void>
   saveCnpj(leadId: string, cnpj: string | null, info: CnpjInfo | null): Promise<void>
+  /** Site e Instagram achados depois (ex.: conferência de sites da busca), sem apagar o que já existe. */
+  fillLeadLinks(leadId: string, links: { website?: string | null; instagram?: string | null }): Promise<void>
   ignoreDuplicate(leadIds: string[]): Promise<void>
   deleteLeads(ids: string[]): Promise<void>
   saveSettings(settings: Settings): Promise<void>
@@ -531,6 +533,17 @@ export const useApp = create<AppState>()((set, get) => {
         await repo.updateLead(leadId, patch)
         if (log) await repo.insertInteractions([log])
       })
+    },
+
+    async fillLeadLinks(leadId, links) {
+      const lead = get().leads.find((l) => l.id === leadId)
+      if (!lead) return
+      const patch: Partial<Lead> = {}
+      if (links.website && !lead.website) patch.website = links.website
+      if (links.instagram && !lead.instagram) patch.instagram = links.instagram
+      if (!Object.keys(patch).length) return
+      patchLead(leadId, patch)
+      await persist((repo) => repo.updateLead(leadId, patch))
     },
 
     async ignoreDuplicate(leadIds) {

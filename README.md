@@ -1,6 +1,6 @@
 # XS Prospecção
 
-Prospecção por ligação e WhatsApp, busca de empresas no Google Maps e gestão do negócio (clientes, projetos, financeiro e precificação) num lugar só.
+Prospecção por ligação e WhatsApp, busca de empresas (base pública do CNPJ) e gestão do negócio (clientes, projetos, financeiro e precificação) num lugar só.
 
 ## Como funciona
 
@@ -14,7 +14,8 @@ Prospecção por ligação e WhatsApp, busca de empresas no Google Maps e gestã
 ```
 
 - **App web**: tudo o que é tela e dado — Painel, Leads, Hoje, Modo Ligação, Funis, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes. Funciona no celular e no PC.
-- **Busca no Maps** (`api/maps.ts`): função da Vercel que consulta o Google (Places API) com a chave `GOOGLE_PLACES_KEY` (só no servidor) e lê o site público das empresas para achar Instagram e CNPJ. Exige login com acesso liberado. No `npm run dev`, o `vite.config.ts` chama a mesma função.
+- **Busca de empresas** (`busca/`, numa VPS grátis da Oracle): base aberta do CNPJ da Receita Federal num SQLite (só empresas ativas), importada toda semana se houver mês novo. Busca por cidade, bairro e nicho em milissegundos. Instalação: `sudo bash busca/instalar.sh <ip-com-tracos>.sslip.io` na VM.
+- **`api/maps.ts`** (Vercel): confere o login e a conta liberada e repassa a busca ao servidor (`XS_BUSCA_URL` + `XS_BUSCA_TOKEN`); também confere se o site do domínio do e-mail está no ar e acha o Instagram. No `npm run dev`, o `vite.config.ts` chama a mesma função.
 - **Motor XS** (`motor/`), opcional: mantém a sessão do WhatsApp para os disparos automáticos (Disparo, Funis, Agendadas). Só escuta em `127.0.0.1` e só aceita chamadas do próprio app. O código antigo da busca no Maps ainda está lá, mas o app não usa mais.
 
 ## Rodar
@@ -33,7 +34,7 @@ Para desenvolver:
 - `npm run motor` (ou dois cliques em **`Iniciar Motor XS.bat`**) · testes: `npm run test:motor`.
 - Gerar um novo instalador: `npm run motor:exe` → `motor/build/Motor XS.exe` e `public/downloads/Motor-XS-Windows.zip` (publique o site para atualizar o download).
 
-Deixe a janela do motor aberta enquanto usa a busca no Maps e o disparo. A sessão do WhatsApp, as campanhas e a última busca ficam em `motor/storage/` (fora do git).
+Deixe a janela do motor aberta enquanto usa o disparo. A sessão do WhatsApp, as campanhas e a última busca ficam em `motor/storage/` (fora do git).
 
 ## Módulos
 

@@ -67,7 +67,7 @@ const sections: LegalSection[] = [
         <p>Do que você cadastra ou importa na XS:</p>
         <Dash
           items={[
-            'Nome da empresa, nicho, endereço, cidade, telefone, WhatsApp, site, Instagram e avaliação no Google.',
+            'Nome da empresa, nicho, endereço, cidade, telefone, WhatsApp, e-mail, site, Instagram e data de abertura.',
             'Nome e cargo de responsáveis ou pessoas com quem você falou.',
             'CNPJ e dados públicos da empresa, como razão social e quadro de sócios.',
             'Histórico de ligações e contatos, retornos, reuniões, observações e mensagens.',
@@ -87,9 +87,10 @@ const sections: LegalSection[] = [
             <strong>Por você</strong>: no cadastro, no perfil e em tudo o que você digita, cola ou importa por planilha.
           </>,
           <>
-            <strong>Pela busca no Google Maps</strong>: o servidor da XS consulta a plataforma oficial do Google com o nicho e a região que você escolheu e
-            recebe as informações que as próprias empresas deixam públicas (nome, telefone, site, endereço, avaliação). Para achar Instagram e CNPJ, o
-            servidor abre a página pública do site da empresa, quando ela tem um.
+            <strong>Pela busca de empresas</strong>: o servidor de busca da XS consulta a base pública do CNPJ que a Receita Federal publica
+            todo mês (dados abertos): nome, endereço, telefone, e-mail, atividade e quadro de sócios das empresas ativas. O CPF que aparece no
+            nome de alguns microempreendedores é removido e nunca chega ao app. Para conferir o site e achar o Instagram, o servidor abre a
+            página pública do site da empresa, quando ela tem um.
           </>,
           <>
             <strong>Pela consulta pública de CNPJ</strong>: quando há um CNPJ, os dados cadastrais públicos da empresa são consultados na BrasilAPI.
@@ -179,10 +180,11 @@ const sections: LegalSection[] = [
               <strong>Supabase</strong>: banco de dados, login e e-mails de autenticação.
             </>,
             <>
-              <strong>Vercel</strong>: hospedagem do site e do servidor que faz a busca no Maps.
+              <strong>Vercel</strong>: hospedagem do site.
             </>,
             <>
-              <strong>Google Maps Platform</strong>: busca de empresas. O Google recebe só o nicho e a região da busca, nunca os seus leads.
+              <strong>Oracle Cloud</strong>: servidor da busca de empresas. Ele recebe a cidade, os nichos e os filtros da busca e, para pular quem
+              você já tem, os telefones e CNPJs da sua lista, que são usados só durante a busca e não ficam guardados.
             </>,
             <>
               <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pelo Motor XS saem da sua própria conta de WhatsApp, conectada por QR Code.
@@ -229,7 +231,7 @@ const sections: LegalSection[] = [
         <Dash
           items={[
             'A sessão de login, para você não precisar entrar toda vez.',
-            'Preferências como tema claro ou escuro, menu recolhido, avisos e a última busca no Maps.',
+            'Preferências como tema claro ou escuro, menu recolhido, avisos e a última busca de empresas.',
             'Uma cópia dos arquivos do site, para abrir mais rápido e funcionar como app instalado.',
           ]}
         />
@@ -361,7 +363,7 @@ export function PrivacyPage() {
             Esta página explica, em linguagem simples, quais dados a XS Prospecção usa, por que usa, onde eles ficam e o que você pode fazer com eles.
           </p>
           <p className="border-l border-line-strong pl-4 text-fg-3">
-            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; a busca no Maps envia ao Google só o nicho e a região; não vendemos
+            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; a busca de empresas usa a base pública do CNPJ; não vendemos
             dados e não usamos rastreamento de publicidade.
           </p>
         </>

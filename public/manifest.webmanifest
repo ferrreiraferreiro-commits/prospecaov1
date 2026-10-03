@@ -1,7 +1,7 @@
 {
   "name": "XS Prospecção",
   "short_name": "XS Prospecção",
-  "description": "Prospecção por ligação e WhatsApp, busca no Maps e gestão de clientes, projetos e financeiro.",
+  "description": "Prospecção por ligação e WhatsApp, busca de empresas e gestão de clientes, projetos e financeiro.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",

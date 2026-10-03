@@ -378,7 +378,7 @@ function MotorCard() {
     <Card
       id="motor"
       title="Motor XS"
-      description="Programa opcional que roda no seu computador e mantém o WhatsApp conectado para os disparos automáticos. A busca no Maps não precisa dele."
+      description="Programa opcional que roda no seu computador e mantém o WhatsApp conectado para os disparos automáticos. A busca de empresas não precisa dele."
       actions={
         <span className={clsx('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium', online ? 'bg-go/10 text-emerald-300' : 'bg-tint/[0.04] text-fg-3')}>
           <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : 'bg-fg-4')} /> {online ? `Ligado · v${health?.versao ?? ''}` : 'Desligado'}

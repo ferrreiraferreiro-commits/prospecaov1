@@ -215,7 +215,7 @@ function Hero() {
             </span>
           </h1>
           <p className="land-in mt-6 max-w-[480px] text-base leading-7 text-fg-2" style={delay(220)}>
-            Encontre empresas no Google Maps, organize todos os seus leads num lugar só e acompanhe cada contato, da ligação ao WhatsApp, até virar cliente.
+            Encontre empresas da sua cidade por nicho e bairro, organize todos os seus leads num lugar só e acompanhe cada contato, da ligação ao WhatsApp, até virar cliente.
           </p>
           <div className="land-in mt-9 flex flex-col gap-3 sm:flex-row sm:items-center" style={delay(300)}>
             <PrimaryCta />
@@ -240,7 +240,7 @@ function Hero() {
 
 function Highlights() {
   const items = [
-    { icon: <MapIcon />, text: 'Leads reais do Google Maps' },
+    { icon: <MapIcon />, text: 'Empresas reais, com CNPJ' },
     { icon: <LayoutList />, text: 'Tudo organizado num lugar' },
     { icon: <CalendarClock />, text: 'Retornos na hora certa' },
     { icon: <Route />, text: 'Do lead ao projeto' },
@@ -264,7 +264,7 @@ function Highlights() {
 
 function Steps() {
   const steps = [
-    { title: 'Capture leads', text: 'Busque empresas no Google Maps por cidade e nicho, com telefone, site e Instagram, ou traga a sua planilha. Quem já está na sua lista fica de fora.' },
+    { title: 'Capture leads', text: 'Busque empresas por cidade, bairro e nicho, com telefone, celular e e-mail, ou traga a sua planilha. Quem já está na sua lista fica de fora.' },
     { title: 'Entre em contato', text: 'Ligue em sequência com o roteiro na tela ou continue pelo WhatsApp. Cada resultado fica registrado no histórico do lead.' },
     { title: 'Organize e feche', text: 'Retornos, reuniões, clientes, projetos e pagamentos ficam ligados ao mesmo lead, do primeiro contato em diante.' },
   ]
@@ -313,7 +313,7 @@ function Product() {
 
 function Audience() {
   const points = [
-    'Capta empresas locais no Google Maps, por cidade e nicho.',
+    'Capta empresas locais por cidade, bairro e nicho, já com telefone e sócio.',
     'Organiza leads, status e histórico de contato num lugar só.',
     'Lembra retornos e reuniões na hora certa.',
     'Transforma o lead em cliente e projeto sem sair da XS.',
@@ -354,11 +354,11 @@ function Faq() {
   const items: { q: string; a: ReactNode }[] = [
     {
       q: 'Preciso instalar alguma coisa?',
-      a: 'Não. A XS funciona no navegador do computador e do celular, inclusive a busca no Google Maps, e pode ficar na tela inicial como um app. Só o disparo automático em massa no WhatsApp usa um programa opcional para Windows.',
+      a: 'Não. A XS funciona no navegador do computador e do celular, inclusive a busca de empresas, e pode ficar na tela inicial como um app. Só o disparo automático em massa no WhatsApp usa um programa opcional para Windows.',
     },
     {
       q: 'De onde vêm os leads?',
-      a: 'Da busca no Google Maps da própria XS, com o telefone, site, Instagram e endereço que a empresa deixou públicos. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
+      a: 'Da busca da própria XS, que usa a base pública de empresas da Receita Federal: todas as empresas ativas do Brasil, com telefone, e-mail, endereço e sócio responsável. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
     },
     {
       q: 'Meus dados ficam guardados?',
@@ -375,7 +375,7 @@ function Faq() {
     },
     {
       q: 'Como funciona o teste grátis?',
-      a: 'Você tem 1 dia com tudo liberado, inclusive a busca no Maps e o WhatsApp, sem cartão de crédito. Quando o teste termina, seus leads continuam guardados e você decide se quer continuar.',
+      a: 'Você tem 1 dia com tudo liberado, inclusive a busca de empresas e o WhatsApp, sem cartão de crédito. Quando o teste termina, seus leads continuam guardados e você decide se quer continuar.',
     },
     {
       q: 'Funciona para outros serviços além de sites?',
@@ -395,7 +395,7 @@ function Faq() {
               <MonitorSmartphone className="size-4 text-fg-3" aria-hidden /> Nada para instalar
             </p>
             <p className="mt-2 text-[13px] leading-6 text-fg-2">
-              Busca no Maps, ligações, leads e gestão funcionam direto no navegador, no PC ou no celular. A busca traz as empresas em poucos segundos.
+              Busca de empresas, ligações, leads e gestão funcionam direto no navegador, no PC ou no celular. A busca traz as empresas na hora.
             </p>
           </div>
         </div>
@@ -449,7 +449,7 @@ function FinalCta() {
       <div className={clsx(WRAP, 'flex flex-col items-center py-28 text-center sm:py-36')}>
         <LogoMark size={40} className="reveal opacity-90" />
         <h2 id="cta-t" className="font-display reveal mt-8 max-w-[680px] text-balance text-[clamp(2rem,1.2rem+3vw,3.25rem)] leading-[1.05]" style={delay(60)}>
-          Seu próximo cliente já está no Google Maps.
+          Seu próximo cliente está a uma busca de distância.
         </h2>
         <p className="reveal mt-5 max-w-[440px] text-base leading-7 text-pretty text-fg-2" style={delay(120)}>
           Crie sua conta, encontre empresas, organize sua prospecção e teste a XS durante 1 dia.

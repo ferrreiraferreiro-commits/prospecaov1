@@ -30,7 +30,7 @@ function maplibreWorker(): Plugin {
 
 /**
  * Na Vercel, api/maps.ts vira a função /api/maps. No `npm run dev` não há Vercel:
- * este atalho chama a mesma função, com as variáveis do .env.local (inclusive GOOGLE_PLACES_KEY).
+ * este atalho chama a mesma função, com as variáveis do .env.local (inclusive XS_BUSCA_URL e XS_BUSCA_TOKEN).
  */
 function apiDev(): Plugin {
   return {
@@ -38,7 +38,7 @@ function apiDev(): Plugin {
     configureServer(server) {
       server.middlewares.use('/api/maps', async (req, res) => {
         const env = loadEnv(server.config.mode, process.cwd(), '')
-        for (const k of ['GOOGLE_PLACES_KEY', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY']) if (env[k]) process.env[k] = env[k]
+        for (const k of ['XS_BUSCA_URL', 'XS_BUSCA_TOKEN', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY']) if (env[k]) process.env[k] = env[k]
         const chunks: Buffer[] = []
         for await (const c of req) chunks.push(c as Buffer)
         const mod = (await server.ssrLoadModule('/api/maps.ts')) as typeof import('./api/maps')
@@ -54,7 +54,9 @@ function apiDev(): Plugin {
             res.end(JSON.stringify(body))
           },
         }
-        await mod.default({ method: req.method, headers: req.headers, body: Buffer.concat(chunks).toString() }, out)
+        // Modo local (sem Supabase e sem contas): não há login para conferir
+        const skipAuth = !env.VITE_SUPABASE_URL
+        await mod.handle({ method: req.method, headers: req.headers, body: Buffer.concat(chunks).toString() }, out, { skipAuth })
       })
     },
   }

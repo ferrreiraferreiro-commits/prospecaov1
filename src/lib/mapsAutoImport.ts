@@ -22,10 +22,12 @@ export async function addMapsRunToLeads(state: MapsState): Promise<number | null
     const known = knownKeys(app.leads)
     const phones = new Set(known.phones)
     const maps = new Set(known.maps)
+    const cnpjs = new Set(known.cnpjs)
     const fresh = state.results.filter((r) => {
       const p = phoneKey(r.phone)
       const m = mapsKey(r.mapsUrl)
-      return !(p && phones.has(p)) && !(m && maps.has(m))
+      const c = (r.cnpj ?? '').replace(/\D/g, '')
+      return !(p && phones.has(p)) && !(m && maps.has(m)) && !(c && cnpjs.has(c))
     })
     if (!fresh.length) return 0
     const nichos = [...new Set(fresh.map((r) => r.niche))].join(', ')
