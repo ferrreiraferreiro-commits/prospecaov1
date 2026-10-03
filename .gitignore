@@ -15,3 +15,6 @@ supabase/criar_usuarios.sql
 
 # Motor XS: sessão do WhatsApp, campanhas e buscas (dados locais, nunca versionar)
 motor/storage/
+
+# Instalador do Motor XS (gerado por npm run motor:exe; vai para a Vercel, não para o git)
+public/downloads/

@@ -27,10 +27,12 @@ npm test             # testes do app
 npm run build
 ```
 
-Motor XS (precisa do Node.js LTS e do Google Chrome, Edge ou Brave):
+Motor XS para quem só usa (Windows): no app, **Ajustes → Motor XS → Baixar o Motor XS**. É um único `Motor XS.exe` (Node embutido), que usa o Chrome ou o Edge do computador e guarda os dados na pasta `Motor XS - dados` ao lado dele.
 
-- Windows: dois cliques em **`Iniciar Motor XS.bat`** (na primeira vez instala as dependências).
-- Ou: `npm run motor` · testes: `npm run test:motor`.
+Para desenvolver:
+
+- `npm run motor` (ou dois cliques em **`Iniciar Motor XS.bat`**) · testes: `npm run test:motor`.
+- Gerar um novo instalador: `npm run motor:exe` → `motor/build/Motor XS.exe` e `public/downloads/Motor-XS-Windows.zip` (publique o site para atualizar o download).
 
 Deixe a janela do motor aberta enquanto usa a busca no Maps e o disparo. A sessão do WhatsApp, as campanhas e a última busca ficam em `motor/storage/` (fora do git).
 

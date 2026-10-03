@@ -4,7 +4,7 @@ import { formatDateKey, periodoLabel } from '../lib/dates'
 import { getActiveRoteiro } from '../lib/script'
 import type { ParsedLead } from '../lib/parser'
 import { EMPTY_ADVANCED, type AdvancedFilters, type QuickFilter, type SortKey } from '../lib/selectors'
-import { STATUS_MAP } from '../lib/statuses'
+import { applyStatusCustom, STATUS_MAP } from '../lib/statuses'
 import { formatCnpj } from '../lib/cnpj'
 import { formatMoney, MEETING_RESULT_LABEL } from '../lib/insights'
 import {
@@ -120,6 +120,7 @@ export const useApp = create<AppState>()((set, get) => {
       get().toast(err instanceof Error ? err.message : 'Falha ao salvar.', 'error')
       try {
         const snap = await repo.load()
+        applyStatusCustom(snap.settings.status1)
         set({ ...snap })
       } catch {
         /* mantém o estado atual */
@@ -149,6 +150,7 @@ export const useApp = create<AppState>()((set, get) => {
       set({ repo, ready: false, loadError: null })
       try {
         const snap = await repo.load()
+        applyStatusCustom(snap.settings.status1)
         set({ ...snap, ready: true })
       } catch (err) {
         set({ loadError: err instanceof Error ? err.message : String(err), ready: true })
@@ -552,6 +554,7 @@ export const useApp = create<AppState>()((set, get) => {
     },
 
     async saveSettings(settings) {
+      applyStatusCustom(settings.status1)
       set({ settings })
       await persist((repo) => repo.saveSettings(settings))
     },

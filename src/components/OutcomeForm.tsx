@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { consecutiveNoAnswer, nextAttempt, ordinal } from '../lib/attempts'
 import { whatsappTarget } from '../lib/contact'
 import { addDays, formatDateTime, todayKey } from '../lib/dates'
-import { CALL_RESULTS, SEM_RESPOSTA, STATUSES, STATUS_MAP, TONE_CLASSES } from '../lib/statuses'
+import { visibleCallResults, SEM_RESPOSTA, STATUSES, STATUS_MAP, TONE_CLASSES } from '../lib/statuses'
 import type { Lead, StatusId } from '../lib/types'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
@@ -59,7 +59,7 @@ export function OutcomeForm({ lead, mode, callId, presetStatus, variant = 'modal
   const [error, setError] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
-  const options = useMemo(() => (mode === 'call' ? CALL_RESULTS : STATUSES.map((s) => s.id)), [mode])
+  const options = useMemo(() => (mode === 'call' ? visibleCallResults() : STATUSES.map((s) => s.id)), [mode])
   const needsFollowup = status === 'follow_up'
   const showFollowup = needsFollowup || wantsFollowup
   const needsMeeting = status === 'agendou_reuniao'

@@ -9,7 +9,8 @@ import { newId } from '../data/repository'
 import { DEFAULT_OBJECTIONS, DEFAULT_SCRIPT, fillTemplate, getActiveRoteiro, getRoteiros, toBlocks } from '../lib/script'
 import { statsByRoteiro } from '../lib/selectors'
 import { DEFAULT_STATUS2, getStatus2Options } from '../lib/status2'
-import type { Lead, Objection, Roteiro, ScriptSection } from '../lib/types'
+import { CALL_RESULTS, STATUS_DEFAULTS, STATUSES, TONE_CLASSES, TONES, type Tone } from '../lib/statuses'
+import type { Lead, Objection, Roteiro, ScriptSection, Settings, StatusCustom, StatusId } from '../lib/types'
 import { useApp } from '../store/useApp'
 
 type Aba = 'roteiros' | 'status'
@@ -495,10 +496,171 @@ function Preview({ roteiro }: { roteiro: Roteiro }) {
 }
 
 // ---------------------------------------------------------------------------
-// Status (Status 2)
+// Status 1 e Status 2
 // ---------------------------------------------------------------------------
 
 function StatusEditor() {
+  return (
+    <div className="grid items-start gap-3 2xl:grid-cols-[1.35fr_1fr]">
+      <Status1Editor />
+      <Status2Editor />
+    </div>
+  )
+}
+
+type Draft1 = Record<StatusId, { label: string; callLabel: string; tone: Tone; oculto: boolean }>
+
+function currentStatus1(custom: Settings['status1']): Draft1 {
+  return Object.fromEntries(STATUSES.map((st) => [st.id, { label: st.label, callLabel: st.callLabel, tone: st.tone, oculto: !!custom?.[st.id]?.oculto }])) as Draft1
+}
+
+const TONE_NAME: Record<Tone, string> = {
+  neutral: 'Cinza',
+  muted: 'Apagado',
+  yellow: 'Amarelo',
+  orange: 'Laranja',
+  red: 'Vermelho',
+  blue: 'Azul',
+  sky: 'Céu',
+  teal: 'Verde-água',
+  green: 'Verde',
+  gold: 'Dourado',
+}
+
+/** Status principal: os 12 resultados de ligação. Dá para renomear, trocar a cor e esconder da ligação. */
+function Status1Editor() {
+  const settings = useApp((s) => s.settings)
+  const leads = useApp((s) => s.leads)
+  const saveSettings = useApp((s) => s.saveSettings)
+  const toast = useApp((s) => s.toast)
+  const saved = useMemo(() => currentStatus1(settings.status1), [settings.status1])
+  const [draft, setDraft] = useState<Draft1>(saved)
+  const [colorFor, setColorFor] = useState<StatusId | null>(null)
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
+  const uso = useMemo(() => {
+    const m = new Map<StatusId, number>()
+    for (const l of leads) m.set(l.status, (m.get(l.status) ?? 0) + 1)
+    return m
+  }, [leads])
+  const set = (id: StatusId, patch: Partial<Draft1[StatusId]>) => setDraft((d) => ({ ...d, [id]: { ...d[id], ...patch } }))
+
+  async function save() {
+    // Só guarda o que difere do original
+    const custom: Partial<Record<StatusId, StatusCustom>> = {}
+    for (const st of STATUSES) {
+      const d = draft[st.id]
+      const base = STATUS_DEFAULTS[st.id]
+      const c: StatusCustom = {}
+      if (d.label.trim() && d.label.trim() !== base.label) c.label = d.label.trim()
+      if (d.callLabel.trim() && d.callLabel.trim() !== base.callLabel) c.callLabel = d.callLabel.trim()
+      if (d.tone !== base.tone) c.tone = d.tone
+      if (d.oculto) c.oculto = true
+      if (Object.keys(c).length) custom[st.id] = c
+    }
+    const next = Object.keys(custom).length ? custom : null
+    await saveSettings({ ...settings, status1: next })
+    setDraft(currentStatus1(next))
+    toast('Status 1 salvo.')
+  }
+
+  return (
+    <section className="panel">
+      <header className="border-b border-line-soft px-4 py-3">
+        <h2 className="flex items-center gap-2 text-[13px] font-semibold">
+          <Tags className="size-4 text-blue-400" /> Status 1 · resultado da ligação
+        </h2>
+        <p className="mt-0.5 text-xs text-fg-3">
+          O status principal do lead. Renomeie, troque a cor e escolha quais aparecem em "Como foi a ligação?". As regras (atendeu, sem resposta, retorno) continuam as mesmas.
+        </p>
+      </header>
+      <div className="hidden grid-cols-[1.2fr_1.2fr_9rem_5.5rem_3rem] gap-2 border-b border-line-soft px-4 py-1.5 text-[10px] font-medium text-fg-4 uppercase sm:grid">
+        <span>Nome do status</span>
+        <span>Botão na ligação</span>
+        <span>Cor</span>
+        <span>Na ligação</span>
+        <span className="text-right">Leads</span>
+      </div>
+      <ul className="divide-y divide-line-soft">
+        {STATUSES.map((st) => {
+          const d = draft[st.id]
+          const inCall = CALL_RESULTS.includes(st.id)
+          return (
+            <li key={st.id} className="grid grid-cols-2 items-center gap-2 px-4 py-2 sm:grid-cols-[1.2fr_1.2fr_9rem_5.5rem_3rem]">
+              <input className="input h-8" value={d.label} onChange={(e) => set(st.id, { label: e.target.value })} aria-label="Nome do status" placeholder={STATUS_DEFAULTS[st.id].label} />
+              {inCall ? (
+                <input
+                  className="input h-8"
+                  value={d.callLabel}
+                  onChange={(e) => set(st.id, { callLabel: e.target.value })}
+                  aria-label="Texto do botão na ligação"
+                  placeholder={STATUS_DEFAULTS[st.id].callLabel}
+                />
+              ) : (
+                <span className="text-2xs text-fg-4">{st.id === 'novo' ? 'Status de entrada' : 'Só pela ficha do lead'}</span>
+              )}
+              <div className="relative min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setColorFor(colorFor === st.id ? null : st.id)}
+                  className={clsx('inline-flex h-7 max-w-full items-center gap-1.5 truncate rounded-[5px] px-2 text-2xs font-medium ring-1 ring-inset', TONE_CLASSES[d.tone].chip)}
+                  title="Trocar a cor"
+                >
+                  <span className={clsx('size-1.5 shrink-0 rounded-full', TONE_CLASSES[d.tone].dot)} />
+                  <span className="truncate">{d.label || STATUS_DEFAULTS[st.id].label}</span>
+                </button>
+                {colorFor === st.id && (
+                  <div className="anim-rise absolute top-full left-0 z-20 mt-1 grid w-44 grid-cols-5 gap-1 rounded-lg border border-line bg-raised p-2 shadow-xl">
+                    {TONES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        title={TONE_NAME[t]}
+                        aria-label={TONE_NAME[t]}
+                        onClick={() => {
+                          set(st.id, { tone: t })
+                          setColorFor(null)
+                        }}
+                        className={clsx('flex size-7 items-center justify-center rounded-md ring-1 ring-inset', TONE_CLASSES[t].chip, d.tone === t && 'ring-2 ring-fg')}
+                      >
+                        <span className={clsx('size-2.5 rounded-full', TONE_CLASSES[t].dot)} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {inCall ? (
+                <label className="flex items-center gap-1.5 text-2xs text-fg-2">
+                  <input type="checkbox" checked={!d.oculto} onChange={(e) => set(st.id, { oculto: !e.target.checked })} />
+                  {d.oculto ? 'Oculto' : 'Aparece'}
+                </label>
+              ) : (
+                <span />
+              )}
+              <span className="num text-right text-2xs text-fg-3">{uso.get(st.id) ?? 0}</span>
+            </li>
+          )
+        })}
+      </ul>
+      <footer className="flex items-center gap-2 border-t border-line-soft px-4 py-3">
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<RotateCcw className="size-3.5" />}
+          onClick={() => setDraft(Object.fromEntries(STATUSES.map((st) => [st.id, { ...STATUS_DEFAULTS[st.id], oculto: false }])) as Draft1)}
+        >
+          Nomes e cores originais
+        </Button>
+        <span className="ml-auto text-2xs text-amber-300">{dirty ? 'Alterações não salvas' : ''}</span>
+        <Button variant="primary" icon={<Save className="size-3.5" />} disabled={!dirty} onClick={() => void save()}>
+          Salvar Status 1
+        </Button>
+      </footer>
+    </section>
+  )
+}
+
+/** Status 2: acompanhamento depois da ligação, lista livre. */
+function Status2Editor() {
   const settings = useApp((s) => s.settings)
   const leads = useApp((s) => s.leads)
   const saveSettings = useApp((s) => s.saveSettings)
@@ -525,14 +687,14 @@ function StatusEditor() {
     const clean = [...new Set(list.map((x) => x.trim()).filter(Boolean))]
     await saveSettings({ ...settings, status2_opcoes: clean.length ? clean : null })
     setList(clean.length ? clean : DEFAULT_STATUS2)
-    toast('Status salvos.')
+    toast('Status 2 salvo.')
   }
 
   return (
-    <section className="panel max-w-2xl">
+    <section className="panel">
       <header className="border-b border-line-soft px-4 py-3">
         <h2 className="flex items-center gap-2 text-[13px] font-semibold">
-          <ListChecks className="size-4 text-blue-400" /> Status de acompanhamento
+          <ListChecks className="size-4 text-blue-400" /> Status 2 · acompanhamento
         </h2>
         <p className="mt-0.5 text-xs text-fg-3">
           O segundo status do lead, para o que acontece depois da ligação (mensagem enviada, proposta, negociação…). Aparece ao lado do status principal e nos filtros.
@@ -568,7 +730,7 @@ function StatusEditor() {
         </Button>
         <span className="ml-auto text-2xs text-fg-4">{dirty ? <span className="text-amber-300">Alterações não salvas</span> : 'Leads que já usam um status removido continuam com ele.'}</span>
         <Button variant="primary" icon={<Save className="size-3.5" />} disabled={!dirty} onClick={() => void save()}>
-          Salvar status
+          Salvar Status 2
         </Button>
       </footer>
     </section>

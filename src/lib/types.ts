@@ -177,6 +177,17 @@ export interface Settings {
   max_tentativas: number
   /** Custos e margens padrão da Precificação */
   precificacao: PricingSettings | null
+  /** Nomes, cores e visibilidade personalizados do Status 1 */
+  status1: Partial<Record<StatusId, StatusCustom>> | null
+}
+
+/** Personalização de um status principal (os ids e as regras continuam fixos). */
+export interface StatusCustom {
+  label?: string
+  callLabel?: string
+  tone?: string
+  /** Some do painel "Como foi a ligação?" */
+  oculto?: boolean
 }
 
 export interface Snapshot {
@@ -203,4 +214,5 @@ export const DEFAULT_SETTINGS: Settings = {
   auto_tentativas: true,
   max_tentativas: 5,
   precificacao: null,
+  status1: null,
 }

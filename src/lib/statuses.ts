@@ -1,4 +1,4 @@
-import type { StatusId } from './types'
+import type { StatusCustom, StatusId } from './types'
 
 export type Tone = 'neutral' | 'muted' | 'yellow' | 'orange' | 'red' | 'blue' | 'sky' | 'teal' | 'green' | 'gold'
 
@@ -30,6 +30,36 @@ export const STATUSES: StatusDef[] = [
 ]
 
 export const STATUS_MAP = Object.fromEntries(STATUSES.map((s) => [s.id, s])) as Record<StatusId, StatusDef>
+
+/** Nomes e cores originais (para restaurar). */
+export const STATUS_DEFAULTS: Record<StatusId, Pick<StatusDef, 'label' | 'callLabel' | 'tone'>> = Object.fromEntries(
+  STATUSES.map((s) => [s.id, { label: s.label, callLabel: s.callLabel, tone: s.tone }]),
+) as Record<StatusId, Pick<StatusDef, 'label' | 'callLabel' | 'tone'>>
+
+export const TONES: Tone[] = ['neutral', 'muted', 'yellow', 'orange', 'red', 'blue', 'sky', 'teal', 'green', 'gold']
+
+let hidden = new Set<StatusId>()
+
+/**
+ * Aplica a personalização salva em Roteiros → Status (nomes, cores, ocultos).
+ * Os objetos de STATUSES/STATUS_MAP são atualizados no lugar, então todas as telas leem o nome novo.
+ */
+export function applyStatusCustom(custom: Partial<Record<StatusId, StatusCustom>> | null | undefined) {
+  hidden = new Set()
+  for (const s of STATUSES) {
+    const base = STATUS_DEFAULTS[s.id]
+    const c = custom?.[s.id]
+    s.label = c?.label?.trim() || base.label
+    s.callLabel = c?.callLabel?.trim() || base.callLabel
+    s.tone = c?.tone && (TONES as string[]).includes(c.tone) ? (c.tone as Tone) : base.tone
+    if (c?.oculto && s.id !== 'novo') hidden.add(s.id)
+  }
+}
+
+/** Resultados de ligação visíveis, na ordem dos atalhos 1–0. */
+export function visibleCallResults(): StatusId[] {
+  return CALL_RESULTS.filter((id) => !hidden.has(id))
+}
 
 /** Resultados oferecidos após uma ligação, na ordem dos atalhos 1–0. */
 export const CALL_RESULTS: StatusId[] = [

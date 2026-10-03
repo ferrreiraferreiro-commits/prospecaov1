@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
 import { MessagesEditor } from '../components/MessagesEditor'
+import { MOTOR_DOWNLOAD, MotorSteps } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
@@ -408,15 +409,14 @@ function MotorCard() {
             </div>
           </dl>
         )}
-        <ol className="list-decimal space-y-1 pl-4 text-fg-2">
-          <li>
-            Precisa do <strong className="text-fg">Node.js</strong> (nodejs.org, versão LTS) e do Google Chrome instalados.
-          </li>
-          <li>
-            Na pasta do projeto, dê dois cliques em <strong className="text-fg">Iniciar Motor XS.bat</strong>. Na primeira vez ele instala as dependências (alguns minutos).
-          </li>
-          <li>Deixe a janela aberta. O ponto verde na barra lateral mostra que está ligado.</li>
-        </ol>
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <MotorSteps https={window.location.protocol === 'https:'} />
+          </div>
+          <a href={MOTOR_DOWNLOAD} download className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-[#3b7bf6]">
+            <Download className="size-3.5" /> Baixar o Motor XS (Windows)
+          </a>
+        </div>
         <div className="flex flex-wrap items-end gap-2 border-t border-line-soft pt-3">
           <label className="block min-w-60 flex-1">
             <span className="label">Endereço do motor</span>
