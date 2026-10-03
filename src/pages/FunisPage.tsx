@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Clock, Copy, MessageSquareText, Plus, Save, Send, T
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SearchInput, confirmAction } from '../components/kit'
+import { MensagensTabs } from '../components/MensagensTabs'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty } from '../components/ui'
 import { newId, nowIso } from '../data/repository'
@@ -125,6 +126,7 @@ export function FunisPage() {
           </Button>
         }
       />
+      <MensagensTabs />
 
       {funnels.length === 0 ? (
         <section className="panel">

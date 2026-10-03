@@ -49,7 +49,7 @@ export function StatsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Estatísticas"
+        title="Números"
         subtitle="Números que ajudam a ajustar o ritmo — sem enfeite."
         actions={
           <Button variant="secondary" icon={<RotateCcw className="size-3.5" />} onClick={() => setConfirmReset(true)}>

@@ -56,6 +56,7 @@ const ClientesPage = lazyPage(() => import('./pages/ClientesPage').then((m) => (
 const DisparoPage = lazyPage(() => import('./pages/DisparoPage').then((m) => ({ default: m.DisparoPage })))
 const FinanceiroPage = lazyPage(() => import('./pages/FinanceiroPage').then((m) => ({ default: m.FinanceiroPage })))
 const FunisPage = lazyPage(() => import('./pages/FunisPage').then((m) => ({ default: m.FunisPage })))
+const MensagensPage = lazyPage(() => import('./pages/MensagensPage').then((m) => ({ default: m.MensagensPage })))
 const MapsPage = lazyPage(() => import('./pages/MapsPage').then((m) => ({ default: m.MapsPage })))
 const PrecificacaoPage = lazyPage(() => import('./pages/PrecificacaoPage').then((m) => ({ default: m.PrecificacaoPage })))
 const ProjetosPage = lazyPage(() => import('./pages/ProjetosPage').then((m) => ({ default: m.ProjetosPage })))
@@ -80,6 +81,7 @@ function Routed() {
           <Route path="ligacao/:id" element={<CallModePage />} />
           <Route path="roteiros" element={<RoteirosPage />} />
           <Route path="maps" element={m(<MapsPage />)} />
+          <Route path="mensagens" element={<MensagensPage />} />
           <Route path="funis" element={m(<FunisPage />)} />
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />

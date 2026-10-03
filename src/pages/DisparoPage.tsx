@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, Field, Pill, SearchInput, Stat } from '../components/kit'
 import { MotorOffline } from '../components/MotorOffline'
+import { MensagensTabs } from '../components/MensagensTabs'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Progress, StatusBadge } from '../components/ui'
 import { funnelMessages } from '../lib/biz'
@@ -85,6 +86,7 @@ export function DisparoPage() {
           </>
         }
       />
+      <MensagensTabs />
 
       {online === false && <MotorOffline feature="O disparo" />}
       {online && wa?.status !== 'connected' && (

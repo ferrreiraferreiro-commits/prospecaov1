@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, confirmAction } from '../components/kit'
 import { MOTOR_DOWNLOAD, MotorOffline } from '../components/MotorOffline'
+import { MensagensTabs } from '../components/MensagensTabs'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Segmented } from '../components/ui'
 import { localParts, quickTimes, relativeTo, syncAgenda, toIso, type Agendamento } from '../lib/agenda'
@@ -176,7 +177,8 @@ export function AgendamentosPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Agendamentos" subtitle="Deixe mensagens de WhatsApp marcadas para um dia e hora. O Motor XS envia sozinho, mesmo com você longe do computador." />
+      <PageHeader title="Mensagens agendadas" subtitle="Deixe mensagens de WhatsApp marcadas para um dia e hora. O Motor XS envia sozinho, mesmo com você longe do computador." />
+      <MensagensTabs />
 
       {online === false && <MotorOffline feature="O agendamento" />}
       {online && health && !health.agenda && (

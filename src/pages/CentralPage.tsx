@@ -20,6 +20,7 @@ import {
 } from '../lib/selectors'
 import { useDuplicates, useIndex, useMetrics, useToday } from '../store/derived'
 import { useHasMotor } from '../store/useAccount'
+import { BulkBar } from '../components/BulkBar'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 
@@ -40,6 +41,15 @@ export function CentralPage() {
   const motor = useHasMotor()
 
   const [limit, setLimit] = useState(PAGE_SIZE)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const toggleOne = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
   const dupIds = useMemo(() => new Set(dupMap.keys()), [dupMap])
 
   // Busca + filtros avançados formam a base; os filtros rápidos mostram contagem sobre ela.
@@ -61,6 +71,8 @@ export function CentralPage() {
   )
 
   useEffect(() => setLimit(PAGE_SIZE), [view.quick, view.search, view.advanced, view.sort])
+  // Trocar o filtro limpa a seleção (a barra só age sobre o que está na tela)
+  useEffect(() => setSelected(new Set()), [view.quick, view.search, view.advanced])
 
   // Renderização incremental ao rolar
   const sentinel = useRef<HTMLDivElement>(null)
@@ -77,7 +89,7 @@ export function CentralPage() {
   const quickLabel = QUICK_FILTERS.find((q) => q.id === view.quick)?.label ?? 'Duplicados'
   const openCallMode = useCallback(
     (leadId: string) => {
-      setQueue(filtered.map((l) => l.id), `Central · ${quickLabel}`)
+      setQueue(filtered.map((l) => l.id), `Leads · ${quickLabel}`)
       navigate(`/ligacao/${leadId}`)
     },
     [filtered, quickLabel, setQueue, navigate],
@@ -215,7 +227,11 @@ export function CentralPage() {
 
       {/* Lista */}
       <section>
-        <LeadListHeader />
+        <LeadListHeader
+          allChecked={filtered.length > 0 && selected.size === filtered.length}
+          someChecked={selected.size > 0}
+          onToggleAll={() => setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map((l) => l.id)))}
+        />
         <div className="panel overflow-hidden">
           {filtered.length === 0 ? (
             <Empty icon={<Search />} title="Nenhum lead neste filtro">
@@ -232,12 +248,25 @@ export function CentralPage() {
                   calls={index.callsByLead.get(lead.id)}
                   duplicate={dupIds.has(lead.id)}
                   onCallMode={openCallMode}
+                  checked={selected.has(lead.id)}
+                  onToggle={toggleOne}
                 />
               ))
           )}
         </div>
         {limit < filtered.length && <div ref={sentinel} className="h-10" />}
       </section>
+
+      {selected.size > 0 && (
+        <BulkBar
+          ids={filtered.filter((l) => selected.has(l.id)).map((l) => l.id)}
+          onClear={() => setSelected(new Set())}
+          onCall={(ids) => {
+            setQueue(ids, `Selecionados · ${ids.length}`)
+            navigate(`/ligacao/${ids[0]}`)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -63,7 +63,7 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
       }
       footer={
         <>
-          <Link to="/configuracoes#mensagens" onClick={onClose} className="mr-auto inline-flex items-center gap-1.5 text-2xs text-fg-3 hover:text-fg">
+          <Link to="/mensagens" onClick={onClose} className="mr-auto inline-flex items-center gap-1.5 text-2xs text-fg-3 hover:text-fg">
             <Settings2 className="size-3" /> Editar modelos
           </Link>
           <Button

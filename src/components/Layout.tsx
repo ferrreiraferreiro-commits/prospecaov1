@@ -1,6 +1,5 @@
 import clsx from 'clsx'
 import {
-  AlarmClock,
   BadgeDollarSign,
   Calculator,
   ChartColumn,
@@ -16,7 +15,6 @@ import {
   Menu,
   MessagesSquare,
   ScrollText,
-  Send,
   Settings,
   Smartphone,
   Sparkles,
@@ -32,6 +30,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
 import { useMapsAutoImport } from '../lib/mapsAutoImport'
 import { useMotor, useMotorPolling } from '../lib/motor'
+import { MENSAGENS_ROUTES } from './MensagensTabs'
 import { useMetrics } from '../store/derived'
 import { accessOf, useAccount, useHasMotor } from '../store/useAccount'
 import { useApp } from '../store/useApp'
@@ -52,6 +51,8 @@ interface NavItem {
   end?: boolean
   /** Só aparece para contas com o Motor XS */
   motor?: boolean
+  /** Outras rotas que contam como esta (abas da mesma área) */
+  also?: string[]
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
@@ -69,9 +70,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'WhatsApp',
     items: [
-      { to: '/funis', label: 'Funis', icon: MessagesSquare, motor: true },
-      { to: '/disparo', label: 'Disparo', icon: Send, motor: true },
-      { to: '/agendamentos', label: 'Agendamentos', icon: AlarmClock, motor: true },
+      { to: '/mensagens', label: 'Mensagens', icon: MessagesSquare, also: MENSAGENS_ROUTES },
       { to: '/whatsapp', label: 'Conexão', icon: Smartphone, motor: true },
     ],
   },
@@ -267,7 +266,14 @@ export function Layout() {
   )
 }
 
+/** A rota atual pertence ao item (ele mesmo ou uma das abas da área)? */
+function useInArea(item: NavItem): boolean {
+  const { pathname } = useLocation()
+  return !!item.also?.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+}
+
 function SideLink({ item, collapsed, badge }: { item: NavItem; collapsed: boolean; badge: number }) {
+  const inArea = useInArea(item)
   return (
     <NavLink
       to={item.to}
@@ -277,14 +283,14 @@ function SideLink({ item, collapsed, badge }: { item: NavItem; collapsed: boolea
         clsx(
           'relative flex h-9 items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors',
           collapsed ? 'justify-center' : 'px-2.5',
-          isActive ? 'bg-blue-500/[0.12] text-fg' : 'text-fg-3 hover:bg-tint/[0.04] hover:text-fg-2',
+          isActive || inArea ? 'bg-blue-500/[0.12] text-fg' : 'text-fg-3 hover:bg-tint/[0.04] hover:text-fg-2',
         )
       }
     >
       {({ isActive }) => (
         <>
-          {isActive && <span className="absolute top-2 bottom-2 -left-2.5 w-[3px] rounded-r bg-blue-500" />}
-          <item.icon className={clsx('size-[17px] shrink-0', isActive && 'text-blue-400')} strokeWidth={1.75} />
+          {(isActive || inArea) && <span className="absolute top-2 bottom-2 -left-2.5 w-[3px] rounded-r bg-blue-500" />}
+          <item.icon className={clsx('size-[17px] shrink-0', (isActive || inArea) && 'text-blue-400')} strokeWidth={1.75} />
           {!collapsed && <span className="truncate">{item.label}</span>}
           {badge > 0 && (
             <span

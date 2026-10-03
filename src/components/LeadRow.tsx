@@ -15,10 +15,24 @@ import { Button } from './ui'
 export const ROW_GRID =
   'lg:grid lg:grid-cols-[minmax(200px,2.4fr)_76px_118px_74px_164px_92px_minmax(120px,1.3fr)_250px] lg:items-center lg:gap-x-4'
 
-export function LeadListHeader() {
+export function LeadListHeader({ allChecked, someChecked, onToggleAll }: { allChecked?: boolean; someChecked?: boolean; onToggleAll?: () => void }) {
   return (
     <div className={clsx(ROW_GRID, 'hidden px-4 pb-2 pl-5 text-2xs font-medium text-fg-4')}>
-      <span>Empresa</span>
+      <span className="flex items-center gap-2.5">
+        {onToggleAll && (
+          <input
+            type="checkbox"
+            className="size-3.5 cursor-pointer accent-blue-500"
+            checked={!!allChecked}
+            ref={(el) => {
+              if (el) el.indeterminate = !allChecked && !!someChecked
+            }}
+            onChange={onToggleAll}
+            aria-label="Selecionar todos os leads da lista"
+          />
+        )}
+        Empresa
+      </span>
       <span>Google</span>
       <span>Telefone</span>
       <span>Site</span>
@@ -36,9 +50,11 @@ interface LeadRowProps {
   calls: Interaction[] | undefined
   duplicate?: boolean
   onCallMode: (leadId: string) => void
+  checked?: boolean
+  onToggle?: (leadId: string) => void
 }
 
-export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onCallMode }: LeadRowProps) {
+export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onCallMode, checked, onToggle }: LeadRowProps) {
   const openLead = useUi((s) => s.openLead)
   const openOutcome = useUi((s) => s.openOutcome)
   const liguei = useLiguei()
@@ -58,6 +74,7 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
       className={clsx(
         ROW_GRID,
         'group relative cursor-pointer border-b border-line-soft px-4 py-2.5 pl-5 transition-colors last:border-b-0 hover:bg-tint/[0.022] focus-visible:bg-tint/[0.03] focus-visible:outline-none',
+        checked && 'bg-blue-500/[0.06] hover:bg-blue-500/[0.08]',
       )}
     >
       <span className={clsx('absolute top-2.5 bottom-2.5 left-0 w-[2px] rounded-r', tone.bar)} aria-hidden />
@@ -65,6 +82,16 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
       {/* Empresa */}
       <div className="min-w-0">
         <div className="flex items-center gap-2">
+          {onToggle && (
+            <input
+              type="checkbox"
+              className="size-3.5 shrink-0 cursor-pointer accent-blue-500"
+              checked={!!checked}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => onToggle(lead.id)}
+              aria-label={`Selecionar ${lead.empresa}`}
+            />
+          )}
           <span className="truncate text-[13px] font-semibold text-fg" title={lead.empresa}>
             {lead.empresa}
           </span>

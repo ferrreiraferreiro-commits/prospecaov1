@@ -2,7 +2,6 @@ import { Bell, Camera, Database, Download, LogOut, Smartphone, Trash2, Upload } 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
-import { MessagesEditor } from '../components/MessagesEditor'
 import { MOTOR_DOWNLOAD, MotorSteps } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
@@ -128,7 +127,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="Ajustes" subtitle={motor ? 'Perfil, mensagens, avisos, Motor XS e backup.' : 'Perfil, mensagens, avisos e backup.'} />
+      <PageHeader title="Ajustes" subtitle={motor ? 'Perfil, avisos, Motor XS e backup.' : 'Perfil, avisos e backup.'} />
 
       <Card id="perfil" title="Meu perfil" description="O primeiro nome entra no roteiro como {nome}." actions={<Button variant="primary" size="sm" onClick={saveProfile}>Salvar perfil</Button>}>
         <div className="mb-4 flex items-center gap-3">
@@ -158,7 +157,7 @@ export function SettingsPage() {
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_140px]">
           <div>
             <label className="label" htmlFor="st-nome">Seu nome</label>
-            <input id="st-nome" className="input" value={nome} placeholder="Ex.: Gabriel Yamashita" onChange={(e) => setNome(e.target.value)} />
+            <input id="st-nome" className="input" value={nome} placeholder="Como você se apresenta na ligação" onChange={(e) => setNome(e.target.value)} />
           </div>
           <div>
             <label className="label" htmlFor="st-serv">O que você oferece</label>
@@ -191,14 +190,6 @@ export function SettingsPage() {
           O WhatsApp Web abre sempre na mesma aba, trocando de conversa a cada lead. Para ligar, clique no ícone de telefone no topo da conversa. Se o
           seu WhatsApp Web não mostrar esse ícone, use o app do WhatsApp para Windows.
         </p>
-      </Card>
-
-      <Card
-        id="mensagens"
-        title="Mensagens de WhatsApp"
-        description="Modelos usados no botão Mensagem. Cada modelo pode ter várias variações — cada lead recebe uma, em rodízio, para os textos não saírem todos iguais."
-      >
-        <MessagesEditor />
       </Card>
 
       <Card id="tentativas" title="Novas tentativas automáticas" description="Quando a ligação não é atendida, o retorno já vem agendado para o dia seguinte, no período oposto (ligou de manhã → tenta à tarde).">
