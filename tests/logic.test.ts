@@ -78,7 +78,13 @@ describe('duplicidade', () => {
   })
 
   it('mapsKey ignora parâmetros de sessão', () => {
-    expect(mapsKey('https://www.google.com/maps/place/A/data=!1s0xABC:0xDEF!8m2?hl=pt')).toBe('0xabc:0xdef')
+    expect(mapsKey('https://www.google.com/maps/place/A/data=!1s0xABC:0xDEF!8m2?hl=pt')).toBe('cid:3567')
+  })
+
+  it('mapsKey reconhece o mesmo lugar no link antigo (feature id) e no da Places API (cid)', () => {
+    const antigo = 'https://www.google.com/maps/place/X/data=!4m7!3m6!1s0x94c9dcee4ccabf6f:0x242bc92aa9f9d2c8!8m2'
+    const novo = `https://maps.google.com/?cid=${BigInt('0x242bc92aa9f9d2c8')}`
+    expect(mapsKey(antigo)).toBe(mapsKey(novo))
   })
 })
 

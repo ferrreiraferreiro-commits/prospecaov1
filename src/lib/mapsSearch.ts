@@ -2,7 +2,7 @@ import { mapsKey, phoneKey } from './duplicates'
 import type { ParsedLead } from './parser'
 import type { Lead } from './types'
 
-/** Resultado de uma busca no Maps feita pelo Motor XS. */
+/** Resultado de uma busca no Maps (Google Places, pelo servidor da XS). */
 export interface MapsResult {
   id: string
   name: string
@@ -70,9 +70,9 @@ export interface MapsState {
 export const PHASE_LABEL: Record<MapsPhase, string> = {
   idle: 'Pronto',
   geocoding: 'Localizando a área',
-  connecting: 'Abrindo o Google Maps',
+  connecting: 'Buscando no Google',
   scrolling: 'Varrendo os setores',
-  enriching: 'Qualificando as fichas',
+  enriching: 'Conferindo os sites',
   processing: 'Finalizando',
   completed: 'Concluída',
   cancelled: 'Interrompida',
@@ -102,7 +102,7 @@ export const POPULAR_NICHES = [
   'Fisioterapia',
 ]
 
-/** Chaves (telefone e lugar no Maps) dos leads que já estão no app — o motor pula esses. */
+/** Chaves (telefone e lugar no Maps) dos leads que já estão no app — a busca pula esses. */
 export function knownKeys(leads: Pick<Lead, 'telefone' | 'whatsapp' | 'maps_url'>[]): { phones: string[]; maps: string[] } {
   const phones = new Set<string>()
   const maps = new Set<string>()

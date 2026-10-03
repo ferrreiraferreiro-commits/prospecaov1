@@ -98,7 +98,7 @@ function Routed() {
           <Route path="ligacao" element={<CallModeEntry />} />
           <Route path="ligacao/:id" element={<CallModePage />} />
           <Route path="roteiros" element={<RoteirosPage />} />
-          <Route path="maps" element={m(<MapsPage />)} />
+          <Route path="maps" element={<MapsPage />} />
           <Route path="mensagens" element={<MensagensPage />} />
           <Route path="funis" element={m(<FunisPage />)} />
           <Route path="disparo" element={m(<DisparoPage />)} />

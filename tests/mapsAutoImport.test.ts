@@ -1,16 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { LocalRepository } from '../src/data/localRepository'
 import type { MapsResult, MapsState } from '../src/lib/mapsSearch'
 import { useApp } from '../src/store/useApp'
-
-const acks: string[] = []
-vi.mock('../src/lib/motor', () => ({
-  motorFetch: async (path: string, init?: { json?: { runId: string } }) => {
-    if (path === '/maps/ack' && init?.json) acks.push(init.json.runId)
-    return {}
-  },
-  useMotor: () => undefined,
-}))
 
 const { addMapsRunToLeads } = await import('../src/lib/mapsAutoImport')
 
@@ -81,17 +72,15 @@ function run(results: MapsResult[], patch: Partial<MapsState> = {}): MapsState {
 describe('busca no Maps vai direto para os leads', () => {
   beforeEach(async () => {
     mem.clear()
-    acks.length = 0
     await useApp.getState().init(new LocalRepository())
   })
 
-  it('salva tudo, marca a origem e avisa o motor', async () => {
+  it('salva tudo e marca a origem', async () => {
     const n = await addMapsRunToLeads(run([result('a', { phone: '(35) 99999-0001' }), result('b')]))
     expect(n).toBe(2)
     const { leads, imports } = useApp.getState()
     expect(leads.map((l) => l.empresa)).toEqual(['Empresa a', 'Empresa b'])
     expect(imports[0].arquivo).toBe('Maps · barbearia · Poços de Caldas, MG')
-    expect(acks).toEqual(['r1'])
   })
 
   it('pula quem já está nos leads (telefone ou lugar no Maps) e não duplica ao repetir', async () => {

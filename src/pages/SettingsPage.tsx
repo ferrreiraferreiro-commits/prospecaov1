@@ -378,7 +378,7 @@ function MotorCard() {
     <Card
       id="motor"
       title="Motor XS"
-      description="Programa que roda no seu computador e faz a busca no Google Maps e o WhatsApp dos disparos."
+      description="Programa opcional que roda no seu computador e mantém o WhatsApp conectado para os disparos automáticos. A busca no Maps não precisa dele."
       actions={
         <span className={clsx('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium', online ? 'bg-go/10 text-emerald-300' : 'bg-tint/[0.04] text-fg-3')}>
           <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : 'bg-fg-4')} /> {online ? `Ligado · v${health?.versao ?? ''}` : 'Desligado'}
@@ -387,18 +387,14 @@ function MotorCard() {
     >
       <div className="space-y-3 text-xs">
         {online && health && (
-          <dl className="grid grid-cols-3 gap-2">
-            <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
-              <dt className="text-[10px] text-fg-4">Navegador para o Maps</dt>
-              <dd className={health.navegador ? 'text-emerald-300' : 'text-red-300'}>{health.navegador ? 'Encontrado' : 'Instale o Chrome'}</dd>
-            </div>
+          <dl className="grid grid-cols-2 gap-2">
             <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
               <dt className="text-[10px] text-fg-4">WhatsApp</dt>
               <dd className="text-fg">{health.whatsapp.status === 'connected' ? (health.whatsapp.user?.name ?? 'Conectado') : 'Desconectado'}</dd>
             </div>
             <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
-              <dt className="text-[10px] text-fg-4">Busca no Maps</dt>
-              <dd className="text-fg">{health.maps.active ? 'Rodando' : 'Parada'}</dd>
+              <dt className="text-[10px] text-fg-4">Disparos em andamento</dt>
+              <dd className="text-fg">{health.disparo.running}</dd>
             </div>
           </dl>
         )}

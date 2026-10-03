@@ -174,15 +174,15 @@ function MapsMock() {
   const [open, setOpen] = useState<string | null>(null)
   const timers = useTimers()
 
-  // Simula a varredura: setores do mapa passando, depois os resultados
+  // Simula a busca: em menos de um segundo os resultados aparecem
   const search = (n = nicho) => {
     timers.clear()
     setNicho(n)
     setOpen(null)
     setBusy(true)
     setProgress(0)
-    for (let s = 1; s <= 19; s++) timers.after(s * 60, () => setProgress(s))
-    timers.after(19 * 60 + 200, () => setBusy(false))
+    for (let s = 1; s <= 19; s++) timers.after(s * 35, () => setProgress(s))
+    timers.after(19 * 35 + 120, () => setBusy(false))
   }
 
   const rows = PLACES[nicho].filter((p) => !semSite || !p.site)
@@ -193,7 +193,7 @@ function MapsMock() {
       title="Buscar no Maps"
       meta={
         <span className="flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-go" /> Motor XS conectado
+          <span className="size-1.5 rounded-full bg-go" /> Resultados em segundos
         </span>
       }
     >
@@ -235,7 +235,7 @@ function MapsMock() {
               <div className="h-full rounded-full bg-accent transition-[width] duration-150" style={{ width: `${(progress / 19) * 100}%` }} />
             </div>
             <p className="num mt-3 text-center text-2xs text-fg-3">
-              Varrendo o mapa · setor {Math.max(progress, 1)} de 19
+              Buscando no Google · Campinas - SP
             </p>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { loadEnv } from 'vite'
 import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -27,8 +28,40 @@ function maplibreWorker(): Plugin {
   }
 }
 
+/**
+ * Na Vercel, api/maps.ts vira a função /api/maps. No `npm run dev` não há Vercel:
+ * este atalho chama a mesma função, com as variáveis do .env.local (inclusive GOOGLE_PLACES_KEY).
+ */
+function apiDev(): Plugin {
+  return {
+    name: 'xs-api-dev',
+    configureServer(server) {
+      server.middlewares.use('/api/maps', async (req, res) => {
+        const env = loadEnv(server.config.mode, process.cwd(), '')
+        for (const k of ['GOOGLE_PLACES_KEY', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY']) if (env[k]) process.env[k] = env[k]
+        const chunks: Buffer[] = []
+        for await (const c of req) chunks.push(c as Buffer)
+        const mod = (await server.ssrLoadModule('/api/maps.ts')) as typeof import('./api/maps')
+        let code = 200
+        const out = {
+          status(c: number) {
+            code = c
+            return out
+          },
+          json(body: unknown) {
+            res.statusCode = code
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(body))
+          },
+        }
+        await mod.default({ method: req.method, headers: req.headers, body: Buffer.concat(chunks).toString() }, out)
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), maplibreWorker()],
+  plugins: [react(), tailwindcss(), maplibreWorker(), apiDev()],
   server: { port: Number(process.env.PORT) || 5180 },
   test: { environment: 'node', include: ['tests/**/*.test.ts'] },
 })

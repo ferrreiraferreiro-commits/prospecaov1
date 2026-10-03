@@ -14,7 +14,8 @@ Prospecção por ligação e WhatsApp, busca de empresas no Google Maps e gestã
 ```
 
 - **App web**: tudo o que é tela e dado — Painel, Leads, Hoje, Modo Ligação, Funis, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes. Funciona no celular e no PC.
-- **Motor XS** (`motor/`): o que a Vercel não consegue fazer — abrir o Google Maps num navegador automatizado e manter a sessão do WhatsApp para os disparos. Só escuta em `127.0.0.1` e só aceita chamadas do próprio app.
+- **Busca no Maps** (`api/maps.ts`): função da Vercel que consulta o Google (Places API) com a chave `GOOGLE_PLACES_KEY` (só no servidor) e lê o site público das empresas para achar Instagram e CNPJ. Exige login com acesso liberado. No `npm run dev`, o `vite.config.ts` chama a mesma função.
+- **Motor XS** (`motor/`), opcional: mantém a sessão do WhatsApp para os disparos automáticos (Disparo, Funis, Agendadas). Só escuta em `127.0.0.1` e só aceita chamadas do próprio app. O código antigo da busca no Maps ainda está lá, mas o app não usa mais.
 
 ## Rodar
 

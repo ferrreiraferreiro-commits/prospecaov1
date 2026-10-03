@@ -1,16 +1,14 @@
 import clsx from 'clsx'
 import { Check, CircleStop, Crosshair, Download, ExternalLink, Globe, LoaderCircle, MapPinned, Phone, Plus, Radar, Search, Star, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/kit'
 import { getMapStyle, MapView, saveMapStyle, type MapPoint, type MapStyle } from '../components/MapView'
-import { MotorOffline } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, InstagramIcon, Progress, Segmented } from '../components/ui'
 import { formatPhone } from '../lib/contact'
-import { addMapsRunToLeads } from '../lib/mapsAutoImport'
-import { formatElapsed, knownKeys, PHASE_LABEL, POPULAR_NICHES, type MapsSearchInput, type MapsState, type Mode } from '../lib/mapsSearch'
-import { motorFetch, useMotor } from '../lib/motor'
+import { formatElapsed, PHASE_LABEL, POPULAR_NICHES, type Mode } from '../lib/mapsSearch'
+import { useMapsSearch } from '../store/useMapsSearch'
 import { useApp } from '../store/useApp'
 
 const FORM_KEY = 'xs-prospeccao:busca-maps'
@@ -58,17 +56,15 @@ function placeLabel(a: Record<string, string> | undefined, fallback: string): st
 }
 
 export function MapsPage() {
-  const online = useMotor((s) => s.online)
-  const leads = useApp((s) => s.leads)
   const toast = useApp((s) => s.toast)
+  const state = useMapsSearch((s) => s.state)
   const [form, setForm] = useState<Form>(loadForm)
-  const [state, setState] = useState<MapsState | null>(null)
   const [nicheInput, setNicheInput] = useState('')
   const [locating, setLocating] = useState(false)
-  const [starting, setStarting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
   const [mapStyle, setMapStyle] = useState<MapStyle>(getMapStyle)
+  const [, tick] = useState(0)
 
   useEffect(() => {
     try {
@@ -78,38 +74,38 @@ export function MapsPage() {
     }
   }, [form])
 
-  const refresh = useCallback(async () => {
-    try {
-      setState(await motorFetch<MapsState>('/maps/estado', { timeoutMs: 5000 }))
-    } catch {
-      /* motor desligado: o aviso aparece pela barra lateral */
-    }
-  }, [])
-
   const active = !!state?.active
+  // Relógio da busca em andamento
   useEffect(() => {
-    if (!online) return
-    void refresh()
-    const id = setInterval(() => void refresh(), active ? 1500 : 8000)
+    if (!active) return
+    const id = setInterval(() => tick((n) => n + 1), 200)
     return () => clearInterval(id)
-  }, [online, active, refresh])
+  }, [active])
+  const elapsed = state ? (active && state.startedAt ? Date.now() - Date.parse(state.startedAt) : state.elapsedMs) : 0
 
   const center: MapPoint | null = state?.active && state.center ? state.center : (form.point ?? state?.center ?? null)
   const results = state?.results ?? []
-  // Normalmente vai sozinho para os leads (useMapsAutoImport); isto cobre uma falha ao salvar
+  // Normalmente vai sozinho para os leads; isto cobre uma falha ao salvar
   const pendingSave = !!state && !state.active && !state.imported && results.length > 0
 
-  async function locate() {
+  /** Acha a cidade digitada. Devolve o ponto (ou null se não achou). */
+  async function locate(): Promise<Form['point']> {
     const q = form.location.trim()
-    if (q.length < 2) return toast('Digite a cidade (ex.: Poços de Caldas, MG).', 'error')
+    if (q.length < 2) {
+      toast('Digite a cidade (ex.: Poços de Caldas, MG).', 'error')
+      return null
+    }
     setLocating(true)
     try {
       const rows = (await nominatim(`search?q=${encodeURIComponent(q)}&countrycodes=br&limit=1`)) as { lat: string; lon: string; address?: Record<string, string> }[]
       if (!rows[0]) throw new Error('Não achei essa cidade. Tente "Cidade, UF".')
       const label = placeLabel(rows[0].address, q)
-      setForm((f) => ({ ...f, point: { lat: Number(rows[0].lat), lng: Number(rows[0].lon), label }, location: label }))
+      const point = { lat: Number(rows[0].lat), lng: Number(rows[0].lon), label }
+      setForm((f) => ({ ...f, point, location: label }))
+      return point
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha ao localizar.', 'error')
+      return null
     } finally {
       setLocating(false)
     }
@@ -140,42 +136,27 @@ export function MapsPage() {
   async function start() {
     if (!form.niches.length) return toast('Escolha ao menos um nicho.', 'error')
     if (!form.point && !form.location.trim()) return toast('Informe a cidade ou clique no mapa.', 'error')
-    setStarting(true)
-    try {
-      // Garante que a busca anterior está nos leads antes de o motor trocá-la pela nova
-      if (pendingSave && state) await addMapsRunToLeads(state)
-      const body: MapsSearchInput & { known: { phones: string[]; maps: string[] } } = {
-        niches: form.niches,
-        location: form.point?.label ?? form.location,
-        lat: form.point?.lat,
-        lng: form.point?.lng,
-        radiusKm: form.radiusKm,
-        targetLeads: form.targetLeads,
-        qualification: form.qualification,
-        analyzeSites: form.analyzeSites,
-        existingPolicy: form.existingPolicy,
-        known: knownKeys(leads),
-      }
-      await motorFetch('/maps/iniciar', { method: 'POST', json: body })
-      await refresh()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Falha ao iniciar.', 'error')
-    } finally {
-      setStarting(false)
-    }
-  }
-
-  async function stop() {
-    await motorFetch('/maps/parar', { method: 'POST' }).catch(() => undefined)
-    await refresh()
+    // Cidade digitada sem localizar: localiza agora e já busca
+    const point = form.point ?? (await locate())
+    if (!point) return
+    void useMapsSearch.getState().run({
+      niches: form.niches,
+      location: point.label,
+      lat: point.lat,
+      lng: point.lng,
+      radiusKm: form.radiusKm,
+      targetLeads: form.targetLeads,
+      qualification: form.qualification,
+      analyzeSites: form.analyzeSites,
+      existingPolicy: form.existingPolicy,
+    })
   }
 
   async function saveNow() {
     if (!state) return
     setSaving(true)
     try {
-      const n = await addMapsRunToLeads(state)
-      await refresh()
+      const n = await useMapsSearch.getState().save()
       if (n !== null) toast(n ?`${n} lead(s) entraram na sua lista.` : 'Essas empresas já estavam nos seus leads.', 'success', { label: 'Ver leads', run: () => (window.location.href = '/leads') })
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha ao salvar nos leads.', 'error')
@@ -197,10 +178,8 @@ export function MapsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Buscar no Maps"
-        subtitle="Varre a região em setores, abre cada ficha e confere telefone, site, Instagram e CNPJ. Nada é inventado: só entra o que o Maps mostra."
+        subtitle="Busca as empresas no Google em segundos e confere telefone, site, Instagram e CNPJ. Nada é inventado: só entra o que o Google mostra."
       />
-
-      {online === false && <MotorOffline feature="A busca no Maps" />}
 
       <div className="grid gap-3 xl:grid-cols-[22rem_1fr]">
         {/* Formulário */}
@@ -237,7 +216,7 @@ export function MapsPage() {
                 </Chip>
               ))}
             </div>
-            <p className="text-2xs text-fg-4">{form.radiusKm <= 5 ? '19 pontos de varredura' : '41 pontos de varredura (centro + 4 anéis)'}</p>
+            <p className="text-2xs text-fg-4">Só entram empresas dentro do círculo do mapa.</p>
           </div>
 
           <div className="space-y-2 p-4">
@@ -313,7 +292,7 @@ export function MapsPage() {
               <input type="checkbox" className="mt-0.5" checked={form.analyzeSites} disabled={active} onChange={(e) => setForm({ ...form, analyzeSites: e.target.checked })} />
               <span>
                 Abrir o site de cada empresa
-                <span className="block text-2xs text-fg-4">Acha Instagram e CNPJ (com o sócio responsável). Mais lento.</span>
+                <span className="block text-2xs text-fg-4">Acha Instagram e CNPJ (com o sócio responsável). Leva alguns segundos a mais.</span>
               </span>
             </label>
             <label className="flex items-start gap-2 text-xs text-fg-2">
@@ -327,11 +306,11 @@ export function MapsPage() {
 
           <div className="p-4">
             {active ? (
-              <Button variant="danger" size="lg" className="w-full" icon={<CircleStop className="size-4" />} onClick={() => void stop()}>
+              <Button variant="danger" size="lg" className="w-full" icon={<CircleStop className="size-4" />} onClick={() => useMapsSearch.getState().stop()}>
                 Parar busca
               </Button>
             ) : (
-              <Button variant="primary" size="lg" className="w-full" icon={<Radar className="size-4" />} loading={starting} disabled={!online} onClick={() => void start()}>
+              <Button variant="primary" size="lg" className="w-full" icon={<Radar className="size-4" />} loading={locating} onClick={() => void start()}>
                 Iniciar busca
               </Button>
             )}
@@ -381,13 +360,12 @@ export function MapsPage() {
             >
               <Progress value={state.progress} max={100} tone={state.phase === 'error' ? 'gold' : 'accent'} className="h-1.5" />
               <p className={clsx('mt-2 text-xs', state.phase === 'error' ? 'text-red-300' : 'text-fg-2')}>{state.error ?? state.message}</p>
-              <dl className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+              <dl className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
                 <Metric label="Progresso" value={`${state.progress}%`} />
-                <Metric label="Setores" value={state.totalSectors ? `${state.currentSector}/${state.totalSectors}` : '—'} />
-                <Metric label="Candidatos" value={state.cardsFound} />
-                <Metric label="Aprovados" value={state.approvedCount} tone="text-emerald-300" />
+                <Metric label="Na área" value={state.cardsFound} />
+                <Metric label="Aprovadas" value={state.approvedCount} tone="text-emerald-300" />
                 <Metric label="Já na base" value={state.recurringBlocked || state.recurringDetected} />
-                <Metric label="Tempo" value={formatElapsed(state.elapsedMs)} />
+                <Metric label="Tempo" value={elapsed < 60_000 ? `${(elapsed / 1000).toFixed(1).replace(".", ",")} s` : formatElapsed(elapsed)} />
               </dl>
               {showLogs && (
                 <pre className="mt-3 max-h-48 overflow-y-auto rounded-md border border-line-soft bg-ink p-2.5 font-mono text-[10.5px] leading-4 whitespace-pre-wrap text-fg-3">
@@ -506,10 +484,10 @@ export function MapsPage() {
             </section>
           )}
 
-          {(!state || state.phase === 'idle') && online && (
+          {(!state || state.phase === 'idle') && (
             <div className="panel flex items-center gap-3 px-4 py-3 text-xs text-fg-3">
               <MapPinned className="size-4 shrink-0 text-blue-400" />
-              Escolha a cidade, o raio e os nichos ao lado. O Motor abre o Google Maps escondido no seu computador, e as empresas que ele achar entram direto nos seus leads.
+              Escolha a cidade, o raio e os nichos ao lado. A busca leva poucos segundos, e as empresas que ela achar entram direto nos seus leads.
             </div>
           )}
         </div>

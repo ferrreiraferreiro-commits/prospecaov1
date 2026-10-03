@@ -38,8 +38,10 @@ export function phoneKey(tel: string | null): string | null {
 /** Identificador do lugar no Google Maps (place id / feature id), ignorando parâmetros de sessão. */
 export function mapsKey(url: string | null): string | null {
   if (!url) return null
-  const feature = url.match(/!1s(0x[0-9a-f]+:0x[0-9a-f]+)/i)
-  if (feature) return feature[1].toLowerCase()
+  // "0x…:0x…" (links antigos do Maps) e "?cid=…" (Places API) são o mesmo lugar:
+  // o cid é a segunda metade do feature id em decimal
+  const feature = url.match(/!1s0x[0-9a-f]+:(0x[0-9a-f]+)/i)
+  if (feature) return `cid:${BigInt(feature[1]).toString()}`
   const place = url.match(/(ChIJ[\w-]{10,})/)
   if (place) return place[1]
   const cid = url.match(/[?&]cid=(\d+)/)

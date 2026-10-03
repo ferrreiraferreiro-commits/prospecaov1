@@ -30,7 +30,6 @@ import {
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
-import { useMapsAutoImport } from '../lib/mapsAutoImport'
 import { useMotor, useMotorPolling } from '../lib/motor'
 import { useMetrics } from '../store/derived'
 import { accessOf, useAccount, useHasMotor } from '../store/useAccount'
@@ -62,7 +61,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/hoje', label: 'Hoje', icon: Sun },
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
-      { to: '/maps', label: 'Buscar no Maps', icon: MapPinned, motor: true },
+      { to: '/maps', label: 'Buscar no Maps', icon: MapPinned },
     ],
   },
   {
@@ -106,10 +105,9 @@ function useGroups() {
   return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => motor || !i.motor) })).filter((g) => g.items.length)
 }
 
-/** Conversa com o Motor XS no computador: status, buscas do Maps e disparos. */
+/** Conversa com o Motor XS no computador: status e disparos do WhatsApp. */
 function MotorSync() {
   useMotorPolling()
-  useMapsAutoImport()
   useDisparoSync()
   return null
 }
@@ -291,7 +289,7 @@ function SideLink({ item, collapsed, badge }: { item: NavItem; collapsed: boolea
   )
 }
 
-/** Indica se o Motor XS (busca no Maps e WhatsApp) está rodando neste computador. */
+/** Indica se o Motor XS (disparos do WhatsApp) está rodando neste computador. */
 function MotorPill({ collapsed }: { collapsed: boolean }) {
   const online = useMotor((s) => s.online)
   const wa = useMotor((s) => s.health?.whatsapp.status)

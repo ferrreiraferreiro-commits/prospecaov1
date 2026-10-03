@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ArrowRight, CalendarClock, Check, LayoutList, Map as MapIcon, Menu, MonitorDown, Plus, Route, X } from 'lucide-react'
+import { ArrowRight, CalendarClock, Check, LayoutList, Map as MapIcon, Menu, MonitorSmartphone, Plus, Route, X } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
@@ -354,7 +354,7 @@ function Faq() {
   const items: { q: string; a: ReactNode }[] = [
     {
       q: 'Preciso instalar alguma coisa?',
-      a: 'Para ligar, organizar leads e cuidar da gestão, não: a XS funciona no navegador do computador e do celular, e pode ficar na tela inicial como um app. Para buscar empresas no Maps e enviar mensagens automáticas no WhatsApp, você baixa o Motor XS para Windows dentro do próprio app.',
+      a: 'Não. A XS funciona no navegador do computador e do celular, inclusive a busca no Google Maps, e pode ficar na tela inicial como um app. Só o disparo automático em massa no WhatsApp usa um programa opcional para Windows.',
     },
     {
       q: 'De onde vêm os leads?',
@@ -392,11 +392,10 @@ function Faq() {
           </h2>
           <div className="mt-10 max-w-[380px] border-l border-line pl-5">
             <p className="flex items-center gap-2 text-[13px] font-medium text-fg">
-              <MonitorDown className="size-4 text-fg-3" aria-hidden /> Sobre o Motor XS
+              <MonitorSmartphone className="size-4 text-fg-3" aria-hidden /> Nada para instalar
             </p>
             <p className="mt-2 text-[13px] leading-6 text-fg-2">
-              Busca no Maps e automações do WhatsApp usam o Motor XS, um programa leve para Windows que roda no seu computador. A sessão do WhatsApp fica
-              guardada nele. Ligação, leads e gestão continuam disponíveis pelo navegador, no PC ou no celular.
+              Busca no Maps, ligações, leads e gestão funcionam direto no navegador, no PC ou no celular. A busca traz as empresas em poucos segundos.
             </p>
           </div>
         </div>

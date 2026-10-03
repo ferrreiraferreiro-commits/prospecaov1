@@ -132,7 +132,7 @@ describe('Busca no Maps → leads', () => {
   it('chaves conhecidas usam DDD + 8 dígitos e o lugar do Maps', () => {
     const k = knownKeys([lead({ telefone: '(35) 9757-7655', maps_url: result.mapsUrl })])
     expect(k.phones).toContain('3597577655')
-    expect(k.maps).toContain('0x1:0x2')
+    expect(k.maps).toContain('cid:2')
   })
 })
 

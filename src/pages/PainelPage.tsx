@@ -227,16 +227,11 @@ export function PainelPage() {
 
         <Card title="Atalhos">
           <div className="grid grid-cols-2 gap-2">
+            <Shortcut to="/maps" icon={<MapPinned />} label="Buscar leads no Maps" hint="Empresas em segundos" />
             {motor ? (
-              <>
-                <Shortcut to="/maps" icon={<MapPinned />} label="Buscar leads no Maps" hint={motorOnline ? 'Motor pronto' : 'Precisa do Motor XS'} />
-                <Shortcut to="/disparo" icon={<Send />} label="Novo disparo" hint={wa?.status === 'connected' ? `WhatsApp: ${wa.user?.name ?? 'conectado'}` : 'WhatsApp desconectado'} />
-              </>
+              <Shortcut to="/disparo" icon={<Send />} label="Novo disparo" hint={wa?.status === 'connected' ? `WhatsApp: ${wa.user?.name ?? 'conectado'}` : 'WhatsApp desconectado'} />
             ) : (
-              <>
-                <Shortcut to="/hoje" icon={<Sun />} label="Ligações de hoje" hint={`${plan.followups.length} retorno(s)`} />
-                <Shortcut to="/projetos" icon={<FolderKanban />} label="Projetos" hint={`${ativos.length} em andamento`} />
-              </>
+              <Shortcut to="/hoje" icon={<Sun />} label="Ligações de hoje" hint={`${plan.followups.length} retorno(s)`} />
             )}
             <Shortcut to="/leads" icon={<PhoneCall />} label="Lista de leads" hint={`${metrics.naoTrabalhados} sem contato`} />
             <Shortcut to="/precificacao" icon={<Sparkles />} label="Calcular orçamento" hint="Precificação" />

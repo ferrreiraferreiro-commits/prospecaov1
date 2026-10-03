@@ -87,14 +87,15 @@ const sections: LegalSection[] = [
             <strong>Por você</strong>: no cadastro, no perfil e em tudo o que você digita, cola ou importa por planilha.
           </>,
           <>
-            <strong>Pela busca no Google Maps</strong>: o Motor XS abre o Google Maps no navegador do seu computador e lê as informações que as próprias
-            empresas deixam públicas na ficha delas (nome, telefone, site, endereço, avaliação).
+            <strong>Pela busca no Google Maps</strong>: o servidor da XS consulta a plataforma oficial do Google com o nicho e a região que você escolheu e
+            recebe as informações que as próprias empresas deixam públicas (nome, telefone, site, endereço, avaliação). Para achar Instagram e CNPJ, o
+            servidor abre a página pública do site da empresa, quando ela tem um.
           </>,
           <>
             <strong>Pela consulta pública de CNPJ</strong>: quando há um CNPJ, os dados cadastrais públicos da empresa são consultados na BrasilAPI.
           </>,
           <>
-            <strong>Pelo WhatsApp</strong>: se você conectar o seu WhatsApp ao Motor XS, a confirmação de entrega, de leitura e as respostas às mensagens
+            <strong>Pelo WhatsApp</strong>: se você usar o disparo automático e conectar o seu WhatsApp ao Motor XS (programa opcional), a confirmação de entrega, de leitura e as respostas às mensagens
             enviadas pela XS entram no histórico do lead.
           </>,
         ]}
@@ -157,8 +158,8 @@ const sections: LegalSection[] = [
           ligado ao seu usuário, e o banco aplica regras de acesso por linha: uma conta só consegue ler e alterar os próprios dados.
         </p>
         <p>
-          O que depende do <strong>Motor XS</strong> fica no seu computador, na pasta de dados do programa: a sessão do WhatsApp, as campanhas de envio
-          e a última busca no Maps. Essas informações não são enviadas para os nossos servidores.
+          Se você usar o <strong>Motor XS</strong> (programa opcional, só para o disparo automático no WhatsApp), ele guarda no seu computador a sessão do
+          WhatsApp e as campanhas de envio. Essas informações não são enviadas para os nossos servidores.
         </p>
         <p>
           Algumas preferências ficam salvas no seu navegador (veja <a href="#navegador">Cookies e armazenamento no navegador</a>).
@@ -178,13 +179,13 @@ const sections: LegalSection[] = [
               <strong>Supabase</strong>: banco de dados, login e e-mails de autenticação.
             </>,
             <>
-              <strong>Vercel</strong>: hospedagem do site.
+              <strong>Vercel</strong>: hospedagem do site e do servidor que faz a busca no Maps.
             </>,
             <>
-              <strong>Google Maps</strong>: acessado pelo navegador do seu computador, via Motor XS, durante a busca de empresas.
+              <strong>Google Maps Platform</strong>: busca de empresas. O Google recebe só o nicho e a região da busca, nunca os seus leads.
             </>,
             <>
-              <strong>WhatsApp</strong>: as mensagens enviadas pelo Motor XS saem da sua própria conta de WhatsApp, conectada por QR Code.
+              <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pelo Motor XS saem da sua própria conta de WhatsApp, conectada por QR Code.
             </>,
             <>
               <strong>BrasilAPI</strong>: consulta de dados públicos de CNPJ.
@@ -360,7 +361,7 @@ export function PrivacyPage() {
             Esta página explica, em linguagem simples, quais dados a XS Prospecção usa, por que usa, onde eles ficam e o que você pode fazer com eles.
           </p>
           <p className="border-l border-line-strong pl-4 text-fg-3">
-            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; o que roda no Motor XS fica no seu computador; não vendemos
+            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; a busca no Maps envia ao Google só o nicho e a região; não vendemos
             dados e não usamos rastreamento de publicidade.
           </p>
         </>

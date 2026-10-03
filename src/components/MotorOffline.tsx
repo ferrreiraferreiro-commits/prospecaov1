@@ -15,7 +15,7 @@ export function MotorSteps({ https }: { https?: boolean }) {
       <li>
         Dê dois cliques nele. Se o Windows avisar "O Windows protegeu o computador", clique em <strong className="text-fg">Mais informações → Executar assim mesmo</strong>.
       </li>
-      <li>Deixe a janela preta aberta enquanto usa a busca no Maps e o disparo. Ela usa o Chrome ou o Edge do computador.</li>
+      <li>Deixe a janela preta aberta enquanto os disparos acontecem.</li>
       {https && <li>Se o navegador perguntar se o site pode acessar apps e serviços deste dispositivo, clique em Permitir.</li>}
     </ol>
   )
@@ -32,7 +32,7 @@ export function MotorOffline({ feature }: { feature: string }) {
         <p className="mb-1.5 font-semibold text-fg">{feature} precisa do Motor XS aberto neste computador</p>
         <MotorSteps https={isHttps} />
         <p className="mt-1.5 text-fg-4">
-          O motor roda no seu computador porque o Google Maps e o WhatsApp precisam de um navegador e de uma sessão sempre abertos.{' '}
+          O motor roda no seu computador porque o disparo automático precisa de uma sessão do WhatsApp sempre aberta.{' '}
           <Link to="/configuracoes#motor" className="text-blue-300 hover:text-blue-200">
             Mais sobre o motor
           </Link>
