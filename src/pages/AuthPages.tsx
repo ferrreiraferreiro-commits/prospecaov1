@@ -189,7 +189,17 @@ export function SignupPage({ client }: { client: SupabaseClient }) {
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
           Começar o teste grátis
         </Button>
-        <p className="text-center text-2xs leading-4 text-fg-4">Ao criar a conta você concorda com os Termos de Uso e a Política de Privacidade.</p>
+        <p className="text-center text-2xs leading-4 text-fg-4">
+          Ao criar a conta você concorda com os{' '}
+          <a href="/termos" target="_blank" rel="noopener" className="text-fg-3 underline decoration-line-strong underline-offset-2 hover:text-fg">
+            Termos de Uso
+          </a>{' '}
+          e a{' '}
+          <a href="/privacidade" target="_blank" rel="noopener" className="text-fg-3 underline decoration-line-strong underline-offset-2 hover:text-fg">
+            Política de Privacidade
+          </a>
+          .
+        </p>
       </form>
     </AuthShell>
   )

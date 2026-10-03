@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { create } from 'zustand'
 
-/** Conta no XS: quem é, plano/teste e recursos liberados (tabela `profiles`). */
+/** Conta na XS: quem é, plano/teste e recursos liberados (tabela `profiles`). */
 export interface Profile {
   user_id: string
   email: string | null

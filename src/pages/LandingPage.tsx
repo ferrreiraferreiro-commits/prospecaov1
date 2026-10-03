@@ -1,31 +1,18 @@
 import clsx from 'clsx'
-import {
-  ArrowRight,
-  BadgeDollarSign,
-  CalendarClock,
-  Calculator,
-  ChartColumn,
-  Check,
-  ChevronDown,
-  FolderKanban,
-  Headphones,
-  MapPinned,
-  MessageCircle,
-  PhoneOff,
-  PhoneOutgoing,
-  RotateCcw,
-  Send,
-  Smartphone,
-  Sun,
-} from 'lucide-react'
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { ArrowRight, CalendarClock, Check, LayoutList, Map as MapIcon, Menu, MonitorDown, Plus, Route, X } from 'lucide-react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
+import { CallDemo } from '../components/site/CallDemo'
+import { ProductShowcase } from '../components/site/ProductShowcase'
+import { SiteFooter } from '../components/site/SiteFooter'
+import '@fontsource-variable/manrope'
 
 /** Atraso da animação de entrada (classe land-in / reveal). */
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 
-const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+/** Largura e margens de todas as seções. */
+const WRAP = 'mx-auto w-full max-w-[1160px] px-5 sm:px-8'
 
 /** Revela cada `.reveal` da página quando ele entra na tela. */
 function useRevealOnScroll(root: React.RefObject<HTMLElement | null>) {
@@ -51,308 +38,251 @@ function useRevealOnScroll(root: React.RefObject<HTMLElement | null>) {
   }, [root])
 }
 
-/** Página pública do XS: quem ainda não entrou chega aqui. */
+/**
+ * A landing foi desenhada só no escuro. Se o tema salvo for o claro, troca para o escuro
+ * enquanto ela está aberta (antes de desenhar) e devolve o tema ao sair.
+ */
+function useDarkTheme() {
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    const before = root.dataset.theme
+    root.dataset.theme = 'dark'
+    return () => {
+      if (before) root.dataset.theme = before
+    }
+  }, [])
+}
+
+/** Página pública da XS: quem ainda não entrou chega aqui. */
 export function LandingPage() {
   const ref = useRef<HTMLDivElement>(null)
   useRevealOnScroll(ref)
+  useDarkTheme()
   return (
-    <div ref={ref} className="min-h-dvh bg-ink text-fg">
+    <div ref={ref} className="land-bg relative isolate min-h-dvh overflow-x-clip text-fg">
+      <div className="land-glow" aria-hidden />
+      <div className="land-grain" aria-hidden />
+      <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-raised focus:px-3 focus:py-2 focus:text-xs">
+        Pular para o conteúdo
+      </a>
       <Nav />
-      <main>
+      <main id="conteudo">
         <Hero />
+        <Highlights />
         <Steps />
-        <Features />
-        <ForSites />
+        <Product />
+        <Audience />
         <Faq />
         <FinalCta />
       </main>
-      <footer className="border-t border-line-soft">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-2xs text-fg-4 sm:px-6">
-          <span className="flex items-center gap-2">
-            <LogoMark size={20} /> XS Prospecção
-          </span>
-          <span>Prospecção por ligação para quem vende sites e serviços digitais.</span>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   )
 }
 
+const NAV_LINKS = [
+  { href: '#como-funciona', label: 'Como funciona' },
+  { href: '#recursos', label: 'Recursos' },
+  { href: '#perguntas', label: 'Perguntas' },
+]
+
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 8)
     on()
     window.addEventListener('scroll', on, { passive: true })
     return () => window.removeEventListener('scroll', on)
   }, [])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const onResize = () => window.innerWidth >= 768 && setOpen(false)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [open])
+
   return (
-    <header className={clsx('sticky top-0 z-30 border-b backdrop-blur transition-colors duration-300', scrolled ? 'border-line-soft bg-ink/90' : 'border-transparent bg-ink/0')}>
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5">
-          <LogoMark size={30} />
-          <Wordmark />
+    <header
+      className={clsx(
+        'sticky top-0 z-40 border-b transition-[background-color,border-color] duration-300',
+        scrolled || open ? 'border-line-soft bg-[#0b0f1a]/80 backdrop-blur-md' : 'border-transparent bg-ink/0',
+      )}
+    >
+      <div className={clsx(WRAP, 'relative flex h-16 items-center gap-3')}>
+        <Link to="/" className="flex items-center gap-2.5" aria-label="XS Prospecção, página inicial">
+          <LogoMark size={28} />
+          <Wordmark className="hidden min-[400px]:block" />
         </Link>
-        <nav className="hidden items-center gap-5 text-xs text-fg-3 md:flex">
-          <a href="#como-funciona" className="transition-colors hover:text-fg">
-            Como funciona
-          </a>
-          <a href="#recursos" className="transition-colors hover:text-fg">
-            Recursos
-          </a>
-          <a href="#perguntas" className="transition-colors hover:text-fg">
-            Perguntas
-          </a>
+
+        <nav aria-label="Principal" className="absolute left-1/2 hidden -translate-x-1/2 md:block">
+          <ul className="flex items-center gap-8 text-[13px] text-fg-2">
+            {NAV_LINKS.map((l) => (
+              <li key={l.href}>
+                <a href={l.href} className="transition-colors hover:text-fg">
+                  {l.label}
+                </a>
+              </li>
+            ))}
+          </ul>
         </nav>
-        <div className="ml-auto flex items-center gap-2">
-          <Link to="/entrar" className="rounded-md px-3 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-hover hover:text-fg">
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <Link to="/entrar" className="hidden h-9 items-center rounded-md px-3 text-[13px] font-medium text-fg-2 transition-colors hover:text-fg md:inline-flex">
             Entrar
           </Link>
-          <Link to="/criar-conta" className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#3b7bf6]">
+          <Link to="/criar-conta" className="inline-flex h-9 items-center rounded-md bg-blue-600 px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3b7bf6]">
             Testar grátis
           </Link>
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls="menu-celular"
+            aria-label={open ? 'Fechar menu' : 'Abrir menu'}
+            className="-mr-2 inline-flex size-10 items-center justify-center rounded-md text-fg-2 transition-colors hover:text-fg md:hidden"
+          >
+            {open ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
         </div>
       </div>
+
+      {open && (
+        <div id="menu-celular" className="anim-fade border-t border-line-soft md:hidden">
+          <nav aria-label="Menu" className={clsx(WRAP, 'py-3')}>
+            <ul>
+              {NAV_LINKS.map((l) => (
+                <li key={l.href}>
+                  <a href={l.href} onClick={() => setOpen(false)} className="flex h-12 items-center border-b border-line-soft text-[15px] text-fg-2 hover:text-fg">
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+              <li>
+                <Link to="/entrar" className="flex h-12 items-center text-[15px] text-fg-2 hover:text-fg">
+                  Entrar
+                </Link>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      )}
     </header>
   )
 }
 
-/** Botão principal com a seta que anda no hover. */
-function PrimaryCta({ children, className }: { children: ReactNode; className?: string }) {
+/** Botão principal: leva para o cadastro. */
+function PrimaryCta({ className }: { className?: string }) {
   return (
     <Link
       to="/criar-conta"
       className={clsx(
-        'group inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white transition-[background-color,transform] duration-200 hover:bg-[#3b7bf6] active:scale-[0.98]',
+        'group inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 text-[15px] font-semibold text-white transition-[background-color,transform] duration-200 hover:bg-[#3b7bf6] active:scale-[0.98] sm:h-11 sm:px-5 sm:text-sm',
         className,
       )}
     >
-      {children}
-      <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
+      Testar 1 dia grátis
+      <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
     </Link>
   )
 }
 
+function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="text-2xs font-medium tracking-[0.14em] text-fg-2/80 uppercase">{children}</p>
+}
+
+const H2 = 'font-display text-balance text-[30px] leading-[1.1] sm:text-[40px] sm:leading-[1.06]'
+
 function Hero() {
   return (
-    <section className="border-b border-line-soft">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 md:py-24 lg:grid-cols-[1.05fr_1fr]">
-        <div>
-          <p className="land-in mb-5 inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-2xs font-medium text-fg-2" style={delay(0)}>
-            <span className="relative flex size-1.5">
-              <span className="absolute inset-0 animate-ping rounded-full bg-go/60" />
-              <span className="relative size-1.5 rounded-full bg-go" />
-            </span>
+    <section aria-labelledby="hero-t">
+      <div className={clsx(WRAP, 'grid items-center gap-14 pt-12 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,548px)] lg:gap-12 lg:pt-28 lg:pb-32')}>
+        <div className="max-w-[600px]">
+          <p className="land-in text-[13px] text-fg-2/80" style={delay(0)}>
             Para quem vende sites e serviços digitais
           </p>
-          <h1 className="text-[40px] leading-[1.04] font-semibold tracking-[-0.035em] sm:text-[56px]">
-            <span className="land-in block" style={delay(90)}>
+          <h1 id="hero-t" className="font-display mt-5 text-[clamp(2.375rem,1.4rem+3.6vw,3.5rem)] leading-[1.02]">
+            <span className="land-in block" style={delay(70)}>
               Do primeiro alô
             </span>
-            <span className="land-in block" style={delay(180)}>
+            <span className="land-in block text-fg-3" style={delay(140)}>
               ao cliente fechado.
             </span>
           </h1>
-          <p className="land-in mt-5 max-w-lg text-[15px] leading-7 text-fg-2" style={delay(300)}>
-            Ache empresas no Google Maps, ligue com o roteiro na tela, não perca nenhum retorno e acompanhe clientes, projetos e dinheiro num app só. No PC ou no celular.
+          <p className="land-in mt-6 max-w-[480px] text-base leading-7 text-fg-2" style={delay(220)}>
+            Encontre empresas no Google Maps, organize todos os seus leads num lugar só e acompanhe cada contato, da ligação ao WhatsApp, até virar cliente.
           </p>
-          <div className="land-in mt-8 flex flex-wrap items-center gap-3" style={delay(420)}>
-            <PrimaryCta>Testar 1 dia grátis</PrimaryCta>
-            <Link to="/entrar" className="inline-flex h-11 items-center rounded-lg border border-line px-5 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg">
-              Já tenho conta
-            </Link>
+          <div className="land-in mt-9 flex flex-col gap-3 sm:flex-row sm:items-center" style={delay(300)}>
+            <PrimaryCta />
+            <a
+              href="#como-funciona"
+              className="inline-flex h-12 items-center justify-center rounded-lg border border-line px-6 text-[15px] font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg sm:h-11 sm:px-5 sm:text-sm"
+            >
+              Ver como funciona
+            </a>
           </div>
-          <p className="land-in mt-4 text-2xs text-fg-4" style={delay(520)}>
-            Um dia com tudo liberado. Sem cartão de crédito.
+          <p className="land-in mt-5 text-xs text-fg-2/70" style={delay(360)}>
+            1 dia com tudo liberado. Sem cartão de crédito.
           </p>
         </div>
-        <div className="land-in" style={delay(260)}>
-          <CallMock />
+        <div className="land-in min-w-0" style={delay(200)}>
+          <CallDemo />
         </div>
       </div>
     </section>
   )
 }
 
-// Leads de exemplo que o cartão do Modo Ligação vai mostrando
-const DEMO = [
-  {
-    sigla: 'BN',
-    empresa: 'Barbearia Navalha',
-    info: 'Barbearia · Centro · 4,8 ★ (212)',
-    tentativa: '2ª',
-    contato: 'ontem',
-    horario: '14h–16h',
-    fala: 'Oi, tudo bem? Aqui é o Rafael. Vi a Barbearia Navalha no Google e reparei que vocês ainda não têm site. Posso te mostrar em 2 minutos como isso traz cliente novo?',
-    retorno: { hora: '15:00', quem: 'Pet Shop Amigo · falar com a Carla' },
-  },
-  {
-    sigla: 'PA',
-    empresa: 'Pet Shop Amigo',
-    info: 'Pet shop · Jardim Europa · 4,6 ★ (98)',
-    tentativa: '1ª',
-    contato: 'nunca',
-    horario: '9h–11h',
-    fala: 'Bom dia! Aqui é o Rafael. Quem procura pet shop no Google decide pelo que aparece primeiro. Vocês já pensaram em ter um site para agendar banho e tosa?',
-    retorno: { hora: '16:30', quem: 'Clínica Sorriso · falar com o Dr. Paulo' },
-  },
-  {
-    sigla: 'CS',
-    empresa: 'Clínica Sorriso',
-    info: 'Dentista · Centro · 4,9 ★ (341)',
-    tentativa: '3ª',
-    contato: 'há 2 dias',
-    horario: '13h–14h',
-    fala: 'Olá, Dr. Paulo! Retornando como combinamos. Separei três exemplos de site de clínica que mais trazem paciente pelo Google. Posso te mandar agora?',
-    retorno: { hora: 'Amanhã 10:00', quem: 'Barbearia Navalha · reunião' },
-  },
-]
-
-/** Texto que aparece sendo digitado. */
-function useTypewriter(text: string, speed = 18) {
-  // Guarda de qual texto é a contagem: ao trocar de texto, recomeça do zero sem piscar o novo inteiro
-  const [st, setSt] = useState(() => ({ text, n: reducedMotion() ? text.length : 0 }))
-  useEffect(() => {
-    if (reducedMotion()) {
-      setSt({ text, n: text.length })
-      return
-    }
-    setSt({ text, n: 0 })
-    const id = setInterval(() => setSt((s) => (s.text === text && s.n < text.length ? { text, n: s.n + 1 } : s)), speed)
-    return () => clearInterval(id)
-  }, [text, speed])
-  const n = st.text === text ? st.n : 0
-  return { shown: text.slice(0, n), done: n >= text.length }
-}
-
-/** Retrato do Modo Ligação, desenhado em HTML e animado (sem imagem). */
-function CallMock() {
-  const [i, setI] = useState(0)
-  const [pressed, setPressed] = useState(false)
-  const lead = DEMO[i]
-  const { shown, done } = useTypewriter(lead.fala)
-
-  // Terminou de "falar": aperta Atendeu e passa para o próximo lead
-  useEffect(() => {
-    if (!done || reducedMotion()) return
-    const press = setTimeout(() => setPressed(true), 1600)
-    const next = setTimeout(() => {
-      setPressed(false)
-      setI((v) => (v + 1) % DEMO.length)
-    }, 2300)
-    return () => {
-      clearTimeout(press)
-      clearTimeout(next)
-    }
-  }, [done])
-
+function Highlights() {
+  const items = [
+    { icon: <MapIcon />, text: 'Leads reais do Google Maps' },
+    { icon: <LayoutList />, text: 'Tudo organizado num lugar' },
+    { icon: <CalendarClock />, text: 'Retornos na hora certa' },
+    { icon: <Route />, text: 'Do lead ao projeto' },
+  ]
   return (
-    <div className="relative mx-auto w-full max-w-[520px]" aria-hidden>
-      <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]">
-        <div className="flex items-center gap-2 border-b border-line-soft px-4 py-2.5">
-          <Headphones className="size-3.5 text-blue-400" />
-          <span className="text-2xs font-medium text-fg-2">Modo ligação</span>
-          <span className="num ml-auto text-2xs text-fg-4">
-            <span key={i} className="anim-rise inline-block text-fg-2">
-              {7 + i}
-            </span>{' '}
-            de 32 · hoje
-          </span>
-        </div>
-        <div key={i} className="anim-fade space-y-4 p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-raised text-sm font-semibold text-fg-2">{lead.sigla}</div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">{lead.empresa}</p>
-              <p className="text-2xs text-fg-3">{lead.info}</p>
-            </div>
-            <span className="rounded bg-emerald-500/10 px-1.5 text-2xs leading-5 font-medium text-emerald-300">sem site</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <MockStat label="Tentativa" value={lead.tentativa} />
-            <MockStat label="Último contato" value={lead.contato} />
-            <MockStat label="Melhor horário" value={lead.horario} />
-          </div>
-          <div className="rounded-lg border border-line-soft bg-ink p-3">
-            <p className="mb-1.5 text-[10px] font-semibold tracking-[0.08em] text-fg-4 uppercase">Roteiro · abertura</p>
-            <p className="min-h-[60px] text-xs leading-5 text-fg-2">
-              “{shown}
-              {done ? '”' : <span className="caret text-blue-400" />}
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <MockButton tone="go" icon={<PhoneOutgoing />} pressed={pressed}>
-              Atendeu
-            </MockButton>
-            <MockButton icon={<PhoneOff />}>Não atendeu</MockButton>
-            <MockButton icon={<RotateCcw />}>Retornar</MockButton>
-          </div>
-        </div>
-      </div>
-      <div key={`r${i}`} className="land-in absolute -right-3 -bottom-5 hidden w-56 rounded-lg border border-line bg-raised p-3 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] sm:block" style={delay(900)}>
-        <p className="flex items-center gap-1.5 text-2xs font-medium text-sky-300">
-          <CalendarClock className="size-3.5" /> Retorno · {lead.retorno.hora}
-        </p>
-        <p className="mt-1 text-2xs text-fg-3">{lead.retorno.quem}</p>
-      </div>
-    </div>
-  )
-}
-
-function MockStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
-      <p className="text-[10px] text-fg-4">{label}</p>
-      <p className="num text-xs font-semibold">{value}</p>
-    </div>
-  )
-}
-
-function MockButton({ children, icon, tone, pressed }: { children: ReactNode; icon: ReactNode; tone?: 'go'; pressed?: boolean }) {
-  return (
-    <div
-      className={clsx(
-        'flex h-9 items-center justify-center gap-1.5 rounded-md text-2xs font-semibold transition-colors [&>svg]:size-3.5',
-        tone === 'go' ? clsx('text-[#04140c]', pressed ? 'press bg-go-strong' : 'bg-go') : 'border border-line bg-raised text-fg-2',
-      )}
-    >
-      {icon}
-      {children}
-    </div>
-  )
-}
-
-function SectionHead({ eyebrow, title, children }: { eyebrow: string; title: ReactNode; children?: ReactNode }) {
-  return (
-    <div className="reveal mb-10 max-w-2xl">
-      <p className="mb-3 text-2xs font-semibold tracking-[0.1em] text-blue-300 uppercase">{eyebrow}</p>
-      <h2 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.025em] sm:text-[34px]">{title}</h2>
-      {children && <p className="mt-3 text-sm leading-6 text-fg-2">{children}</p>}
-    </div>
+    <section aria-label="Em resumo" className="border-y border-line-soft">
+      <ul className={clsx(WRAP, 'grid grid-cols-2 gap-x-6 gap-y-5 py-7 lg:grid-cols-4 lg:gap-0 lg:py-0')}>
+        {items.map((it) => (
+          <li
+            key={it.text}
+            className="flex items-center gap-3 text-[13px] text-fg-2 lg:border-l lg:border-line-soft lg:px-8 lg:py-7 lg:first:border-l-0 lg:first:pl-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-fg-3"
+          >
+            {it.icon}
+            {it.text}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
 function Steps() {
   const steps = [
-    { icon: <MapPinned />, title: 'Ache os leads', text: 'Busque empresas no Google Maps por cidade e nicho, ou traga a sua planilha. Quem já está na lista é pulado.' },
-    { icon: <Headphones />, title: 'Ligue em sequência', text: 'Um lead atrás do outro, com roteiro e respostas para as objeções. Registrar o resultado leva um clique.' },
-    { icon: <FolderKanban />, title: 'Feche e acompanhe', text: 'Reunião marcada, cliente fechado, projeto andando e pagamento recebido, tudo ligado ao mesmo lead.' },
+    { title: 'Capture leads', text: 'Busque empresas no Google Maps por cidade e nicho, com telefone, site e Instagram, ou traga a sua planilha. Quem já está na sua lista fica de fora.' },
+    { title: 'Entre em contato', text: 'Ligue em sequência com o roteiro na tela ou continue pelo WhatsApp. Cada resultado fica registrado no histórico do lead.' },
+    { title: 'Organize e feche', text: 'Retornos, reuniões, clientes, projetos e pagamentos ficam ligados ao mesmo lead, do primeiro contato em diante.' },
   ]
   return (
-    <section id="como-funciona" className="scroll-mt-14 border-b border-line-soft">
-      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <SectionHead eyebrow="Como funciona" title="Três passos, todo dia." />
-        <ol className="grid gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-3">
+    <section id="como-funciona" aria-labelledby="como-t" className="scroll-mt-16">
+      <div className={clsx(WRAP, 'py-24 sm:py-32')}>
+        <div className="reveal">
+          <Eyebrow>Como funciona</Eyebrow>
+          <h2 id="como-t" className={clsx(H2, 'mt-4')}>
+            Três passos, todo dia.
+          </h2>
+        </div>
+        <ol className="mt-14 grid gap-12 sm:mt-16 md:grid-cols-3 md:gap-10">
           {steps.map((s, i) => (
-            <li key={s.title} className="reveal group bg-panel p-6 transition-colors duration-300 hover:bg-raised" style={delay(i * 110)}>
-              <div className="mb-5 flex items-center justify-between">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-300 transition-transform duration-300 group-hover:-translate-y-0.5 [&>svg]:size-[18px]">
-                  {s.icon}
-                </span>
-                <span className="num text-xs text-fg-4">0{i + 1}</span>
-              </div>
-              <h3 className="text-[15px] font-semibold">{s.title}</h3>
-              <p className="mt-2 text-xs leading-5 text-fg-3">{s.text}</p>
+            <li key={s.title} className="reveal border-t border-line pt-6" style={delay(i * 90)}>
+              <span className="num text-xs text-fg-3">0{i + 1}</span>
+              <h3 className="mt-8 text-[19px] leading-7 font-semibold tracking-[-0.015em]">{s.title}</h3>
+              <p className="mt-2 max-w-[320px] text-sm leading-6 text-fg-2">{s.text}</p>
             </li>
           ))}
         </ol>
@@ -361,61 +291,59 @@ function Steps() {
   )
 }
 
-function Features() {
-  const items = [
-    { icon: <MapPinned />, title: 'Busca no Maps', text: 'Empresas da sua cidade com telefone, site, Instagram e o sócio pelo CNPJ. Filtre só quem não tem site.' },
-    { icon: <Send />, title: 'Disparo no WhatsApp', text: 'Funis de mensagens com intervalo entre envios, mensagens agendadas e as respostas no histórico do lead.' },
-    { icon: <Sun />, title: 'Hoje', text: 'A fila do dia montada sozinha: retornos, reuniões, quem tentar de novo e leads novos.' },
-    { icon: <RotateCcw />, title: 'Tentativas automáticas', text: 'Não atendeu de manhã? O retorno já fica marcado para a tarde do dia seguinte.' },
-    { icon: <MessageCircle />, title: 'WhatsApp com modelos', text: 'Mensagens prontas com o nome da empresa e do responsável, abertas no seu WhatsApp.' },
-    { icon: <BadgeDollarSign />, title: 'Clientes e financeiro', text: 'Mensalidades, pagamentos e o que entrou no mês, sem planilha paralela.' },
-    { icon: <Calculator />, title: 'Precificação', text: 'Quanto cobrar para pagar os custos, os impostos e ainda sobrar lucro.' },
-    { icon: <ChartColumn />, title: 'Números', text: 'Taxa de contato, melhores horários e quanto falta para a meta do dia.' },
-  ]
+function Product() {
   return (
-    <section id="recursos" className="scroll-mt-14 border-b border-line-soft">
-      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <SectionHead eyebrow="Recursos" title="Feito para a mesa de prospecção, não para um CRM genérico.">
-          Cada tela existe para você fazer mais ligações boas e não esquecer ninguém.
-        </SectionHead>
-        <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-          {items.map((f, i) => (
-            <div key={f.title} className="reveal group flex gap-3.5" style={delay((i % 4) * 90)}>
-              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-line text-fg-2 transition-colors duration-300 group-hover:border-blue-500/40 group-hover:text-blue-300 [&>svg]:size-4">
-                {f.icon}
-              </span>
-              <div>
-                <h3 className="text-sm font-semibold">{f.title}</h3>
-                <p className="mt-1 text-xs leading-5 text-fg-3">{f.text}</p>
-              </div>
-            </div>
-          ))}
+    <section id="recursos" aria-labelledby="recursos-t" className="scroll-mt-16 border-y border-line-soft bg-panel/40">
+      <div className={clsx(WRAP, 'py-24 sm:py-32')}>
+        <div className="reveal max-w-[640px]">
+          <Eyebrow>Recursos</Eyebrow>
+          <h2 id="recursos-t" className={clsx(H2, 'mt-4')}>
+            Uma mesa de prospecção.
+            <br />
+            Não mais um CRM genérico.
+          </h2>
+        </div>
+        <div className="reveal mt-14 sm:mt-16">
+          <ProductShowcase />
         </div>
       </div>
     </section>
   )
 }
 
-function ForSites() {
+function Audience() {
   const points = [
-    'Busca no Maps só de empresas sem site, para atacar primeiro quem mais precisa',
-    'Roteiro e objeções de venda de site já prontos para ajustar',
-    'Do lead ao projeto: entrada de 50%, prazo e etapas do site',
-    'Funciona no celular como app, para ligar de qualquer lugar',
+    'Capta empresas locais no Google Maps, por cidade e nicho.',
+    'Organiza leads, status e histórico de contato num lugar só.',
+    'Lembra retornos e reuniões na hora certa.',
+    'Transforma o lead em cliente e projeto sem sair da XS.',
   ]
   return (
-    <section className="border-b border-line-soft">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center">
-        <SectionHead eyebrow="Para quem vende site" title="Pensado para quem vive de vender site para empresa local." />
-        <ul className="space-y-3">
-          {points.map((p, i) => (
-            <li key={p} className="reveal flex items-start gap-3 rounded-lg border border-line-soft bg-panel px-4 py-3 text-sm text-fg-2" style={delay(i * 90)}>
-              <Check className="mt-0.5 size-4 shrink-0 text-go" /> {p}
+    <section aria-labelledby="publico-t">
+      <div className={clsx(WRAP, 'grid gap-14 py-24 sm:py-32 lg:grid-cols-2 lg:gap-20')}>
+        <div className="reveal">
+          <Eyebrow>Para quem é</Eyebrow>
+          <h2 id="publico-t" className={clsx(H2, 'mt-4')}>
+            Feito para quem vende sites
+            <br className="hidden sm:block" /> para empresas locais.
+          </h2>
+          <p className="mt-5 max-w-[460px] text-base leading-7 text-fg-2">
+            A XS foi criada em volta de uma rotina de prospecção real: encontrar negócios, organizar os contatos, retornar na hora certa e transformar oportunidades em projetos.
+          </p>
+          <dl className="mt-12 grid max-w-[460px] grid-cols-[88px_1fr] gap-x-4 gap-y-3 border-t border-line-soft pt-6 text-sm">
+            <dt className="text-fg-3">Antes</dt>
+            <dd className="text-fg-3">Maps + bloco de notas + WhatsApp + planilha</dd>
+            <dt className="text-fg-2">Com a XS</dt>
+            <dd className="text-fg">Um fluxo só.</dd>
+          </dl>
+        </div>
+        <ul className="reveal self-center border-t border-line-soft lg:mt-10" style={delay(120)}>
+          {points.map((p) => (
+            <li key={p} className="flex items-start gap-4 border-b border-line-soft py-5 text-[15px] leading-6 text-fg-2">
+              <Check className="mt-1 size-4 shrink-0 text-go" aria-hidden />
+              {p}
             </li>
           ))}
-          <li className="reveal flex items-start gap-3 px-4 pt-1 text-2xs text-fg-4" style={delay(points.length * 90)}>
-            <Smartphone className="mt-px size-3.5 shrink-0" /> Instale pelo navegador: ícone na tela inicial, abre em tela cheia.
-          </li>
         </ul>
       </div>
     </section>
@@ -423,21 +351,56 @@ function ForSites() {
 }
 
 function Faq() {
-  const items = [
+  const items: { q: string; a: ReactNode }[] = [
     {
       q: 'Preciso instalar alguma coisa?',
-      a: 'Para ligar, organizar e gerir, não: o XS funciona no navegador do PC e do celular. Para buscar empresas no Maps e disparar no WhatsApp, você baixa o Motor XS no Windows (um arquivo só, abre com dois cliques).',
+      a: 'Para ligar, organizar leads e cuidar da gestão, não: a XS funciona no navegador do computador e do celular, e pode ficar na tela inicial como um app. Para buscar empresas no Maps e enviar mensagens automáticas no WhatsApp, você baixa o Motor XS para Windows dentro do próprio app.',
     },
-    { q: 'De onde vêm os leads?', a: 'Da busca no Google Maps do próprio XS, ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.' },
-    { q: 'Meus dados ficam guardados?', a: 'Sim, na nuvem e protegidos. Cada conta só enxerga os próprios leads e a própria gestão. Você pode baixar um backup quando quiser.' },
-    { q: 'Como funciona o teste grátis?', a: 'Você tem 1 dia com tudo liberado, inclusive a busca no Maps e o WhatsApp, sem cartão. No fim do teste você escolhe se quer continuar.' },
-    { q: 'Funciona para outros serviços além de site?', a: 'Funciona para qualquer serviço vendido por ligação: tráfego pago, social media, identidade visual, sistemas. O roteiro é seu.' },
+    {
+      q: 'De onde vêm os leads?',
+      a: 'Da busca no Google Maps da própria XS, com o telefone, site, Instagram e endereço que a empresa deixou públicos. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
+    },
+    {
+      q: 'Meus dados ficam guardados?',
+      a: (
+        <>
+          Sim. Ficam num banco de dados em São Paulo e cada conta só acessa os próprios dados. Você pode exportar um backup quando quiser. Os detalhes estão
+          na{' '}
+          <a href="/privacidade" className="text-fg-2 underline decoration-line-strong underline-offset-4 hover:text-fg">
+            Política de Privacidade
+          </a>
+          .
+        </>
+      ),
+    },
+    {
+      q: 'Como funciona o teste grátis?',
+      a: 'Você tem 1 dia com tudo liberado, inclusive a busca no Maps e o WhatsApp, sem cartão de crédito. Quando o teste termina, seus leads continuam guardados e você decide se quer continuar.',
+    },
+    {
+      q: 'Funciona para outros serviços além de sites?',
+      a: 'Funciona para qualquer serviço vendido para empresas: tráfego pago, social media, identidade visual, sistemas. Os roteiros, mensagens e objeções são seus, e você ajusta como quiser.',
+    },
   ]
   return (
-    <section id="perguntas" className="scroll-mt-14 border-b border-line-soft">
-      <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
-        <SectionHead eyebrow="Perguntas" title="Antes de testar." />
-        <div className="reveal divide-y divide-line-soft rounded-xl border border-line bg-panel">
+    <section id="perguntas" aria-labelledby="perguntas-t" className="scroll-mt-16 border-t border-line-soft">
+      <div className={clsx(WRAP, 'grid gap-14 py-24 sm:py-32 lg:grid-cols-[minmax(0,1fr)_minmax(0,640px)] lg:gap-20')}>
+        <div className="reveal">
+          <Eyebrow>Perguntas</Eyebrow>
+          <h2 id="perguntas-t" className={clsx(H2, 'mt-4')}>
+            Antes de testar.
+          </h2>
+          <div className="mt-10 max-w-[380px] border-l border-line pl-5">
+            <p className="flex items-center gap-2 text-[13px] font-medium text-fg">
+              <MonitorDown className="size-4 text-fg-3" aria-hidden /> Sobre o Motor XS
+            </p>
+            <p className="mt-2 text-[13px] leading-6 text-fg-2">
+              Busca no Maps e automações do WhatsApp usam o Motor XS, um programa leve para Windows que roda no seu computador. A sessão do WhatsApp fica
+              guardada nele. Ligação, leads e gestão continuam disponíveis pelo navegador, no PC ou no celular.
+            </p>
+          </div>
+        </div>
+        <div className="reveal border-t border-line-soft" style={delay(100)}>
           {items.map((it) => (
             <FaqItem key={it.q} q={it.q} a={it.a} />
           ))}
@@ -447,18 +410,33 @@ function Faq() {
   )
 }
 
-function FaqItem({ q, a }: { q: string; a: string }) {
+function FaqItem({ q, a }: { q: string; a: ReactNode }) {
   const [open, setOpen] = useState(false)
+  const id = useId()
   return (
-    <div>
-      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-3 px-5 py-4 text-left text-sm font-medium text-fg transition-colors hover:bg-tint/[0.02]">
-        <span className="flex-1">{q}</span>
-        <ChevronDown className={clsx('size-4 shrink-0 text-fg-3 transition-transform duration-300', open && 'rotate-180')} />
-      </button>
+    <div className="border-b border-line-soft">
+      <h3>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls={`${id}-a`}
+          id={`${id}-q`}
+          className="group flex w-full items-center gap-4 py-5 text-left text-[15px] font-medium text-fg"
+        >
+          <span className="flex-1">{q}</span>
+          <Plus className={clsx('size-4 shrink-0 text-fg-3 transition-transform duration-300 group-hover:text-fg-2', open && 'rotate-45')} aria-hidden />
+        </button>
+      </h3>
       {/* Abre deslizando (grid 0fr → 1fr) */}
-      <div className={clsx('grid transition-[grid-template-rows] duration-300 ease-out', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
-        <div className="overflow-hidden">
-          <p className="-mt-1 px-5 pb-4 text-xs leading-5 text-fg-3">{a}</p>
+      <div
+        id={`${id}-a`}
+        role="region"
+        aria-labelledby={`${id}-q`}
+        className={clsx('grid transition-[grid-template-rows] duration-300 ease-out', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
+      >
+        <div className="overflow-hidden" inert={!open}>
+          <p className="max-w-[560px] pr-8 pb-6 text-sm leading-6 text-fg-2">{a}</p>
         </div>
       </div>
     </div>
@@ -467,14 +445,19 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 function FinalCta() {
   return (
-    <section>
-      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <div className="reveal flex flex-col items-start gap-6 rounded-2xl border border-line bg-panel p-8 sm:p-12 md:flex-row md:items-center">
-          <div className="flex-1">
-            <h2 className="text-[26px] leading-tight font-semibold tracking-[-0.025em] sm:text-[30px]">Sua próxima venda está numa ligação.</h2>
-            <p className="mt-2 text-sm text-fg-3">Crie a conta em 1 minuto e faça a primeira ligação hoje.</p>
-          </div>
-          <PrimaryCta className="shrink-0">Testar 1 dia grátis</PrimaryCta>
+    <section aria-labelledby="cta-t" className="relative border-t border-line-soft">
+      <div className="land-glow-end" aria-hidden />
+      <div className={clsx(WRAP, 'flex flex-col items-center py-28 text-center sm:py-36')}>
+        <LogoMark size={40} className="reveal opacity-90" />
+        <h2 id="cta-t" className="font-display reveal mt-8 max-w-[680px] text-balance text-[clamp(2rem,1.2rem+3vw,3.25rem)] leading-[1.05]" style={delay(60)}>
+          Seu próximo cliente já está no Google Maps.
+        </h2>
+        <p className="reveal mt-5 max-w-[440px] text-base leading-7 text-pretty text-fg-2" style={delay(120)}>
+          Crie sua conta, encontre empresas, organize sua prospecção e teste a XS durante 1 dia.
+        </p>
+        <div className="reveal mt-9 flex w-full flex-col items-center gap-4 sm:w-auto" style={delay(180)}>
+          <PrimaryCta className="w-full sm:w-auto" />
+          <p className="text-xs text-fg-2/70">Sem cartão de crédito.</p>
         </div>
       </div>
     </section>

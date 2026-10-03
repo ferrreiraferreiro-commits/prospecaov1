@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LogoMark } from './components/Brand'
 import { Layout } from './components/Layout'
@@ -65,6 +65,24 @@ const RoteirosPage = lazyPage(() => import('./pages/RoteirosPage').then((m) => (
 const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
 const WhatsAppPage = lazyPage(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
+const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })))
+const TermsPage = lazyPage(() => import('./pages/TermsPage').then((m) => ({ default: m.TermsPage })))
+
+/** Política de Privacidade e Termos: abertas para todos, logado ou não, antes de qualquer carregamento. */
+const LEGAL_PATHS = ['/privacidade', '/termos']
+
+function LegalRoutes() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<div className="min-h-dvh bg-ink" />}>
+        <Routes>
+          <Route path="privacidade" element={<PrivacyPage />} />
+          <Route path="termos" element={<TermsPage />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  )
+}
 
 function Routed() {
   const motor = useHasMotor()
@@ -125,7 +143,7 @@ function Loaded() {
   const repo = useApp((s) => s.repo)
   const accountReady = useAccount((s) => s.ready)
   const profile = useAccount((s) => s.profile)
-  if (!ready || !bizReady || !accountReady) return <Splash text="Carregando o XS Prospecção…" />
+  if (!ready || !bizReady || !accountReady) return <Splash text="Carregando a XS Prospecção…" />
   if (loadError || bizError) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
@@ -215,5 +233,7 @@ function SupabaseApp() {
 }
 
 export function App() {
+  // Os links para essas páginas recarregam a página (<a href>), então basta olhar o caminho aqui
+  if (LEGAL_PATHS.includes(window.location.pathname.replace(/\/+$/, ''))) return <LegalRoutes />
   return supabase ? <SupabaseApp /> : <LocalApp />
 }

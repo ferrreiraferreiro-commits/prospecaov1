@@ -189,7 +189,7 @@
 @keyframes land-up {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -202,7 +202,7 @@
 }
 .reveal {
   opacity: 0;
-  transform: translateY(18px);
+  transform: translateY(10px);
   transition:
     opacity 760ms cubic-bezier(0.16, 1, 0.3, 1),
     transform 760ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -246,6 +246,58 @@
   .caret {
     display: none;
   }
+}
+
+/* Landing: títulos em Manrope */
+.font-display {
+  font-family: 'Manrope Variable', var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+/* Landing: fundo azul noite. .land-glow fica atrás do topo, .land-glow-end atrás do convite final */
+.land-bg {
+  background: linear-gradient(180deg, #0d1324 0, #0a0e18 1000px, var(--color-ink) 2200px);
+}
+.land-glow,
+.land-glow-end,
+.land-grain {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+.land-glow {
+  inset-inline: 0;
+  top: 0;
+  height: 1100px;
+  background: radial-gradient(60% 50% at 70% 15%, rgb(91 141 239 / 0.12), transparent 72%);
+}
+.land-glow-end {
+  inset-inline: 0;
+  bottom: 0;
+  height: 640px;
+  background: radial-gradient(55% 65% at 50% 100%, rgb(60 90 170 / 0.16), transparent 75%);
+}
+/* Granulado bem leve, para o fundo não ficar chapado */
+.land-grain {
+  inset: 0;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Textos legais (Privacidade e Termos) */
+.legal strong {
+  font-weight: 500;
+  color: var(--color-fg);
+}
+.legal a {
+  color: var(--color-fg);
+  text-decoration: underline;
+  text-decoration-color: var(--color-line-strong);
+  text-underline-offset: 4px;
+}
+.legal a:hover {
+  text-decoration-color: var(--color-fg-3);
 }
 
 /* Mapa (MapLibre) com a cara do app */

@@ -71,7 +71,7 @@ export function Welcome() {
           <LogoMark size={56} />
           <div>
             <h2 id="bv-titulo" className="text-lg leading-6 font-semibold tracking-[-0.01em]">
-              Bem-vindo ao XS Prospecção
+              Boas-vindas à XS Prospecção
             </h2>
             <p className="mt-1 text-xs text-fg-3">Quatro respostas rápidas e o app já fica do seu jeito. Dá para mudar depois em Ajustes.</p>
           </div>

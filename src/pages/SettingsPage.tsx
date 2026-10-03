@@ -102,7 +102,7 @@ export function SettingsPage() {
         imports: data.imports ?? [],
         settings: { ...DEFAULT_SETTINGS, ...data.settings },
       })
-      // Backups do XS trazem também a gestão (os da Central antiga, só os leads)
+      // Backups da XS trazem também a gestão (os da Central antiga, só os leads)
       if (data.gestao) await useBiz.getState().restore({ ...emptyBiz(), ...data.gestao })
       toast('Backup restaurado.')
     } catch (err) {

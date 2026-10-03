@@ -30,7 +30,7 @@ export function WhatsAppPage() {
   const [wa, setWa] = useState<WaInfo | null>(null)
   const [busy, setBusy] = useState(false)
   const [tel, setTel] = useState('')
-  const [texto, setTexto] = useState('Teste do XS Prospecção ✅')
+  const [texto, setTexto] = useState('Teste da XS Prospecção ✅')
   const [sending, setSending] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -61,7 +61,7 @@ export function WhatsAppPage() {
   }
 
   async function disconnect() {
-    if (!window.confirm('Desconectar este WhatsApp do XS? Campanhas em andamento ficam pausadas.')) return
+    if (!window.confirm('Desconectar este WhatsApp da XS? Campanhas em andamento ficam pausadas.')) return
     setBusy(true)
     try {
       setWa(await motorFetch<WaInfo>('/whatsapp/desconectar', { method: 'POST', timeoutMs: 20000 }))
