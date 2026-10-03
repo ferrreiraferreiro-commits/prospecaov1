@@ -1,9 +1,9 @@
 {
-  "name": "Central de Prospecção",
-  "short_name": "Prospecção",
-  "description": "Mesa de prospecção por ligação: leads, ligações, retornos e reuniões.",
+  "name": "XS Prospecção",
+  "short_name": "XS Prospecção",
+  "description": "Prospecção por ligação e WhatsApp, busca no Maps e gestão de clientes, projetos e financeiro.",
   "lang": "pt-BR",
-  "start_url": "/hoje",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

@@ -14,6 +14,11 @@ import { isIos, isStandalone, useInstall } from '../lib/pwa'
 import { DEFAULT_STATUS2, getStatus2Options } from '../lib/status2'
 import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
+import clsx from 'clsx'
+import { LogoMark } from '../components/Brand'
+import { BIZ_TABLES, emptyBiz, type BizSnapshot } from '../lib/biz'
+import { DEFAULT_MOTOR_URL, getMotorUrl, setMotorUrl, useMotor } from '../lib/motor'
+import { useBiz } from '../store/useBiz'
 
 const NL = '\n'
 
@@ -82,19 +87,22 @@ export function SettingsPage() {
   }
 
   const exportBackup = () => {
-    const blob = new Blob([JSON.stringify(exportSnapshot(), null, 2)], { type: 'application/json' })
+    const biz = useBiz.getState()
+    const gestao = Object.fromEntries(BIZ_TABLES.map((t) => [t, biz[t]]))
+    const blob = new Blob([JSON.stringify({ ...exportSnapshot(), gestao }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `prospeccao-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `xs-prospeccao-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(a.href)
   }
 
   const importBackup = async (file: File) => {
     try {
-      const data = JSON.parse(await file.text()) as Snapshot
+      const data = JSON.parse(await file.text()) as Snapshot & { gestao?: Partial<BizSnapshot> }
       if (!Array.isArray(data.leads) || !Array.isArray(data.interactions)) throw new Error('Arquivo de backup inválido.')
-      if (!window.confirm(`Restaurar ${data.leads.length} leads? Os dados atuais serão substituídos.`)) return
+      const extra = data.gestao ? ` e ${data.gestao.clients?.length ?? 0} clientes` : ''
+      if (!window.confirm(`Restaurar ${data.leads.length} leads${extra}? Os dados atuais serão substituídos.`)) return
       setBusy(true)
       await restoreBackup({
         leads: data.leads,
@@ -104,6 +112,8 @@ export function SettingsPage() {
         imports: data.imports ?? [],
         settings: { ...DEFAULT_SETTINGS, ...data.settings },
       })
+      // Backups do XS trazem também a gestão (os da Central antiga, só os leads)
+      if (data.gestao) await useBiz.getState().restore({ ...emptyBiz(), ...data.gestao })
       toast('Backup restaurado.')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha ao restaurar.', 'error')
@@ -127,7 +137,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="Configurações" />
+      <PageHeader title="Ajustes" subtitle="Perfil, roteiros, mensagens, Motor XS e backup." />
 
       <Card id="perfil" title="Meu perfil" description="O primeiro nome entra no roteiro como {nome}." actions={<Button variant="primary" size="sm" onClick={saveProfile}>Salvar perfil</Button>}>
         <div className="mb-4 flex items-center gap-3">
@@ -390,6 +400,85 @@ export function SettingsPage() {
           </div>
         </div>
       </Card>
+
+      <MotorCard />
+
+      <Card id="sobre" title="Sobre o XS Prospecção">
+        <div className="flex items-start gap-3">
+          <LogoMark size={36} />
+          <div className="space-y-1.5 text-xs text-fg-2">
+            <p>
+              Prospecção por ligação (Central, Hoje, Modo Ligação) unida aos módulos do <strong className="text-fg">Caldeira Nexus</strong>: busca no Google Maps, funis e disparo de
+              WhatsApp, clientes, projetos, financeiro e precificação.
+            </p>
+            <p className="text-fg-3">Caldeira Nexus © Luis Caldeira — reconstruído e integrado ao XS Prospecção com autorização do autor.</p>
+          </div>
+        </div>
+      </Card>
     </div>
+  )
+}
+
+function MotorCard() {
+  const online = useMotor((s) => s.online)
+  const health = useMotor((s) => s.health)
+  const check = useMotor((s) => s.check)
+  const toast = useApp((s) => s.toast)
+  const [url, setUrl] = useState(getMotorUrl())
+  return (
+    <Card
+      id="motor"
+      title="Motor XS"
+      description="Programa que roda no seu computador e faz a busca no Google Maps e o WhatsApp dos disparos."
+      actions={
+        <span className={clsx('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium', online ? 'bg-go/10 text-emerald-300' : 'bg-tint/[0.04] text-fg-3')}>
+          <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : 'bg-fg-4')} /> {online ? `Ligado · v${health?.versao ?? ''}` : 'Desligado'}
+        </span>
+      }
+    >
+      <div className="space-y-3 text-xs">
+        {online && health && (
+          <dl className="grid grid-cols-3 gap-2">
+            <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
+              <dt className="text-[10px] text-fg-4">Navegador para o Maps</dt>
+              <dd className={health.navegador ? 'text-emerald-300' : 'text-red-300'}>{health.navegador ? 'Encontrado' : 'Instale o Chrome'}</dd>
+            </div>
+            <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
+              <dt className="text-[10px] text-fg-4">WhatsApp</dt>
+              <dd className="text-fg">{health.whatsapp.status === 'connected' ? (health.whatsapp.user?.name ?? 'Conectado') : 'Desconectado'}</dd>
+            </div>
+            <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
+              <dt className="text-[10px] text-fg-4">Busca no Maps</dt>
+              <dd className="text-fg">{health.maps.active ? 'Rodando' : 'Parada'}</dd>
+            </div>
+          </dl>
+        )}
+        <ol className="list-decimal space-y-1 pl-4 text-fg-2">
+          <li>
+            Precisa do <strong className="text-fg">Node.js</strong> (nodejs.org, versão LTS) e do Google Chrome instalados.
+          </li>
+          <li>
+            Na pasta do projeto, dê dois cliques em <strong className="text-fg">Iniciar Motor XS.bat</strong>. Na primeira vez ele instala as dependências (alguns minutos).
+          </li>
+          <li>Deixe a janela aberta. O ponto verde na barra lateral mostra que está ligado.</li>
+        </ol>
+        <div className="flex flex-wrap items-end gap-2 border-t border-line-soft pt-3">
+          <label className="block min-w-60 flex-1">
+            <span className="label">Endereço do motor</span>
+            <input className="input font-mono text-xs" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={DEFAULT_MOTOR_URL} />
+          </label>
+          <Button
+            size="sm"
+            onClick={async () => {
+              setMotorUrl(url)
+              await check()
+              toast(useMotor.getState().online ? 'Motor encontrado.' : 'Motor não respondeu nesse endereço.', useMotor.getState().online ? 'success' : 'error')
+            }}
+          >
+            Salvar e testar
+          </Button>
+        </div>
+      </div>
+    </Card>
   )
 }

@@ -1,7 +1,9 @@
+import { emptyBiz, type BizRow, type BizSnapshot, type BizTable } from '../lib/biz'
 import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import type { Repository } from './repository'
 
-const STORAGE_KEY = 'central-prospeccao:v1'
+const STORAGE_KEY = 'xs-prospeccao:v1'
+const BIZ_KEY = 'xs-prospeccao:gestao:v1'
 
 function emptySnapshot(): Snapshot {
   return { leads: [], interactions: [], followups: [], meetings: [], imports: [], settings: { ...DEFAULT_SETTINGS } }
@@ -114,5 +116,47 @@ export class LocalRepository implements Repository {
   async replaceAll(snapshot: Snapshot) {
     this.data = structuredClone(snapshot)
     this.persist()
+  }
+
+  private biz: BizSnapshot = emptyBiz()
+
+  async loadBiz(): Promise<BizSnapshot> {
+    try {
+      const raw = localStorage.getItem(BIZ_KEY)
+      if (raw) this.biz = { ...emptyBiz(), ...(JSON.parse(raw) as Partial<BizSnapshot>) }
+    } catch (err) {
+      console.error('Falha ao ler dados de gestão', err)
+    }
+    return structuredClone(this.biz)
+  }
+
+  private persistBiz() {
+    try {
+      localStorage.setItem(BIZ_KEY, JSON.stringify(this.biz))
+    } catch (err) {
+      throw new Error('Não foi possível salvar no navegador (armazenamento cheio?). Exporte um backup.', { cause: err })
+    }
+  }
+
+  async upsertRows<T extends BizTable>(table: T, rows: BizRow<T>[]) {
+    const list = this.biz[table] as BizRow<T>[]
+    for (const row of rows) {
+      const i = list.findIndex((x) => x.id === row.id)
+      if (i >= 0) list[i] = row
+      else list.push(row)
+    }
+    this.persistBiz()
+  }
+
+  async deleteRows(table: BizTable, ids: string[]) {
+    const set = new Set(ids)
+    const lists = this.biz as unknown as Record<BizTable, { id: string }[]>
+    lists[table] = lists[table].filter((x) => !set.has(x.id))
+    this.persistBiz()
+  }
+
+  async replaceBiz(biz: BizSnapshot) {
+    this.biz = { ...emptyBiz(), ...structuredClone(biz) }
+    this.persistBiz()
   }
 }

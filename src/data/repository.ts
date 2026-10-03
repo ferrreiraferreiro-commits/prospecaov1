@@ -1,3 +1,4 @@
+import type { BizRow, BizSnapshot, BizTable } from '../lib/biz'
 import type { Followup, ImportRecord, Interaction, Lead, Meeting, Settings, Snapshot } from '../lib/types'
 
 /**
@@ -28,6 +29,12 @@ export interface Repository {
   saveSettings(settings: Settings): Promise<void>
   /** Substitui todos os dados (restaurar backup). */
   replaceAll(snapshot: Snapshot): Promise<void>
+
+  // Gestão (clientes, projetos, financeiro, precificação, funis)
+  loadBiz(): Promise<BizSnapshot>
+  upsertRows<T extends BizTable>(table: T, rows: BizRow<T>[]): Promise<void>
+  deleteRows(table: BizTable, ids: string[]): Promise<void>
+  replaceBiz(biz: BizSnapshot): Promise<void>
 }
 
 export function newId(): string {

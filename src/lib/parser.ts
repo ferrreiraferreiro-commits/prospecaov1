@@ -22,6 +22,8 @@ export interface ParsedLead {
   observacoes: string | null
   dados_extras: Record<string, string> | null
   status: StatusId
+  /** CNPJ já identificado (busca no Maps) */
+  cnpj?: string | null
 }
 
 export interface ParseResult {

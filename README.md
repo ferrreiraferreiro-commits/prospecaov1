@@ -1,60 +1,70 @@
-# Central de Prospecção
+# XS Prospecção
 
-Mesa de trabalho para prospecção ativa por telefone: importe a lista de leads (TXT exportado), ligue, registre o resultado em poucos cliques e acompanhe follow-ups, reuniões e metas.
+Prospecção por ligação e WhatsApp, busca de empresas no Google Maps e gestão do negócio (clientes, projetos, financeiro e precificação) num lugar só.
+
+O XS Prospecção junta a antiga **Central de Prospecção** com os módulos do **Caldeira Nexus**, de Luis Caldeira, reconstruídos e integrados com a autorização dele (o código-fonte original se perdeu; esta é uma reescrita a partir do pacote compilado, com melhorias).
+
+## Como funciona
+
+```
+┌──────────────────────────────┐        ┌──────────────────────────────┐
+│ App web (Vercel ou localhost)│  HTTP  │ Motor XS (no seu computador) │
+│ React · leads · gestão       │ ─────► │ 127.0.0.1:3077               │
+│ dados no Supabase            │        │ Chrome automatizado (Maps)   │
+└──────────────────────────────┘        │ sessão do WhatsApp (Baileys) │
+                                        └──────────────────────────────┘
+```
+
+- **App web**: tudo o que é tela e dado — Painel, Leads, Hoje, Modo Ligação, Funis, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes. Funciona no celular e no PC.
+- **Motor XS** (`motor/`): o que a Vercel não consegue fazer — abrir o Google Maps num navegador automatizado e manter a sessão do WhatsApp para os disparos. Só escuta em `127.0.0.1` e só aceita chamadas do próprio app.
 
 ## Rodar
 
 ```bash
 npm install
-npm run dev        # http://localhost:5180
-npm test           # testes (parser, duplicidade, métricas, fluxo completo)
+npm run dev          # app em http://localhost:5180
+npm test             # testes do app
 npm run build
 ```
 
-Sem configurar nada, o app roda em **modo local**: os dados ficam no navegador (localStorage). Use **Ajustes → Exportar backup** de vez em quando.
+Motor XS (precisa do Node.js LTS e do Google Chrome, Edge ou Brave):
 
-## Supabase (sincronizar entre dispositivos)
+- Windows: dois cliques em **`Iniciar Motor XS.bat`** (na primeira vez instala as dependências).
+- Ou: `npm run motor` · testes: `npm run test:motor`.
 
-1. Crie um projeto no Supabase e rode as migrações de `supabase/migrations/` em ordem (0001, 0002, 0003) no SQL Editor.
-2. Em *Authentication → Users*, crie o seu usuário (e-mail + senha). Desative novos cadastros em *Authentication → Providers/Sign In* se quiser.
-3. Copie `.env.example` para `.env.local` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+Deixe a janela do motor aberta enquanto usa a busca no Maps e o disparo. A sessão do WhatsApp, as campanhas e a última busca ficam em `motor/storage/` (fora do git).
 
-Com as variáveis definidas, o app pede login e todas as tabelas ficam protegidas por RLS (`user_id = auth.uid()`).
+## Módulos
 
-Para migrar o que já está no modo local: exporte o backup antes, configure o Supabase, entre e use **Restaurar backup**.
+| Área | O que faz |
+|---|---|
+| **Painel** | Meta do dia, retornos e reuniões, funil de prospecção, recebido no mês, projetos em andamento. |
+| **Leads / Hoje / Ligação** | A Central de Prospecção: importação de TXT, registro de ligações, retornos, reuniões, roteiro e objeções. |
+| **Buscar no Maps** | Varre a região em 19 ou 41 setores, abre cada ficha e confere telefone, site, Instagram, endereço e CNPJ (o sócio só é sugerido quando nome, telefone e cidade conferem). Pula quem já está nos leads e importa com um clique. |
+| **Funis** | Sequências de WhatsApp: mensagens com variações em rodízio e esperas entre elas. Variáveis `{saudacao}`, `{responsavel}`, `{empresa}`, `{cidade}`, `{nicho}`, `{nome}`, `{servico}`. |
+| **Disparo** | Campanhas com intervalo aleatório entre leads (1–60 min), um lead por vez, trava de duplicidade por telefone, confirmação de entrega/leitura e respostas recebidas. Pausa sozinho se o WhatsApp desconectar de forma suspeita. O resultado vai para o histórico de cada lead. |
+| **Conexão** | QR Code do WhatsApp, status e mensagem de teste. |
+| **Clientes** | Ficha do cliente (fixo/avulso, valor mensal, etiquetas), pagamentos, projetos e anotações/lembretes. "Virar cliente" na ficha do lead. |
+| **Projetos** | Kanban por etapa, tarefas, prazo, prioridade e cobrança (entrada de 50% ou total). |
+| **Financeiro** | Receitas e despesas por mês, gráfico de 6 meses, despesas por categoria, a receber. Pagamento de cliente marcado como pago vira receita sozinho. |
+| **Precificação** | Custo da hora, preço por markup divisor (imposto + taxa + margem saem do preço), orçamentos salvos e "virar projeto". |
+
+## Supabase
+
+O app usa o projeto `central-prospeccao` (mesmos leads e logins). As migrações ficam em `supabase/migrations/` (0001 → 0004); a 0004 cria as tabelas da gestão com RLS por usuário. Defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (`.env.local` / Vercel). Sem elas, o app roda em modo local (dados no navegador).
 
 ## Deploy (Vercel)
 
-Importe o repositório na Vercel (framework: Vite). Defina as duas variáveis `VITE_SUPABASE_*` no projeto. O `vercel.json` já redireciona as rotas para o SPA e agenda `/api/keepalive` uma vez por dia, para o Supabase gratuito não pausar por falta de uso.
-
-## Fluxo de uso
-
-- **Central**: indicadores, filtros rápidos (Novos, Para ligar, Follow-up…), busca e lista de leads com ações rápidas (tel, WhatsApp, Maps, Instagram, site).
-- **Liguei**: registra data e hora no clique e abre "Como foi a ligação?". Teclas `1`–`0` escolhem o resultado, `Ctrl+Enter` salva.
-- **Hoje**: retornos do dia (e atrasados), tentar novamente, novos, reuniões e o que já foi feito hoje. "Começar ligações" abre a fila no Modo Ligação.
-- **Modo Ligação**: empresa à esquerda, roteiro (teleprompter, `↑`/`↓`) e objeções no centro, anotações e resultado à direita. "Salvar e próximo lead" segue a fila.
-- **Mensagens**: modelos de WhatsApp com variáveis ({saudacao}, {responsavel}, {empresa}…) e variações em rodízio. O WhatsApp abre com o texto pronto; quem envia é você. Depois de "Pediu WhatsApp" o app oferece mandar a mensagem.
-- **Novas tentativas**: depois de "Não atendeu" a próxima tentativa já vem agendada (dia seguinte, período oposto). Depois de N tentativas seguidas sem resposta, o lead sai da fila e aparece em "Sugestão: encerrar".
-- **Reuniões**: resultado (fechou com valor, realizada, não fechou, não compareceu); Números mostra faturamento, ticket médio e taxa de fechamento.
-- **Números**: inclui o melhor horário para ligar (taxa de atendimento por dia × hora).
-- **Prioridade**: sem site + nota alta + muitas avaliações vem primeiro (etiqueta "Alto potencial").
-- **CNPJ**: consulta dados públicos e sócios (BrasilAPI); o sócio só é sugerido se nome, telefone e cidade conferirem.
-- **Avisos e app**: aviso na hora do retorno (e notificação do sistema, se permitida); instalável no celular/PC como app.
-- **Ajustes**: seu nome e serviço (usados no roteiro), meta diária, roteiros, mensagens, tentativas, avisos, backup.
+Projeto `xs-prospeccao`. O `.vercelignore` deixa o `motor/` fora do deploy. Na versão publicada (https), o Chrome pode pedir permissão para o site acessar o Motor XS no computador — clique em Permitir.
 
 ## Estrutura
 
 ```
-src/lib        regras puras: parser do TXT, duplicidade, métricas/filtros/fila do dia, roteiro
-src/data       Repository (interface) + LocalRepository + SupabaseRepository
-src/store      estado (zustand) e ações: importar, registrar ligação, resultado, follow-up, reunião
-src/components peças de UI (linha do lead, painel de resultado, drawer, importador…)
-src/pages      Central, Hoje, Modo Ligação, Estatísticas, Ajustes, Login
-supabase/      migração SQL com RLS
-tests/         vitest (inclui o TXT real em tests/fixtures)
+src/lib        regras puras (parser, duplicidade, métricas, biz.ts da gestão, mapsSearch, disparo)
+src/data       Repository + LocalRepository + SupabaseRepository (inclui as tabelas da gestão)
+src/store      useApp (prospecção) e useBiz (gestão)
+src/pages      Painel, Leads, Hoje, Ligação, Maps, Funis, Disparo, WhatsApp, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes
+motor/src      server.ts (API local), maps.ts (busca), enrich.ts (links/telefone/CNPJ), whatsapp.ts, disparo.ts
 ```
 
-Regras importantes:
-- Dados importados não são alterados; "Não informado"/"Sem site oficial" viram ausência de dado.
-- Duplicidade só é sugerida por telefone (DDD + 8 últimos dígitos, então o nono dígito não engana), local no Maps ou nome + endereço — nunca só pelo nome.
-- O histórico nunca é sobrescrito: cada ligação, mudança de status, follow-up e reunião vira um registro.
+Regras que continuam valendo: dados importados não são inventados nem alterados; duplicidade só por telefone, lugar no Maps ou nome + endereço; o histórico do lead nunca é sobrescrito.

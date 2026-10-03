@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { BIZ_TABLES, emptyBiz, type BizRow, type BizSnapshot, type BizTable } from '../lib/biz'
 import { DEFAULT_SETTINGS, type Lead, type Settings, type Snapshot } from '../lib/types'
 import type { Repository } from './repository'
 
@@ -144,4 +145,39 @@ export class SupabaseRepository implements Repository {
     for (const part of chunks(snapshot.meetings)) check(await this.db.from('meetings').insert(part))
     await this.saveSettings(snapshot.settings)
   }
+
+  async loadBiz(): Promise<BizSnapshot> {
+    const out = emptyBiz() as unknown as Record<BizTable, unknown[]>
+    const lists = await Promise.all(BIZ_TABLES.map((t) => this.fetchAll<Record<string, unknown>>(t, 'created_at')))
+    BIZ_TABLES.forEach((t, i) => {
+      out[t] = lists[i].map(numericRow)
+    })
+    return out as unknown as BizSnapshot
+  }
+
+  async upsertRows<T extends BizTable>(table: T, rows: BizRow<T>[]) {
+    for (const part of chunks(rows)) check(await this.db.from(table).upsert(part))
+  }
+
+  async deleteRows(table: BizTable, ids: string[]) {
+    for (const part of chunks(ids, 200)) check(await this.db.from(table).delete().in('id', part))
+  }
+
+  async replaceBiz(biz: BizSnapshot) {
+    const { data: userData } = await this.db.auth.getUser()
+    const uid = userData.user?.id
+    if (!uid) throw new Error('Sessão expirada. Entre novamente.')
+    // Apaga na ordem inversa das chaves estrangeiras e insere na ordem direta
+    for (const t of [...BIZ_TABLES].reverse()) check(await this.db.from(t).delete().eq('user_id', uid))
+    for (const t of BIZ_TABLES) await this.upsertRows(t, (biz[t] ?? []) as BizRow<typeof t>[])
+  }
+}
+
+/** Colunas numeric chegam como texto do Postgres. */
+const NUMERIC = new Set(['valor', 'valor_mensal', 'orcamento', 'horas', 'custos_diretos', 'imposto', 'taxa_cartao', 'margem', 'preco_final', 'valor_hora', 'lucro'])
+
+function numericRow(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(row)) out[k] = NUMERIC.has(k) && v !== null && v !== undefined ? Number(v) : v
+  return out
 }

@@ -18,11 +18,12 @@ import type { StatusId } from '../lib/types'
 // Botões
 // ---------------------------------------------------------------------------
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'subtle'
+type Variant = 'primary' | 'go' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'subtle'
 type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-go text-[#04140c] font-semibold hover:bg-[#4ccb8d] active:bg-go-strong',
+  primary: 'bg-blue-600 text-white font-semibold hover:bg-[#3b7bf6] active:bg-blue-700',
+  go: 'bg-go text-[#04140c] font-semibold hover:bg-[#4ccb8d] active:bg-go-strong',
   secondary: 'border border-line bg-raised text-fg hover:bg-hover hover:border-line-strong',
   ghost: 'text-fg-2 hover:bg-hover hover:text-fg',
   subtle: 'bg-tint/[0.04] text-fg-2 hover:bg-tint/[0.07] hover:text-fg',

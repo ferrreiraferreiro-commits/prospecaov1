@@ -23,6 +23,9 @@
   --color-go-strong: #2fa56d;
   --color-accent: #5b8def;
   --color-bad: #e5534b;
+  /* Gráficos (paleta validada para daltonismo): receitas × despesas */
+  --color-viz-in: #4f86f7;
+  --color-viz-out: #cc6f22;
 
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
@@ -54,6 +57,8 @@
   --color-go-strong: #168552;
   --color-accent: #2f6fe0;
   --color-bad: #d13b32;
+  --color-viz-in: #2f6fe0;
+  --color-viz-out: #c2620f;
 
   --color-sky-200: oklch(44.3% 0.11 240.79);
   --color-sky-300: oklch(50% 0.134 242.749);
@@ -178,4 +183,40 @@
 }
 .anim-fade {
   animation: fade 140ms ease-out;
+}
+
+/* Mapa (Leaflet) com a cara do app */
+.xs-map.leaflet-container {
+  background: var(--color-ink);
+  font-family: inherit;
+}
+.xs-map .leaflet-control-zoom a {
+  background: var(--color-raised);
+  color: var(--color-fg);
+  border-color: var(--color-line);
+}
+.xs-map .leaflet-control-zoom a:hover {
+  background: var(--color-hover);
+}
+.xs-map .leaflet-control-attribution {
+  background: color-mix(in srgb, var(--color-ink) 80%, transparent);
+  color: var(--color-fg-4);
+  font-size: 9px;
+}
+.xs-map .leaflet-control-attribution a {
+  color: var(--color-fg-3);
+}
+.xs-map .leaflet-tooltip {
+  background: var(--color-raised);
+  color: var(--color-fg);
+  border: 1px solid var(--color-line);
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.6);
+  font-size: 11px;
+}
+.xs-map .leaflet-tooltip-top::before {
+  border-top-color: var(--color-line);
+}
+
+:root:not([data-theme='light']) .xs-map-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.92) saturate(0.6);
 }

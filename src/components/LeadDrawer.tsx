@@ -13,6 +13,7 @@ import { useUi } from '../store/useUi'
 import { defaultFollowup, draftToInput, FollowupPicker } from './FollowupPicker'
 import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
 import { useLiguei } from './OutcomeModal'
+import { ClientLink } from './ClientLink'
 import { CnpjSection } from './CnpjSection'
 import { MeetingResult } from './MeetingResult'
 import { Timeline } from './Timeline'
@@ -172,6 +173,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           <Button variant="secondary" size="sm" icon={<MessageCircle className="size-3.5" />} disabled={!whatsappTarget(lead)} onClick={() => openMessage({ leadId: lead.id })}>
             Mensagem
           </Button>
+          <ClientLink lead={lead} />
           <QuickActions lead={lead} className="ml-auto" size="md" />
         </div>
       </header>

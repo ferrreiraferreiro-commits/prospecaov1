@@ -89,7 +89,7 @@ export function CentralPage() {
   if (!leads.length) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Central de Prospecção" subtitle="Importe sua lista e comece a ligar." />
+        <PageHeader title="Leads" subtitle="Importe sua lista ou busque no Maps e comece a ligar." />
         <div className="panel">
           <Empty
             icon={<Upload />}
@@ -110,7 +110,7 @@ export function CentralPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Central de Prospecção"
+        title="Leads"
         subtitle={`${metrics.totalLeads} leads · ${metrics.hoje.ligacoes} ligações hoje`}
         actions={
           <>

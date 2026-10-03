@@ -12,7 +12,7 @@ export function Avatar({ src, name, size = 32, className }: { src: string | null
   return (
     <span
       className={clsx(
-        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold/15 font-semibold text-gold ring-1 ring-gold/30',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-500/15 font-semibold text-blue-300 ring-1 ring-blue-500/35',
         className,
       )}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}

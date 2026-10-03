@@ -1,3 +1,4 @@
+import { convertClosedLead } from './ClientLink'
 import clsx from 'clsx'
 import { useState } from 'react'
 import { formatMoney, MEETING_RESULT_LABEL, MEETING_RESULTS } from '../lib/insights'
@@ -34,7 +35,9 @@ export function MeetingResult({ meeting, compact }: { meeting: Meeting; compact?
     await setMeetingResult(meeting.id, r, v)
     setEditing(false)
     setAskValue(false)
-    toast(r === 'fechou' ? `Venda registrada${v ? ` · ${formatMoney(v)}` : ''}. Parabéns!` : `Reunião: ${MEETING_RESULT_LABEL[r].toLowerCase()}.`)
+    if (r === 'fechou') {
+      toast(`Venda registrada${v ? ` · ${formatMoney(v)}` : ''}. Parabéns!`, 'success', { label: 'Criar cliente e projeto', run: () => void convertClosedLead(meeting.lead_id, v) })
+    } else toast(`Reunião: ${MEETING_RESULT_LABEL[r].toLowerCase()}.`)
   }
 
   if (meeting.resultado && !editing) {

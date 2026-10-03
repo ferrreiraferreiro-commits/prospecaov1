@@ -93,7 +93,7 @@ export function CallModePage() {
   if (!lead) {
     return (
       <div className="panel mx-auto mt-10 max-w-lg">
-        <Empty icon={<Headphones />} title="Lead não encontrado" action={<Button onClick={() => navigate('/')}>Voltar para a Central</Button>}>
+        <Empty icon={<Headphones />} title="Lead não encontrado" action={<Button onClick={() => navigate('/leads')}>Voltar para os leads</Button>}>
           Ele pode ter sido excluído.
         </Empty>
       </div>

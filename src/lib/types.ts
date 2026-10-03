@@ -1,3 +1,5 @@
+import type { PricingSettings } from './biz'
+
 export type StatusId =
   | 'novo'
   | 'so_chama'
@@ -173,6 +175,8 @@ export interface Settings {
   auto_tentativas: boolean
   /** Tentativas seguidas sem resposta antes de sugerir encerrar */
   max_tentativas: number
+  /** Custos e margens padrão da Precificação */
+  precificacao: PricingSettings | null
 }
 
 export interface Snapshot {
@@ -198,4 +202,5 @@ export const DEFAULT_SETTINGS: Settings = {
   mensagens: null,
   auto_tentativas: true,
   max_tentativas: 5,
+  precificacao: null,
 }

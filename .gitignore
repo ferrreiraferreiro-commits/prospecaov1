@@ -12,3 +12,6 @@ dist
 
 # Contém senhas: não versionar
 supabase/criar_usuarios.sql
+
+# Motor XS: sessão do WhatsApp, campanhas e buscas (dados locais, nunca versionar)
+motor/storage/

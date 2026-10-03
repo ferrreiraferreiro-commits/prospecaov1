@@ -61,8 +61,8 @@ export const MESSAGE_VARIABLES = ['{saudacao}', '{responsavel}', '{empresa}', '{
  * Preenche as variáveis. Uma variável sem valor some junto com a vírgula/espaço
  * que sobraria ("Bom dia, {responsavel}!" sem nome vira "Bom dia!").
  */
-export function fillMessage(text: string, lead: Lead, settings: Settings, now: Date = new Date()): string {
-  const vars: Record<string, string> = {
+export function fillMessage(text: string, lead: Lead, settings: Settings, now: Date = new Date(), keep: string[] = []): string {
+  const all: Record<string, string> = {
     saudacao: saudacao(now),
     responsavel: responsavelDoLead(lead),
     empresa: titleCase(lead.empresa),
@@ -71,6 +71,8 @@ export function fillMessage(text: string, lead: Lead, settings: Settings, now: D
     nome: settings.nome_vendedor.trim().split(/\s+/)[0] ?? '',
     servico: settings.servico.trim() || 'desenvolvimento de sites',
   }
+  // Variáveis em `keep` ficam no texto (ex.: {saudacao} resolvida pelo Motor na hora do envio)
+  const vars = Object.fromEntries(Object.entries(all).filter(([k]) => !keep.includes(k)))
   const filled = text.replace(/\{\s*(\w+)\s*\}/g, (m, key: string) => (key in vars ? vars[key] : m))
   return filled
     .replace(/\b(de|da|do|em|para)[ \t]+(?=[.,!?]|$)/gm, '') // "site para ." → "site ."

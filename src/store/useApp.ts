@@ -198,6 +198,7 @@ export const useApp = create<AppState>()((set, get) => {
           maps_url: p.maps_url,
           observacoes: p.observacoes,
           dados_extras: p.dados_extras,
+          cnpj: p.cnpj ?? null,
           import_id: record.id,
           status: p.status,
           falei_com: null,
