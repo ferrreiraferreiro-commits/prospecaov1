@@ -11,7 +11,8 @@ import { supabase } from './data/supabaseClient'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
 import { HojePage } from './pages/HojePage'
-import { LoginPage } from './pages/LoginPage'
+import { ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pages/AuthPages'
+import { LandingPage } from './pages/LandingPage'
 import { PainelPage } from './pages/PainelPage'
 import type { Repository } from './data/repository'
 import { accessOf, useAccount, useHasMotor } from './store/useAccount'
@@ -165,10 +166,15 @@ function LocalApp() {
 function SupabaseApp() {
   const client = supabase!
   const [session, setSession] = useState<Session | null | undefined>(undefined)
+  // Veio pelo link de "esqueci a senha": pede a senha nova antes de abrir o app
+  const [recovering, setRecovering] = useState(() => window.location.pathname === '/redefinir-senha')
 
   useEffect(() => {
     client.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = client.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data } = client.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      setSession(s)
+    })
     return () => data.subscription.unsubscribe()
   }, [client])
 
@@ -180,7 +186,29 @@ function SupabaseApp() {
   }, [userId, client])
 
   if (session === undefined) return <Splash text="Conectando…" />
-  if (!session) return <LoginPage client={client} />
+  if (session && recovering) {
+    return (
+      <BrowserRouter>
+        <NewPasswordPage client={client} onDone={() => setRecovering(false)} />
+      </BrowserRouter>
+    )
+  }
+  if (!session) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route index element={<LandingPage />} />
+          <Route path="entrar" element={<LoginPage client={client} />} />
+          <Route path="criar-conta" element={<SignupPage client={client} />} />
+          <Route path="esqueci-senha" element={<ForgotPasswordPage client={client} />} />
+          {/* Link de recuperação expirado ou já usado */}
+          <Route path="redefinir-senha" element={<Navigate to="/esqueci-senha" replace />} />
+          {/* Telas do app pedem login e voltam para elas depois */}
+          <Route path="*" element={<LoginPage client={client} />} />
+        </Routes>
+      </BrowserRouter>
+    )
+  }
   return <Loaded />
 }
 
