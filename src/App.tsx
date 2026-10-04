@@ -14,7 +14,7 @@ import { ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pa
 import { LandingPage } from './pages/LandingPage'
 import { PainelPage } from './pages/PainelPage'
 import type { Repository } from './data/repository'
-import { accessOf, useAccount, useHasMotor } from './store/useAccount'
+import { accessOf, useAccount, useHasMotor, useIsAdmin } from './store/useAccount'
 import { useApp } from './store/useApp'
 import { useBiz } from './store/useBiz'
 
@@ -62,6 +62,7 @@ const ProjetosPage = lazyPage(() => import('./pages/ProjetosPage').then((m) => (
 const AgendamentosPage = lazyPage(() => import('./pages/AgendamentosPage').then((m) => ({ default: m.AgendamentosPage })))
 const RoteirosPage = lazyPage(() => import('./pages/RoteirosPage').then((m) => ({ default: m.RoteirosPage })))
 const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const ContasPage = lazyPage(() => import('./pages/ContasPage').then((m) => ({ default: m.ContasPage })))
 const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
 const WhatsAppPage = lazyPage(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
 const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })))
@@ -85,6 +86,7 @@ function LegalRoutes() {
 
 function Routed() {
   const motor = useHasMotor()
+  const admin = useIsAdmin()
   // Telas que dependem do Motor WhatsApp XS só existem para contas com esse recurso
   const m = (el: ReactNode) => (motor ? el : <Navigate to="/" replace />)
   return (
@@ -108,6 +110,7 @@ function Routed() {
           <Route path="precificacao" element={<PrecificacaoPage />} />
           <Route path="estatisticas" element={<StatsPage />} />
           <Route path="configuracoes" element={<SettingsPage />} />
+          <Route path="contas" element={admin ? <ContasPage /> : <Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

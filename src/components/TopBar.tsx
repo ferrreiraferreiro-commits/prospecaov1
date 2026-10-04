@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Bell, CalendarCheck, CalendarClock, Crown, LogOut, Monitor, Moon, Sun, UserRound } from 'lucide-react'
+import { Bell, CalendarCheck, CalendarClock, Crown, LogOut, Monitor, Moon, ShieldCheck, Sun, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../data/supabaseClient'
@@ -8,7 +8,7 @@ import { formatDateTime, formatDayLabel, periodoLabel } from '../lib/dates'
 import { buildTodayPlan } from '../lib/selectors'
 import { useTheme, type ThemePref } from '../lib/theme'
 import { useIndex, useMetrics, useToday } from '../store/derived'
-import { planInfo, useAccount } from '../store/useAccount'
+import { planInfo, useAccount, useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { Avatar } from './Avatar'
@@ -141,6 +141,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
   const login = useLogin()
   const [theme, setTheme] = useTheme()
   const navigate = useNavigate()
+  const admin = useIsAdmin()
 
   const fullName = settings.nome_vendedor.trim() || (login ? login.charAt(0).toUpperCase() + login.slice(1) : 'Você')
   const firstName = fullName.split(/\s+/)[0]
@@ -215,6 +216,17 @@ function UserMenu({ compact }: { compact?: boolean }) {
             >
               <UserRound className="size-4" /> Meu perfil
             </button>
+            {admin && (
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  navigate('/contas')
+                }}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-500/10 text-xs font-semibold text-blue-200 transition-colors hover:bg-blue-500/20"
+              >
+                <ShieldCheck className="size-4" /> Contas e planos
+              </button>
+            )}
             {supabase && (
               <button
                 onClick={() => supabase!.auth.signOut()}

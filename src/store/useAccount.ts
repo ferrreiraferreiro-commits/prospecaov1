@@ -18,6 +18,8 @@ export interface Profile {
   /** Ex.: 'motor' = busca no Maps e WhatsApp pelo Motor WhatsApp XS */
   recursos: string[]
   boas_vindas_feitas: boolean
+  /** Dono da XS: vê a tela Contas e muda o plano dos outros */
+  admin?: boolean
 }
 
 type EditableProfile = Partial<Pick<Profile, 'nome' | 'cidade' | 'boas_vindas_feitas'>>
@@ -94,6 +96,11 @@ export const useAccount = create<AccountState>()((set, get) => ({
 /** A conta pode usar o Motor WhatsApp XS (busca no Maps, disparo e agendamento pelo WhatsApp)? */
 export function useHasMotor(): boolean {
   return useAccount((s) => !s.profile || s.profile.recursos.includes('motor'))
+}
+
+/** É o dono da XS (tela Contas)? O banco confere de novo em cada chamada. */
+export function useIsAdmin(): boolean {
+  return useAccount((s) => !!s.profile?.admin)
 }
 
 export type Access = { ok: true; diasDeTeste: number | null; horasDeTeste: number | null } | { ok: false; motivo: 'teste_acabou' | 'plano_venceu' | 'cancelado' }

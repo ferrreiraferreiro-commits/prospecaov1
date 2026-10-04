@@ -17,6 +17,7 @@ import {
   MessagesSquare,
   ScrollText,
   Settings,
+  ShieldCheck,
   Send,
   Smartphone,
   Sparkles,
@@ -30,7 +31,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
 import { useMotor, useMotorPolling } from '../lib/motor'
-import { accessOf, useAccount, useHasMotor } from '../store/useAccount'
+import { accessOf, useAccount, useHasMotor, useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -48,6 +49,8 @@ interface NavItem {
   end?: boolean
   /** Só aparece para contas com o Motor WhatsApp XS */
   motor?: boolean
+  /** Só aparece para o dono da XS */
+  admin?: boolean
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
@@ -85,6 +88,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/estatisticas', label: 'Números', icon: ChartColumn },
       { to: '/configuracoes', label: 'Ajustes', icon: Settings },
+      { to: '/contas', label: 'Contas', icon: ShieldCheck, admin: true },
     ],
   },
 ]
@@ -96,10 +100,11 @@ const MOBILE: NavItem[] = [
   { to: '/maps', label: 'Buscar', icon: MapPinned },
 ]
 
-/** Menu da conta: sem o Motor, somem os itens que dependem dele (e grupos vazios). */
+/** Menu da conta: sem o Motor, somem os itens que dependem dele (e grupos vazios); Contas só para o dono. */
 function useGroups() {
   const motor = useHasMotor()
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => motor || !i.motor) })).filter((g) => g.items.length)
+  const admin = useIsAdmin()
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (motor || !i.motor) && (admin || !i.admin)) })).filter((g) => g.items.length)
 }
 
 /** Conversa com o Motor WhatsApp XS no computador: status e disparos do WhatsApp. */

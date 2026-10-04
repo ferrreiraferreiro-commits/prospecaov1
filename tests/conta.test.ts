@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isBlockReport, parseLeadsAny, parseSheet, splitRows } from '../src/lib/sheet'
 import { accessOf, planInfo, type Profile } from '../src/store/useAccount'
+import { escolhaAtual, fimSugerido, loginDe, somarCiclo } from '../src/lib/admin'
 
 describe('importar planilha', () => {
   it('lê CSV com ponto e vírgula, aspas e colunas extras', () => {
@@ -76,5 +77,31 @@ describe('plano no menu do perfil', () => {
     expect(planInfo({ ...base, plano: 'ativo', ciclo: 'diario' }, now)).toEqual({ nome: 'Diário', ate: null, dias: null })
     expect(planInfo({ ...base, plano: 'ativo' }, now)?.nome).toBe('Assinatura')
     expect(planInfo(null, now)).toBeNull()
+  })
+})
+
+describe('tela Contas', () => {
+  const now = new Date('2026-10-04T15:00:00')
+
+  it('soma o ciclo escolhido', () => {
+    expect(somarCiclo('diario', now)).toEqual(new Date('2026-10-05T15:00:00'))
+    expect(somarCiclo('semanal', now)).toEqual(new Date('2026-10-11T15:00:00'))
+    expect(somarCiclo('mensal', now)).toEqual(new Date('2026-11-04T15:00:00'))
+    expect(somarCiclo('trimestral', now)).toEqual(new Date('2027-01-04T15:00:00'))
+  })
+  it('renova a partir do fim atual quando o plano ainda está em dia', () => {
+    const emDia = { plano: 'ativo' as const, plano_ate: '2026-10-10T15:00:00' }
+    expect(fimSugerido('mensal', emDia, now)).toEqual(new Date('2026-11-10T15:00:00'))
+    expect(fimSugerido('mensal', { ...emDia, plano_ate: '2026-10-01T15:00:00' }, now)).toEqual(new Date('2026-11-04T15:00:00'))
+    expect(fimSugerido('semanal', { plano: 'teste', plano_ate: null }, now)).toEqual(new Date('2026-10-11T15:00:00'))
+    expect(fimSugerido('teste', emDia, now)).toEqual(new Date('2026-10-05T15:00:00'))
+    expect(fimSugerido('vitalicio', emDia, now)).toBeNull()
+    expect(fimSugerido('cancelado', emDia, now)).toBeNull()
+  })
+  it('mostra o login sem o domínio interno', () => {
+    expect(loginDe('gabriel@prospeccao.local')).toBe('gabriel')
+    expect(loginDe('ana@gmail.com')).toBe('ana@gmail.com')
+    expect(escolhaAtual({ plano: 'ativo', ciclo: 'trimestral' })).toBe('trimestral')
+    expect(escolhaAtual({ plano: 'vitalicio', ciclo: null })).toBe('vitalicio')
   })
 })
