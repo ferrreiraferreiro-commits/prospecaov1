@@ -90,7 +90,7 @@ export function WhatsAppPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="WhatsApp" subtitle="Conecte o número que vai fazer os disparos. A sessão fica salva no seu computador, dentro do Motor XS." />
+      <PageHeader title="WhatsApp" subtitle="Conecte o número que vai fazer os disparos. A sessão fica salva no seu computador, dentro do Motor WhatsApp XS." />
 
       {online === false && <MotorOffline feature="A conexão do WhatsApp" />}
 

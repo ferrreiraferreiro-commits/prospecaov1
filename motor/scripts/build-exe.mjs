@@ -1,5 +1,5 @@
-// Gera "Motor XS.exe": o motor inteiro num executável só (Node SEA).
-// Uso: npm run build:exe   →   motor/build/Motor XS.exe
+// Gera "Motor WhatsApp XS.exe": o motor inteiro num executável só (Node SEA).
+// Uso: npm run build:exe   →   motor/build/Motor WhatsApp XS.exe
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -61,7 +61,7 @@ fs.writeFileSync(
 execFileSync(process.execPath, ['--experimental-sea-config', seaConfig], { stdio: 'inherit' })
 
 // 3) Cópia do node.exe com o motor injetado
-const exe = path.join(out, process.platform === 'win32' ? 'Motor XS.exe' : 'motor-xs')
+const exe = path.join(out, process.platform === 'win32' ? 'Motor WhatsApp XS.exe' : 'motor-xs')
 fs.copyFileSync(process.execPath, exe)
 if (process.platform === 'win32') stripSignature(exe)
 // Ícone XS e nome do programa (antes de injetar o motor)
@@ -70,12 +70,12 @@ if (process.platform === 'win32') {
   execFileSync(rcedit, [
     exe,
     '--set-icon', path.join(root, 'assets', 'icon.ico'),
-    '--set-version-string', 'ProductName', 'Motor XS',
-    '--set-version-string', 'FileDescription', 'Motor XS - WhatsApp da XS Prospecção',
+    '--set-version-string', 'ProductName', 'Motor WhatsApp XS',
+    '--set-version-string', 'FileDescription', 'Motor WhatsApp XS - XS Prospecção',
     '--set-version-string', 'LegalCopyright', 'XS Prospecção',
     '--set-version-string', 'CompanyName', 'XS Prospecção',
-    '--set-version-string', 'OriginalFilename', 'Motor XS.exe',
-    '--set-version-string', 'InternalName', 'Motor XS',
+    '--set-version-string', 'OriginalFilename', 'Motor WhatsApp XS.exe',
+    '--set-version-string', 'InternalName', 'Motor WhatsApp XS',
     '--set-file-version', version,
     '--set-product-version', version,
   ])
@@ -91,22 +91,22 @@ for (const f of ['motor.cjs', 'sea-prep.blob', 'sea-config.json']) fs.rmSync(pat
 const mb = (fs.statSync(exe).size / 1024 / 1024).toFixed(1)
 console.log(`\n  Pronto: ${path.relative(process.cwd(), exe)} (${mb} MB) · versão ${version}`)
 
-// 4) .zip para o botão "Baixar o Motor XS" do site (public/downloads → Vercel)
+// 4) .zip para o botão "Baixar o Motor WhatsApp XS" do site (public/downloads → Vercel)
 if (process.platform === 'win32') {
   const downloads = path.resolve(root, '..', 'public', 'downloads')
   fs.mkdirSync(downloads, { recursive: true })
-  const zip = path.join(downloads, 'Motor-XS-Windows.zip')
+  const zip = path.join(downloads, 'Motor-WhatsApp-XS.zip')
   const leia = path.join(out, 'LEIA-ME.txt')
   fs.writeFileSync(
     leia,
     [
-      `Motor XS ${version} - XS Prospecção`,
+      `Motor WhatsApp XS ${version} - XS Prospecção`,
       '',
       'O que é: o programa que mantém o seu WhatsApp conectado para os disparos, funis e mensagens agendadas da XS.',
       'Ele roda só no seu computador, só aceita conexões do próprio computador e do site da XS, e não envia seus dados para outros lugares.',
       '',
       'Como usar:',
-      '1. Extraia o "Motor XS.exe" numa pasta fixa (ex.: Documentos).',
+      '1. Extraia o "Motor WhatsApp XS.exe" numa pasta fixa (ex.: Documentos).',
       '2. Dê dois cliques. Se o Windows mostrar "O Windows protegeu o computador", clique em "Mais informações" e depois em "Executar assim mesmo".',
       '   Esse aviso aparece em programas novos que ainda não têm assinatura digital paga; não é sinal de vírus.',
       '3. Deixe a janela preta aberta enquanto usa os disparos. Para fechar, feche a janela.',
@@ -116,5 +116,5 @@ if (process.platform === 'win32') {
     ].join('\r\n'),
   )
   execFileSync('powershell', ['-NoProfile', '-Command', `Compress-Archive -Path '${exe}','${leia}' -DestinationPath '${zip}' -CompressionLevel Optimal -Force`], { stdio: 'inherit' })
-  console.log(`  Download: public/downloads/Motor-XS-Windows.zip (${(fs.statSync(zip).size / 1024 / 1024).toFixed(1)} MB) — publique o site para atualizar.\n`)
+  console.log(`  Download: public/downloads/Motor-WhatsApp-XS.zip (${(fs.statSync(zip).size / 1024 / 1024).toFixed(1)} MB) — publique o site para atualizar.\n`)
 }

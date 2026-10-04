@@ -176,15 +176,15 @@ export function AgendamentosPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Mensagens agendadas" subtitle="Deixe mensagens de WhatsApp marcadas para um dia e hora. O Motor XS envia sozinho, mesmo com você longe do computador." />
+      <PageHeader title="Mensagens agendadas" subtitle="Deixe mensagens de WhatsApp marcadas para um dia e hora. O Motor WhatsApp XS envia sozinho, mesmo com você longe do computador." />
 
       {online === false && <MotorOffline feature="O agendamento" />}
       {online && health && !health.agenda && (
         <div className="panel flex flex-wrap items-center gap-3 border-amber-400/25 px-4 py-3 text-xs">
           <span className="size-2 rounded-full bg-amber-400" />
-          <span className="flex-1 text-fg-2">Seu Motor XS (versão {health.versao}) é anterior aos agendamentos. Baixe a versão nova, feche o motor aberto e abra o novo.</span>
+          <span className="flex-1 text-fg-2">Seu Motor WhatsApp XS (versão {health.versao}) é anterior aos agendamentos. Baixe a versão nova, feche o motor aberto e abra o novo.</span>
           <a href={MOTOR_DOWNLOAD} download className="font-medium text-blue-300 hover:text-blue-200">
-            Baixar o Motor XS →
+            Baixar o Motor WhatsApp XS →
           </a>
         </div>
       )}
@@ -314,7 +314,7 @@ export function AgendamentosPage() {
                 <Coffee className="size-3.5" /> Para funcionar com você fora de casa
               </p>
               <ul className="list-disc space-y-0.5 pl-4">
-                <li>Deixe o computador ligado com o Motor XS aberto e o WhatsApp conectado.</li>
+                <li>Deixe o computador ligado com o Motor WhatsApp XS aberto e o WhatsApp conectado.</li>
                 <li>Enquanto houver agendamento, o Motor impede o Windows de suspender sozinho{health?.acordado ? ' (ativo agora)' : ''}. Não feche a tampa do notebook.</li>
                 <li>Se o PC estiver desligado no horário, a mensagem sai assim que o Motor abrir de novo.</li>
               </ul>

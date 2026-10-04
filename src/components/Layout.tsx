@@ -48,7 +48,7 @@ interface NavItem {
   label: string
   icon: LucideIcon
   end?: boolean
-  /** Só aparece para contas com o Motor XS */
+  /** Só aparece para contas com o Motor WhatsApp XS */
   motor?: boolean
 }
 
@@ -105,7 +105,7 @@ function useGroups() {
   return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => motor || !i.motor) })).filter((g) => g.items.length)
 }
 
-/** Conversa com o Motor XS no computador: status e disparos do WhatsApp. */
+/** Conversa com o Motor WhatsApp XS no computador: status e disparos do WhatsApp. */
 function MotorSync() {
   useMotorPolling()
   useDisparoSync()
@@ -289,7 +289,7 @@ function SideLink({ item, collapsed, badge }: { item: NavItem; collapsed: boolea
   )
 }
 
-/** Indica se o Motor XS (disparos do WhatsApp) está rodando neste computador. */
+/** Indica se o Motor WhatsApp XS (disparos do WhatsApp) está rodando neste computador. */
 function MotorPill({ collapsed }: { collapsed: boolean }) {
   const online = useMotor((s) => s.online)
   const wa = useMotor((s) => s.health?.whatsapp.status)

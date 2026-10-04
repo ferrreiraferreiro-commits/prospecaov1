@@ -86,7 +86,7 @@ function LegalRoutes() {
 
 function Routed() {
   const motor = useHasMotor()
-  // Telas que dependem do Motor XS só existem para contas com esse recurso
+  // Telas que dependem do Motor WhatsApp XS só existem para contas com esse recurso
   const m = (el: ReactNode) => (motor ? el : <Navigate to="/" replace />)
   return (
     <BrowserRouter>

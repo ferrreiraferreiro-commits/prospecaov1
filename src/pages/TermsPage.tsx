@@ -109,11 +109,11 @@ const sections: LegalSection[] = [
   },
   {
     id: 'motor',
-    title: 'Motor XS',
+    title: 'Motor WhatsApp XS',
     body: (
       <>
         <p>
-          O disparo automático no WhatsApp (envios em massa, funis e mensagens agendadas) funciona pelo <strong>Motor XS</strong>, um programa opcional
+          O disparo automático no WhatsApp (envios em massa, funis e mensagens agendadas) funciona pelo <strong>Motor WhatsApp XS</strong>, um programa opcional
           para Windows que você baixa dentro do app e roda no seu computador. Todo o resto, inclusive a busca de empresas, funciona direto no
           navegador, no computador ou no celular.
         </p>
@@ -137,7 +137,7 @@ const sections: LegalSection[] = [
           serviços a XS funciona.
         </p>
         <p>
-          <strong>WhatsApp</strong>: o Motor XS conecta a sua própria conta de WhatsApp por QR Code, da mesma forma que o WhatsApp Web, e as mensagens
+          <strong>WhatsApp</strong>: o Motor WhatsApp XS conecta a sua própria conta de WhatsApp por QR Code, da mesma forma que o WhatsApp Web, e as mensagens
           saem do seu número. Essa conexão não usa a API oficial do WhatsApp para empresas. O WhatsApp pode limitar ou bloquear números que enviam muitas
           mensagens ou recebem denúncias. A XS ajuda com intervalos entre envios e pausa automática, mas não garante que isso não aconteça. O uso e o
           conteúdo das mensagens são de sua responsabilidade.
@@ -166,7 +166,7 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          A XS, incluindo o código, o design, a marca e o Motor XS, pertence ao seu responsável. Estes Termos dão a você o direito de usar o serviço, não
+          A XS, incluindo o código, o design, a marca e o Motor WhatsApp XS, pertence ao seu responsável. Estes Termos dão a você o direito de usar o serviço, não
           a propriedade dele.
         </p>
         <p>

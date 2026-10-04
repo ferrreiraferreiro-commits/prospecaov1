@@ -9,7 +9,7 @@ export interface Profile {
   cidade: string | null
   plano: 'teste' | 'ativo' | 'cancelado' | 'vitalicio'
   teste_ate: string
-  /** Ex.: 'motor' = busca no Maps e WhatsApp pelo Motor XS */
+  /** Ex.: 'motor' = busca no Maps e WhatsApp pelo Motor WhatsApp XS */
   recursos: string[]
   boas_vindas_feitas: boolean
 }
@@ -85,7 +85,7 @@ export const useAccount = create<AccountState>()((set, get) => ({
   },
 }))
 
-/** A conta pode usar o Motor XS (busca no Maps, disparo e agendamento pelo WhatsApp)? */
+/** A conta pode usar o Motor WhatsApp XS (busca no Maps, disparo e agendamento pelo WhatsApp)? */
 export function useHasMotor(): boolean {
   return useAccount((s) => !s.profile || s.profile.recursos.includes('motor'))
 }

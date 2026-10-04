@@ -96,7 +96,7 @@ const sections: LegalSection[] = [
             <strong>Pela consulta pública de CNPJ</strong>: quando há um CNPJ, os dados cadastrais públicos da empresa são consultados na BrasilAPI.
           </>,
           <>
-            <strong>Pelo WhatsApp</strong>: se você usar o disparo automático e conectar o seu WhatsApp ao Motor XS (programa opcional), a confirmação de entrega, de leitura e as respostas às mensagens
+            <strong>Pelo WhatsApp</strong>: se você usar o disparo automático e conectar o seu WhatsApp ao Motor WhatsApp XS (programa opcional), a confirmação de entrega, de leitura e as respostas às mensagens
             enviadas pela XS entram no histórico do lead.
           </>,
         ]}
@@ -159,7 +159,7 @@ const sections: LegalSection[] = [
           ligado ao seu usuário, e o banco aplica regras de acesso por linha: uma conta só consegue ler e alterar os próprios dados.
         </p>
         <p>
-          Se você usar o <strong>Motor XS</strong> (programa opcional, só para o disparo automático no WhatsApp), ele guarda no seu computador a sessão do
+          Se você usar o <strong>Motor WhatsApp XS</strong> (programa opcional, só para o disparo automático no WhatsApp), ele guarda no seu computador a sessão do
           WhatsApp e as campanhas de envio. Essas informações não são enviadas para os nossos servidores.
         </p>
         <p>
@@ -187,7 +187,7 @@ const sections: LegalSection[] = [
               você já tem, os telefones e CNPJs da sua lista, que são usados só durante a busca e não ficam guardados.
             </>,
             <>
-              <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pelo Motor XS saem da sua própria conta de WhatsApp, conectada por QR Code.
+              <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pelo Motor WhatsApp XS saem da sua própria conta de WhatsApp, conectada por QR Code.
             </>,
             <>
               <strong>BrasilAPI</strong>: consulta de dados públicos de CNPJ.
@@ -250,7 +250,7 @@ const sections: LegalSection[] = [
             'Conexão com o site e com o banco de dados por HTTPS.',
             'Login com e-mail e senha; a senha é guardada em formato de hash pelo serviço de autenticação.',
             'Separação de dados por usuário diretamente no banco de dados.',
-            'O Motor XS só aceita conexões do próprio computador e só responde ao app da XS.',
+            'O Motor WhatsApp XS só aceita conexões do próprio computador e só responde ao app da XS.',
           ]}
         />
         <p>
@@ -274,7 +274,7 @@ const sections: LegalSection[] = [
           são apagados do banco de dados. Cópias de segurança mantidas pelos provedores de infraestrutura podem levar algum tempo para serem
           substituídas, e algumas informações podem ser mantidas quando a lei exigir.
         </p>
-        <p>Os dados guardados no seu computador pelo Motor XS ficam sob o seu controle e podem ser apagados excluindo a pasta de dados do programa.</p>
+        <p>Os dados guardados no seu computador pelo Motor WhatsApp XS ficam sob o seu controle e podem ser apagados excluindo a pasta de dados do programa.</p>
       </>
     ),
   },

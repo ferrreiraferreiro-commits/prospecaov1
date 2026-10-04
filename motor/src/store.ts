@@ -5,11 +5,16 @@ import { fileURLToPath } from 'node:url'
 
 /**
  * Onde o motor guarda a sessão do WhatsApp, as campanhas e a última busca. Nunca vai para o git.
- * - Motor XS.exe: pasta "Motor XS - dados" ao lado do executável
+ * - Motor WhatsApp XS.exe: pasta "Motor WhatsApp XS - dados" ao lado do executável (ou a antiga "Motor XS - dados")
  * - npm start (código-fonte): motor/storage
  */
 function defaultStorage(): string {
-  if (isSea()) return path.join(path.dirname(process.execPath), 'Motor XS - dados')
+  if (isSea()) {
+    const dir = path.dirname(process.execPath)
+    // Quem já usava o "Motor XS" mantém a pasta antiga (e a sessão do WhatsApp, sem novo QR Code)
+    const antiga = path.join(dir, 'Motor XS - dados')
+    return fs.existsSync(antiga) ? antiga : path.join(dir, 'Motor WhatsApp XS - dados')
+  }
   return path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'storage')
 }
 

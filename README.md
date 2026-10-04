@@ -6,7 +6,7 @@ Prospecção por ligação e WhatsApp, busca de empresas (base pública do CNPJ)
 
 ```
 ┌──────────────────────────────┐        ┌──────────────────────────────┐
-│ App web (Vercel ou localhost)│  HTTP  │ Motor XS (no seu computador) │
+│ App web (Vercel ou localhost)│  HTTP  │ Motor WhatsApp XS (no seu computador) │
 │ React · leads · gestão       │ ─────► │ 127.0.0.1:3077               │
 │ dados no Supabase            │        │ Chrome automatizado (Maps)   │
 └──────────────────────────────┘        │ sessão do WhatsApp (Baileys) │
@@ -16,7 +16,7 @@ Prospecção por ligação e WhatsApp, busca de empresas (base pública do CNPJ)
 - **App web**: tudo o que é tela e dado — Painel, Leads, Hoje, Modo Ligação, Funis, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes. Funciona no celular e no PC.
 - **Busca de empresas** (`busca/`, numa VPS grátis da Oracle): base aberta do CNPJ da Receita Federal num SQLite (só empresas ativas), importada toda semana se houver mês novo. Busca por cidade, bairro e nicho em milissegundos. Instalação: `sudo bash busca/instalar.sh <ip-com-tracos>.sslip.io` na VM.
 - **`api/maps.ts`** (Vercel): confere o login e a conta liberada e repassa a busca ao servidor (`XS_BUSCA_URL` + `XS_BUSCA_TOKEN`); também confere se o site do domínio do e-mail está no ar e acha o Instagram. No `npm run dev`, o `vite.config.ts` chama a mesma função.
-- **Motor XS** (`motor/`), opcional: mantém a sessão do WhatsApp para os disparos automáticos (Disparo, Funis, Agendadas). Só escuta em `127.0.0.1` e só aceita chamadas do próprio app. O código antigo da busca no Maps ainda está lá, mas o app não usa mais.
+- **Motor WhatsApp XS** (`motor/`), opcional: mantém a sessão do WhatsApp para os disparos automáticos (Disparo, Funis, Agendadas). Só escuta em `127.0.0.1` e só aceita chamadas do próprio app. O código antigo da busca no Maps ainda está lá, mas o app não usa mais.
 
 ## Rodar
 
@@ -27,12 +27,12 @@ npm test             # testes do app
 npm run build
 ```
 
-Motor XS para quem só usa (Windows): no app, **Ajustes → Motor XS → Baixar o Motor XS**. É um único `Motor XS.exe` (Node embutido), que usa o Chrome ou o Edge do computador e guarda os dados na pasta `Motor XS - dados` ao lado dele.
+Motor WhatsApp XS para quem só usa (Windows): no app, **Ajustes → Motor WhatsApp XS → Baixar o Motor WhatsApp XS**. É um único `Motor WhatsApp XS.exe` (Node embutido), que usa o Chrome ou o Edge do computador e guarda os dados na pasta `Motor XS - dados` ao lado dele.
 
 Para desenvolver:
 
-- `npm run motor` (ou dois cliques em **`Iniciar Motor XS.bat`**) · testes: `npm run test:motor`.
-- Gerar um novo instalador: `npm run motor:exe` → `motor/build/Motor XS.exe` e `public/downloads/Motor-XS-Windows.zip` (publique o site para atualizar o download).
+- `npm run motor` (ou dois cliques em **`Iniciar Motor WhatsApp XS.bat`**) · testes: `npm run test:motor`.
+- Gerar um novo instalador: `npm run motor:exe` → `motor/build/Motor WhatsApp XS.exe` e `public/downloads/Motor-WhatsApp-XS.zip` (publique o site para atualizar o download).
 
 Deixe a janela do motor aberta enquanto usa o disparo. A sessão do WhatsApp, as campanhas e a última busca ficam em `motor/storage/` (fora do git).
 
@@ -57,7 +57,7 @@ O app usa o projeto `central-prospeccao` (mesmos leads e logins). As migrações
 
 ## Deploy (Vercel)
 
-Projeto `xs-prospeccao`. O `.vercelignore` deixa o `motor/` fora do deploy. Na versão publicada (https), o Chrome pode pedir permissão para o site acessar o Motor XS no computador — clique em Permitir.
+Projeto `xs-prospeccao`. O `.vercelignore` deixa o `motor/` fora do deploy. Na versão publicada (https), o Chrome pode pedir permissão para o site acessar o Motor WhatsApp XS no computador — clique em Permitir.
 
 ## Estrutura
 

@@ -127,7 +127,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="Ajustes" subtitle={motor ? 'Perfil, avisos, Motor XS e backup.' : 'Perfil, avisos e backup.'} />
+      <PageHeader title="Ajustes" subtitle={motor ? 'Perfil, avisos, Motor WhatsApp XS e backup.' : 'Perfil, avisos e backup.'} />
 
       <Card id="perfil" title="Meu perfil" description="O primeiro nome entra no roteiro como {nome}." actions={<Button variant="primary" size="sm" onClick={saveProfile}>Salvar perfil</Button>}>
         <div className="mb-4 flex items-center gap-3">
@@ -377,7 +377,7 @@ function MotorCard() {
   return (
     <Card
       id="motor"
-      title="Motor XS"
+      title="Motor WhatsApp XS"
       description="Programa opcional que roda no seu computador e mantém o WhatsApp conectado para os disparos automáticos. A busca de empresas não precisa dele."
       actions={
         <span className={clsx('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium', online ? 'bg-go/10 text-emerald-300' : 'bg-tint/[0.04] text-fg-3')}>
@@ -403,7 +403,7 @@ function MotorCard() {
             <MotorSteps https={window.location.protocol === 'https:'} />
           </div>
           <a href={MOTOR_DOWNLOAD} download className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-[#3b7bf6]">
-            <Download className="size-3.5" /> Baixar o Motor XS (Windows)
+            <Download className="size-3.5" /> Baixar o Motor WhatsApp XS (Windows)
           </a>
         </div>
         <div className="flex flex-wrap items-end gap-2 border-t border-line-soft pt-3">

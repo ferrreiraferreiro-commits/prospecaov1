@@ -1,5 +1,5 @@
 /**
- * Motor XS — servidor local da XS Prospecção: só o WhatsApp (disparos, funis e mensagens agendadas).
+ * Motor WhatsApp XS — servidor local da XS Prospecção: só o WhatsApp (disparos, funis e mensagens agendadas).
  * A busca de empresas roda no servidor da XS, não aqui.
  * Escuta só em 127.0.0.1 e só aceita chamadas do próprio app (localhost ou o domínio na Vercel).
  */
@@ -38,7 +38,7 @@ app.use(express.json({ limit: '8mb' }))
 app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin) {
-    if (!allowedOrigin(origin)) return res.status(403).json({ error: 'Origem não autorizada pelo Motor XS.' })
+    if (!allowedOrigin(origin)) return res.status(403).json({ error: 'Origem não autorizada pelo Motor WhatsApp XS.' })
     res.setHeader('Access-Control-Allow-Origin', origin)
     res.setHeader('Vary', 'Origin')
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS')
@@ -120,23 +120,23 @@ app.delete('/agenda/:id', wrap((req) => deleteAgenda(String(req.params.id))))
 app.post('/agenda/sincronizado', wrap((req) => markAgendaSynced(Array.isArray(req.body?.itens) ? req.body.itens : [])))
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  res.status(400).json({ error: err?.message || 'Erro no Motor XS.' })
+  res.status(400).json({ error: err?.message || 'Erro no Motor WhatsApp XS.' })
 })
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   console.log('')
   console.log('  ┌────────────────────────────────────────────┐')
-  console.log('  │  Motor XS ligado  ·  XS Prospecção         │')
-  console.log(`  │  http://127.0.0.1:${PORT}                      │`)
-  console.log('  │  Deixe esta janela aberta enquanto usa      │')
-  console.log('  │  os disparos e mensagens de WhatsApp.       │')
+  console.log('  │  Motor WhatsApp XS ligado · XS Prospecção  │')
+  console.log(`  │  http://127.0.0.1:${PORT}                     │`)
+  console.log('  │  Deixe esta janela aberta enquanto usa     │')
+  console.log('  │  os disparos e mensagens de WhatsApp.      │')
   console.log('  └────────────────────────────────────────────┘')
   console.log(`  Dados locais: ${storageDir}`)
   resumeStoredSession()
 })
 
 server.on('error', (err: NodeJS.ErrnoException) => {
-  if (err.code === 'EADDRINUSE') console.error(`\n  A porta ${PORT} já está em uso. O Motor XS já está aberto em outra janela?\n`)
+  if (err.code === 'EADDRINUSE') console.error(`\n  A porta ${PORT} já está em uso. O Motor WhatsApp XS já está aberto em outra janela?\n`)
   else console.error(err)
   process.exit(1)
 })

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { create } from 'zustand'
 
 /**
- * Motor XS: programa local (pasta motor/) que roda no computador do usuário e
+ * Motor WhatsApp XS: programa local (pasta motor/) que roda no computador do usuário e
  * mantém a sessão do WhatsApp para os disparos, funis e mensagens agendadas.
  * O app conversa com ele por HTTP em 127.0.0.1.
  */
@@ -48,10 +48,10 @@ export async function motorFetch<T>(path: string, init: RequestInit & { json?: u
     })
   } catch {
     useMotor.getState().markOffline()
-    throw new MotorError('O Motor XS não está rodando neste computador. Abra o "Iniciar Motor XS" e tente de novo.', true)
+    throw new MotorError('O Motor WhatsApp XS não está rodando neste computador. Abra o "Motor WhatsApp XS" e tente de novo.', true)
   }
   const body = (await res.json().catch(() => ({}))) as T & { error?: string }
-  if (!res.ok) throw new MotorError(body.error || `Falha no Motor XS (${res.status}).`)
+  if (!res.ok) throw new MotorError(body.error || `Falha no Motor WhatsApp XS (${res.status}).`)
   return body
 }
 
