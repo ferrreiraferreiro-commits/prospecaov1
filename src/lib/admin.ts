@@ -74,6 +74,64 @@ export async function listarContas(db: SupabaseClient): Promise<Conta[]> {
   return (data ?? []) as Conta[]
 }
 
+export async function definirEmail(db: SupabaseClient, alvo: string, email: string): Promise<void> {
+  const { error } = await db.rpc('admin_definir_email', { alvo, novo: email })
+  if (error) throw new Error(error.message)
+}
+
+export async function novaSenha(db: SupabaseClient, alvo: string, senha: string): Promise<void> {
+  const { error } = await db.rpc('admin_nova_senha', { alvo, senha })
+  if (error) throw new Error(error.message)
+}
+
+/** Senha provisória fácil de ditar (sem 0/o, 1/l/i). */
+export function gerarSenha(tamanho = 8): string {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(tamanho))
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('')
+}
+
+/** Pagamento que o dono recebeu de uma conta. */
+export interface PagamentoXs {
+  id: string
+  user_id: string
+  valor: number
+  /** diario | semanal | mensal | trimestral | vitalicio | teste */
+  plano: string
+  pago_em: string
+  obs: string | null
+}
+
+export async function listarPagamentos(db: SupabaseClient): Promise<PagamentoXs[]> {
+  const { data, error } = await db.from('pagamentos_xs').select('id,user_id,valor,plano,pago_em,obs').order('pago_em', { ascending: false })
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as PagamentoXs[]).map((p) => ({ ...p, valor: Number(p.valor) }))
+}
+
+export async function registrarPagamento(db: SupabaseClient, p: Omit<PagamentoXs, 'id'>): Promise<void> {
+  const { error } = await db.from('pagamentos_xs').insert(p)
+  if (error) throw new Error(error.message)
+}
+
+export async function apagarPagamento(db: SupabaseClient, id: string): Promise<void> {
+  const { error } = await db.from('pagamentos_xs').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** Soma do que entrou no mês de `now` (horário local). */
+export function recebidoNoMes(pagamentos: Pick<PagamentoXs, 'valor' | 'pago_em'>[], now = new Date()): number {
+  return pagamentos
+    .filter((p) => {
+      const d = new Date(p.pago_em)
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+    })
+    .reduce((s, p) => s + p.valor, 0)
+}
+
+export function nomeDoPlano(plano: string): string {
+  return ESCOLHAS.find((e) => e.id === plano)?.label ?? plano
+}
+
 export async function definirPlano(db: SupabaseClient, alvo: string, escolha: Escolha, ate: Date | null): Promise<void> {
   const plano = isCiclo(escolha) ? 'ativo' : escolha
   const { error } = await db.rpc('admin_definir_plano', {

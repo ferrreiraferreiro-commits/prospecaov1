@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { isBlockReport, parseLeadsAny, parseSheet, splitRows } from '../src/lib/sheet'
 import { accessOf, planInfo, type Profile } from '../src/store/useAccount'
-import { escolhaAtual, fimSugerido, loginDe, somarCiclo } from '../src/lib/admin'
+import { escolhaAtual, fimSugerido, gerarSenha, loginDe, recebidoNoMes, somarCiclo } from '../src/lib/admin'
+import { isLegacyEmail, signIn, SO_EMAIL, toAuthPassword } from '../src/lib/auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 describe('importar planilha', () => {
   it('lê CSV com ponto e vírgula, aspas e colunas extras', () => {
@@ -103,5 +105,48 @@ describe('tela Contas', () => {
     expect(loginDe('ana@gmail.com')).toBe('ana@gmail.com')
     expect(escolhaAtual({ plano: 'ativo', ciclo: 'trimestral' })).toBe('trimestral')
     expect(escolhaAtual({ plano: 'vitalicio', ciclo: null })).toBe('vitalicio')
+  })
+})
+
+describe('login só por e-mail, senha e pagamentos', () => {
+  const fakeClient = (senhaCerta: string) => {
+    const tentativas: { email: string; password: string }[] = []
+    const client = {
+      auth: {
+        signInWithPassword: async (c: { email: string; password: string }) => {
+          tentativas.push(c)
+          return { error: c.password === senhaCerta ? null : { message: 'Invalid login credentials' } }
+        },
+      },
+    } as unknown as SupabaseClient
+    return { client, tentativas }
+  }
+
+  it('recusa nome de usuário e o e-mail interno antigo', async () => {
+    const { client, tentativas } = fakeClient('x')
+    expect(await signIn(client, 'gabriel', '123')).toBe(SO_EMAIL)
+    expect(await signIn(client, 'gabriel@prospeccao.local', '123')).toBe(SO_EMAIL)
+    expect(tentativas).toHaveLength(0)
+    expect(isLegacyEmail('Gabriel@prospeccao.local')).toBe(true)
+    expect(isLegacyEmail('gabriel@gmail.com')).toBe(false)
+  })
+  it('conta antiga com e-mail novo ainda entra com a senha de sempre', async () => {
+    const { client, tentativas } = fakeClient(toAuthPassword('minhasenha'))
+    expect(await signIn(client, ' Gabriel@Gmail.com ', 'minhasenha')).toBeNull()
+    expect(tentativas.map((t) => t.email)).toEqual(['gabriel@gmail.com', 'gabriel@gmail.com'])
+    expect(await signIn(fakeClient('outra').client, 'a@b.com', 'errada')).toBe('E-mail ou senha incorretos.')
+  })
+  it('gera senha provisória fácil de ditar', () => {
+    const s = gerarSenha()
+    expect(s).toMatch(/^[a-hjkmnp-z2-9]{8}$/)
+  })
+  it('soma o que entrou no mês', () => {
+    const now = new Date('2026-10-20T12:00:00')
+    const pags = [
+      { valor: 50, pago_em: new Date('2026-10-01T10:00:00').toISOString() },
+      { valor: 29.9, pago_em: new Date('2026-10-19T10:00:00').toISOString() },
+      { valor: 100, pago_em: new Date('2026-09-30T10:00:00').toISOString() },
+    ]
+    expect(recebidoNoMes(pags, now)).toBeCloseTo(79.9)
   })
 })

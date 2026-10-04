@@ -31,7 +31,9 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
 import { useMotor, useMotorPolling } from '../lib/motor'
-import { accessOf, useAccount, useHasMotor, useIsAdmin } from '../store/useAccount'
+import { formatDateTime } from '../lib/dates'
+import { suporteUrl, useSuporteWhatsApp } from '../lib/suporte'
+import { accessOf, planInfo, useAccount, useHasMotor, useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -39,7 +41,7 @@ import { LeadDrawer } from './LeadDrawer'
 import { MessageModal } from './MessageModal'
 import { OutcomeModal } from './OutcomeModal'
 import { TopBar } from './TopBar'
-import { Spinner } from './ui'
+import { Spinner, WhatsAppIcon } from './ui'
 import { useReminders } from './useReminders'
 
 interface NavItem {
@@ -207,6 +209,7 @@ export function Layout() {
             <TopBar />
           </div>
         )}
+        {!full && <PlanoAviso />}
         <Suspense
           fallback={
             <div className="flex justify-center py-20">
@@ -380,3 +383,61 @@ function Toasts() {
   )
 }
 
+
+const AVISO_KEY = 'xs-prospeccao:aviso-plano'
+
+/** Faixa quando o teste ou o plano acaba em até 3 dias, com o botão de renovar pelo WhatsApp. */
+function PlanoAviso() {
+  const profile = useAccount((s) => s.profile)
+  const suporte = useSuporteWhatsApp()
+  const plan = planInfo(profile)
+  const [fechado, setFechado] = useState(() => {
+    try {
+      return sessionStorage.getItem(AVISO_KEY)
+    } catch {
+      return null
+    }
+  })
+  if (!profile || !plan?.ate) return null
+  const falta = Date.parse(plan.ate) - Date.now()
+  if (falta <= 0 || falta > 3 * 86_400_000 || fechado === plan.ate) return null
+
+  const teste = profile.plano === 'teste'
+  const horas = Math.ceil(falta / 3_600_000)
+  const quando = horas < 24 ? `em ${horas} hora${horas === 1 ? '' : 's'}` : `em ${plan.dias} dias`
+  const texto = teste
+    ? `Oi! Estou no teste grátis da XS e quero assinar. Minha conta: ${profile.email ?? ''}`
+    : `Oi! Quero renovar meu plano ${plan.nome} da XS. Minha conta: ${profile.email ?? ''}`
+
+  const fechar = () => {
+    try {
+      sessionStorage.setItem(AVISO_KEY, plan.ate!)
+    } catch {
+      /* sem armazenamento: some só até recarregar */
+    }
+    setFechado(plan.ate)
+  }
+
+  return (
+    <div className="anim-fade mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2.5 text-xs">
+      <AlarmClock className="size-4 shrink-0 text-amber-200" strokeWidth={1.75} />
+      <p className="min-w-0 flex-1 text-amber-100">
+        {teste ? 'Seu teste grátis' : `Seu plano ${plan.nome}`} acaba <span className="font-semibold">{quando}</span>
+        <span className="num text-amber-200/70"> · {formatDateTime(plan.ate)}</span>
+      </p>
+      {suporte && (
+        <a
+          href={suporteUrl(suporte, texto)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-7 items-center gap-1.5 rounded-md bg-go px-2.5 text-xs font-semibold text-[#04140c] transition-colors hover:bg-[#4ccb8d]"
+        >
+          <WhatsAppIcon className="size-3.5" /> {teste ? 'Assinar pelo WhatsApp' : 'Renovar pelo WhatsApp'}
+        </a>
+      )}
+      <button onClick={fechar} className="rounded-md p-1 text-amber-200/60 hover:bg-amber-400/10 hover:text-amber-100" aria-label="Fechar aviso">
+        <X className="size-3.5" />
+      </button>
+    </div>
+  )
+}

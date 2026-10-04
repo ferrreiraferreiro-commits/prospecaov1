@@ -4,7 +4,8 @@ import { useState, type CSSProperties, type FormEvent, type ReactNode } from 're
 import { Link, useNavigate } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
 import { Button } from '../components/ui'
-import { authErrorPt, signIn } from '../lib/auth'
+import { authErrorPt, signIn, SO_EMAIL } from '../lib/auth'
+import { suporteUrl, useSuporteWhatsApp } from '../lib/suporte'
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 
@@ -84,6 +85,7 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const suporte = useSuporteWhatsApp()
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -106,7 +108,7 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
       }
     >
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
-        <Input id="lg-email" label="E-mail" autoComplete="username" autoCapitalize="none" inputMode="email" value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus />
+        <Input id="lg-email" label="E-mail" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="seu@email.com" value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus />
         <Input
           id="lg-pass"
           label="Senha"
@@ -121,7 +123,16 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
             </Link>
           }
         />
-        {error && <ErrorText>{error}</ErrorText>}
+        {error && (
+          <ErrorText>
+            {error}
+            {error === SO_EMAIL && suporte && (
+              <a href={suporteUrl(suporte, 'Oi! Eu entrava na XS com nome de usuário e preciso cadastrar meu e-mail.')} target="_blank" rel="noreferrer" className="mt-1.5 block font-medium text-red-200 underline">
+                Falar no WhatsApp
+              </a>
+            )}
+          </ErrorText>
+        )}
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
           Entrar
         </Button>
@@ -269,6 +280,55 @@ export function NewPasswordPage({ client, onDone }: { client: SupabaseClient; on
         {error && <ErrorText>{error}</ErrorText>}
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
           Salvar e entrar
+        </Button>
+      </form>
+    </AuthShell>
+  )
+}
+
+/**
+ * Conta antiga (entrava por nome de usuário): cadastra um e-mail de verdade antes de
+ * continuar, porque a entrada agora é só por e-mail. A senha continua a mesma.
+ */
+export function CadastrarEmailPage({ client, login, onDone }: { client: SupabaseClient; login: string; onDone: () => void }) {
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    const { error } = await client.rpc('definir_meu_email', { novo: email })
+    if (error) {
+      setLoading(false)
+      return setError(error.message)
+    }
+    // Sessão nova já com o e-mail novo
+    await client.auth.refreshSession()
+    onDone()
+  }
+
+  return (
+    <AuthShell
+      title="Cadastre seu e-mail"
+      subtitle={
+        <>
+          Agora a XS entra só pelo e-mail, não mais pelo usuário <span className="text-fg">{login}</span>. Cadastre o seu para continuar.
+        </>
+      }
+      footer={
+        <button type="button" onClick={() => void client.auth.signOut()} className="text-fg-3 hover:text-fg">
+          Sair
+        </button>
+      }
+    >
+      <form onSubmit={(e) => void submit(e)} className="space-y-4">
+        <Input id="ce-email" label="Seu e-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+        <p className="text-2xs text-fg-3">Da próxima vez, entre com esse e-mail e a mesma senha de sempre.</p>
+        {error && <ErrorText>{error}</ErrorText>}
+        <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
+          Salvar e continuar
         </Button>
       </form>
     </AuthShell>

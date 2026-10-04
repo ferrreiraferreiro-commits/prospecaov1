@@ -4,13 +4,15 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LogoMark } from './components/Brand'
 import { Layout } from './components/Layout'
 import { Welcome } from './components/Welcome'
-import { Button, Spinner } from './components/ui'
+import { Button, Spinner, WhatsAppIcon } from './components/ui'
 import { LocalRepository } from './data/localRepository'
 import { SupabaseRepository } from './data/supabaseRepository'
 import { supabase } from './data/supabaseClient'
+import { isLegacyEmail } from './lib/auth'
+import { suporteUrl, useSuporteWhatsApp } from './lib/suporte'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
-import { ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pages/AuthPages'
+import { CadastrarEmailPage, ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pages/AuthPages'
 import { LandingPage } from './pages/LandingPage'
 import { PainelPage } from './pages/PainelPage'
 import type { Repository } from './data/repository'
@@ -154,8 +156,16 @@ function Loaded() {
       </div>
     )
   }
+  // Conta antiga, do login por nome de usuário: cadastra o e-mail antes de tudo
+  if (supabase && profile && isLegacyEmail(profile.email)) {
+    return (
+      <BrowserRouter>
+        <CadastrarEmailPage client={supabase} login={profile.email!.split('@')[0]} onDone={() => void useAccount.getState().init(supabase, profile.user_id)} />
+      </BrowserRouter>
+    )
+  }
   const access = accessOf(profile)
-  if (!access.ok) return <Blocked motivo={access.motivo} />
+  if (!access.ok) return <Blocked motivo={access.motivo} email={profile?.email ?? null} />
   return <Routed />
 }
 
@@ -165,7 +175,14 @@ const BLOQUEIO = {
   cancelado: 'Sua assinatura está pausada',
 }
 
-function Blocked({ motivo }: { motivo: keyof typeof BLOQUEIO }) {
+function Blocked({ motivo, email }: { motivo: keyof typeof BLOQUEIO; email: string | null }) {
+  const suporte = useSuporteWhatsApp()
+  const pedido = {
+    teste_acabou: 'Meu teste grátis da XS terminou e quero assinar.',
+    plano_venceu: 'Meu plano da XS venceu e quero renovar.',
+    cancelado: 'Minha conta da XS está pausada e quero liberar o acesso.',
+  }[motivo]
+  const texto = `Oi! ${pedido}${email ? ` Minha conta: ${email}` : ''}`
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
       <LogoMark size={64} />
@@ -173,11 +190,23 @@ function Blocked({ motivo }: { motivo: keyof typeof BLOQUEIO }) {
         <p className="text-base font-semibold text-fg">{BLOQUEIO[motivo]}</p>
         <p className="max-w-sm text-xs text-fg-3">Seus leads e sua gestão continuam guardados. Fale com a gente para liberar o acesso de novo.</p>
       </div>
-      {supabase && (
-        <Button variant="secondary" onClick={() => void supabase!.auth.signOut()}>
-          Sair
-        </Button>
-      )}
+      <div className="flex flex-wrap justify-center gap-2">
+        {suporte && (
+          <a
+            href={suporteUrl(suporte, texto)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-go px-4 text-sm font-semibold text-[#04140c] transition-colors hover:bg-[#4ccb8d]"
+          >
+            <WhatsAppIcon className="size-4" /> {motivo === 'teste_acabou' ? 'Assinar pelo WhatsApp' : 'Renovar pelo WhatsApp'}
+          </a>
+        )}
+        {supabase && (
+          <Button variant="secondary" size="lg" onClick={() => void supabase!.auth.signOut()}>
+            Sair
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

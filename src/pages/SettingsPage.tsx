@@ -7,6 +7,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
 import { supabase } from '../data/supabaseClient'
+import { changePassword } from '../lib/auth'
 import { formatDateTime } from '../lib/dates'
 import { getAvisosOn, notificationPermission, setAvisosOn, showSystemNotification } from '../lib/notify'
 import { isIos, isStandalone, useInstall } from '../lib/pwa'
@@ -15,7 +16,7 @@ import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
 import { BIZ_TABLES, emptyBiz, type BizSnapshot } from '../lib/biz'
 import { DEFAULT_MOTOR_URL, getMotorUrl, setMotorUrl, useMotor } from '../lib/motor'
-import { useHasMotor } from '../store/useAccount'
+import { useAccount, useHasMotor } from '../store/useAccount'
 import { useBiz } from '../store/useBiz'
 
 
@@ -169,6 +170,8 @@ export function SettingsPage() {
           </div>
         </div>
       </Card>
+
+      {supabase && <AcessoCard />}
 
       <Card
         title="WhatsApp"
@@ -423,6 +426,66 @@ function MotorCard() {
           </Button>
         </div>
       </div>
+    </Card>
+  )
+}
+
+/** E-mail de acesso e troca de senha (só com login). */
+function AcessoCard() {
+  const toast = useApp((s) => s.toast)
+  const email = useAccount((s) => s.profile?.email ?? null)
+  const [atual, setAtual] = useState('')
+  const [nova, setNova] = useState('')
+  const [confirma, setConfirma] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
+  const [salvando, setSalvando] = useState(false)
+
+  const trocar = async () => {
+    if (!supabase || !email) return
+    setErro(null)
+    if (nova !== confirma) return setErro('A confirmação não é igual à senha nova.')
+    setSalvando(true)
+    const err = await changePassword(supabase, email, atual, nova)
+    setSalvando(false)
+    if (err) return setErro(err)
+    setAtual('')
+    setNova('')
+    setConfirma('')
+    toast('Senha trocada. Use a nova no próximo acesso.')
+  }
+
+  return (
+    <Card id="acesso" title="Acesso e senha" description="Você entra na XS com este e-mail.">
+      <p className="mb-4 flex items-center gap-2 text-xs">
+        <span className="text-fg-3">E-mail</span>
+        <span className="font-medium text-fg">{email ?? 'Não informado'}</span>
+      </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          void trocar()
+        }}
+        className="grid gap-3 sm:grid-cols-3"
+      >
+        <div>
+          <label className="label" htmlFor="ac-atual">Senha atual</label>
+          <input id="ac-atual" type="password" className="input" autoComplete="current-password" value={atual} onChange={(e) => setAtual(e.target.value)} required />
+        </div>
+        <div>
+          <label className="label" htmlFor="ac-nova">Senha nova</label>
+          <input id="ac-nova" type="password" className="input" autoComplete="new-password" minLength={6} placeholder="Pelo menos 6 caracteres" value={nova} onChange={(e) => setNova(e.target.value)} required />
+        </div>
+        <div>
+          <label className="label" htmlFor="ac-conf">Repita a senha nova</label>
+          <input id="ac-conf" type="password" className="input" autoComplete="new-password" minLength={6} value={confirma} onChange={(e) => setConfirma(e.target.value)} required />
+        </div>
+        <div className="flex items-center gap-3 sm:col-span-3">
+          <Button type="submit" variant="primary" size="sm" loading={salvando} disabled={!atual || !nova || !confirma}>
+            Trocar senha
+          </Button>
+          {erro && <p className="text-xs text-red-300">{erro}</p>}
+        </div>
+      </form>
     </Card>
   )
 }
