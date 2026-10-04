@@ -2,7 +2,7 @@ import { Bell, Camera, Database, Download, LogOut, Smartphone, Trash2, Upload } 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
-import { MOTOR_DOWNLOAD, MotorSteps } from '../components/MotorOffline'
+import { MOTOR_DOWNLOAD, MotorSteps, NavegadorBloqueou } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
@@ -375,6 +375,7 @@ function MotorCard() {
   const online = useMotor((s) => s.online)
   const health = useMotor((s) => s.health)
   const check = useMotor((s) => s.check)
+  const bloqueado = useMotor((s) => s.bloqueado) && !online
   const toast = useApp((s) => s.toast)
   const [url, setUrl] = useState(getMotorUrl())
   return (
@@ -384,11 +385,13 @@ function MotorCard() {
       description="Programa opcional que roda no seu computador e mantém o WhatsApp conectado para os disparos automáticos. A busca de empresas não precisa dele."
       actions={
         <span className={clsx('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium', online ? 'bg-go/10 text-emerald-300' : 'bg-tint/[0.04] text-fg-3')}>
-          <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : 'bg-fg-4')} /> {online ? `Ligado · v${health?.versao ?? ''}` : 'Desligado'}
+          <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : bloqueado ? 'bg-amber-400' : 'bg-fg-4')} />{' '}
+          {online ? `Ligado · v${health?.versao ?? ''}` : bloqueado ? 'Bloqueado pelo navegador' : 'Desligado'}
         </span>
       }
     >
       <div className="space-y-3 text-xs">
+        {bloqueado && <NavegadorBloqueou />}
         {online && health && (
           <dl className="grid grid-cols-2 gap-2">
             <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">

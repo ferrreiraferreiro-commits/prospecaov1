@@ -22,7 +22,7 @@ export function MotorSteps({ https }: { https?: boolean }) {
 }
 
 /** O motor pode até estar aberto, mas o navegador negou a este site falar com ele. */
-function NavegadorBloqueou() {
+export function NavegadorBloqueou() {
   const host = typeof window !== 'undefined' ? window.location.host : 'o site'
   return (
     <section className="panel flex flex-col gap-3 border-red-400/30 bg-red-400/[0.05] px-4 py-3.5 sm:flex-row sm:items-start">
@@ -36,6 +36,9 @@ function NavegadorBloqueou() {
           </li>
           <li>
             Em <strong className="text-fg">Apps e serviços neste dispositivo</strong> (ou <strong className="text-fg">Rede local</strong>), escolha <strong className="text-fg">Permitir</strong>. Se não aparecer ali, abra <strong className="text-fg">Configurações do site</strong>.
+          </li>
+          <li>
+            No <strong className="text-fg">Brave</strong>, a opção se chama <strong className="text-fg">Acesso ao localhost</strong>. Se continuar bloqueado, desligue o Shields (o leão) para este site.
           </li>
           <li>Recarregue a página.</li>
         </ol>

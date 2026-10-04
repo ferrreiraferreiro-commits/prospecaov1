@@ -290,20 +290,20 @@ function MotorPill({ collapsed }: { collapsed: boolean }) {
       : 'Motor online'
     : online === false
       ? bloqueado
-        ? 'Motor bloqueado pelo navegador'
+        ? 'Motor bloqueado'
         : 'Motor desligado'
       : 'Verificando motor…'
   return (
     <NavLink
       to="/configuracoes#motor"
-      title={label}
+      title={bloqueado && !online ? 'O navegador está bloqueando o Motor WhatsApp XS. Clique para ver como liberar.' : label}
       className={clsx(
         'flex h-9 items-center gap-2.5 rounded-lg text-xs text-fg-3 transition-colors hover:bg-tint/[0.04] hover:text-fg-2',
         collapsed ? 'justify-center' : 'px-2.5',
       )}
     >
       <span className="relative flex size-4 items-center justify-center">
-        <span className={clsx('size-2 rounded-full', online ? 'bg-go' : online === false ? 'bg-fg-4' : 'bg-amber-400')} />
+        <span className={clsx('size-2 rounded-full', online ? 'bg-go' : online === false && !bloqueado ? 'bg-fg-4' : 'bg-amber-400')} />
         {online && <span className="absolute size-2 animate-ping rounded-full bg-go/60" />}
       </span>
       {!collapsed && <span className="truncate">{label}</span>}
