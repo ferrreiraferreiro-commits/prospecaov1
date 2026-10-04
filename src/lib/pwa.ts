@@ -56,3 +56,32 @@ export function useInstall(): [boolean, () => Promise<boolean>] {
   }
   return [can, install]
 }
+
+export type Navegador = 'brave' | 'edge' | 'chrome' | 'samsung' | 'firefox' | 'safari' | 'outro'
+
+export async function detectarNavegador(): Promise<Navegador> {
+  const ua = navigator.userAgent
+  const brave = (navigator as Navigator & { brave?: { isBrave(): Promise<boolean> } }).brave
+  if (brave && (await brave.isBrave().catch(() => false))) return 'brave'
+  if (/SamsungBrowser/i.test(ua)) return 'samsung'
+  if (/Edg\//.test(ua)) return 'edge'
+  if (/Firefox\//.test(ua)) return 'firefox'
+  if (/Chrome\//.test(ua)) return 'chrome'
+  if (/Safari\//.test(ua)) return 'safari'
+  return 'outro'
+}
+
+export function isAndroid(): boolean {
+  return /android/i.test(navigator.userAgent)
+}
+
+/** O app já está instalado neste aparelho? (Chrome/Edge; nos outros responde false) */
+export async function appJaInstalado(): Promise<boolean> {
+  const nav = navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> }
+  if (!nav.getInstalledRelatedApps) return false
+  try {
+    return (await nav.getInstalledRelatedApps()).length > 0
+  } catch {
+    return false
+  }
+}

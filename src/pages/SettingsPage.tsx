@@ -1,4 +1,4 @@
-import { Bell, Camera, Database, Download, LogOut, Smartphone, Trash2, Upload } from 'lucide-react'
+import { Bell, Camera, Database, Download, LogOut, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
@@ -11,7 +11,7 @@ import { supabase } from '../data/supabaseClient'
 import { changePassword, isLegacyEmail, USUARIO_REGRA, usuarioValido } from '../lib/auth'
 import { formatDateTime } from '../lib/dates'
 import { getAvisosOn, notificationPermission, setAvisosOn, showSystemNotification } from '../lib/notify'
-import { isIos, isStandalone, useInstall } from '../lib/pwa'
+import { InstalarApp } from '../components/InstalarApp'
 import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
@@ -60,7 +60,6 @@ export function SettingsPage() {
   const [avisos, setAvisos] = useState(getAvisosOn)
   const [permissao, setPermissao] = useState(notificationPermission)
   const [maxTent, setMaxTent] = useState(String(settings.max_tentativas))
-  const [canInstall, install] = useInstall()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const saveProfile = async () => {
@@ -275,29 +274,7 @@ export function SettingsPage() {
       </Card>
 
       <Card id="app" title="Instalar como app" description="Abre em tela cheia, com ícone na tela inicial do celular ou na barra de tarefas do PC. Os dados continuam os mesmos.">
-        {isStandalone() ? (
-          <p className="text-xs text-go">Você já está usando o app instalado.</p>
-        ) : canInstall ? (
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Smartphone className="size-3.5" />}
-            onClick={async () => {
-              if (await install()) toast('App instalado.')
-            }}
-          >
-            Instalar agora
-          </Button>
-        ) : isIos() ? (
-          <p className="text-xs leading-5 text-fg-2">
-            No iPhone: abra este site no <span className="text-fg">Safari</span>, toque em <span className="text-fg">Compartilhar</span> e depois em{' '}
-            <span className="text-fg">Adicionar à Tela de Início</span>.
-          </p>
-        ) : (
-          <p className="text-xs leading-5 text-fg-2">
-            No Android (Chrome): menu <span className="text-fg">⋮</span> → <span className="text-fg">Instalar app</span> ou <span className="text-fg">Adicionar à tela inicial</span>. No PC (Chrome/Edge): ícone de instalar na barra de endereço.
-          </p>
-        )}
+        <InstalarApp />
       </Card>
 
       <Card title="Importações" description={`${imports.length} ${imports.length === 1 ? 'arquivo importado' : 'arquivos importados'}`}>

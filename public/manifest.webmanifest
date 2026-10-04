@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "XS Prospecção",
   "short_name": "XS Prospecção",
   "description": "Prospecção por ligação e WhatsApp, busca de empresas e gestão de clientes, projetos e financeiro.",
@@ -25,6 +26,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://xs-prospeccao.vercel.app/manifest.webmanifest"
     }
   ]
 }
