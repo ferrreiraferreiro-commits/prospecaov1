@@ -11,6 +11,28 @@ const out = path.join(root, 'build')
 fs.rmSync(out, { recursive: true, force: true })
 fs.mkdirSync(out, { recursive: true })
 
+/**
+ * Tira a assinatura digital do node.exe copiado. Depois de trocar o ícone e injetar o motor
+ * ela ficaria inválida, e assinatura quebrada é pior para o antivírus do que nenhuma.
+ * (Mesmo efeito de "signtool remove /s", sem precisar do Windows SDK.)
+ */
+function stripSignature(file) {
+  const buf = fs.readFileSync(file)
+  const pe = buf.readUInt32LE(0x3c)
+  if (buf.toString('latin1', pe, pe + 4) !== 'PE\0\0') throw new Error('Arquivo não é um executável do Windows.')
+  const opt = pe + 24
+  const dirs = opt + (buf.readUInt16LE(opt) === 0x20b ? 112 : 96)
+  const sec = dirs + 4 * 8 // IMAGE_DIRECTORY_ENTRY_SECURITY
+  const off = buf.readUInt32LE(sec)
+  const size = buf.readUInt32LE(sec + 4)
+  if (!off || !size) return
+  if (off + size < buf.length - 8) throw new Error('Assinatura fora do lugar esperado; não removida.')
+  buf.writeUInt32LE(0, sec)
+  buf.writeUInt32LE(0, sec + 4)
+  buf.writeUInt32LE(0, opt + 64) // checksum do cabeçalho
+  fs.writeFileSync(file, buf.subarray(0, off))
+}
+
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version
 
 // 1) Um arquivo JavaScript só, com todas as dependências
@@ -41,6 +63,7 @@ execFileSync(process.execPath, ['--experimental-sea-config', seaConfig], { stdio
 // 3) Cópia do node.exe com o motor injetado
 const exe = path.join(out, process.platform === 'win32' ? 'Motor XS.exe' : 'motor-xs')
 fs.copyFileSync(process.execPath, exe)
+if (process.platform === 'win32') stripSignature(exe)
 // Ícone XS e nome do programa (antes de injetar o motor)
 if (process.platform === 'win32') {
   const rcedit = path.join(root, 'node_modules', 'rcedit', 'bin', process.arch === 'x64' ? 'rcedit-x64.exe' : 'rcedit.exe')
@@ -48,7 +71,8 @@ if (process.platform === 'win32') {
     exe,
     '--set-icon', path.join(root, 'assets', 'icon.ico'),
     '--set-version-string', 'ProductName', 'Motor XS',
-    '--set-version-string', 'FileDescription', 'Motor XS - XS Prospecção',
+    '--set-version-string', 'FileDescription', 'Motor XS - WhatsApp da XS Prospecção',
+    '--set-version-string', 'LegalCopyright', 'XS Prospecção',
     '--set-version-string', 'CompanyName', 'XS Prospecção',
     '--set-version-string', 'OriginalFilename', 'Motor XS.exe',
     '--set-version-string', 'InternalName', 'Motor XS',
@@ -72,6 +96,25 @@ if (process.platform === 'win32') {
   const downloads = path.resolve(root, '..', 'public', 'downloads')
   fs.mkdirSync(downloads, { recursive: true })
   const zip = path.join(downloads, 'Motor-XS-Windows.zip')
-  execFileSync('powershell', ['-NoProfile', '-Command', `Compress-Archive -Path '${exe}' -DestinationPath '${zip}' -CompressionLevel Optimal -Force`], { stdio: 'inherit' })
+  const leia = path.join(out, 'LEIA-ME.txt')
+  fs.writeFileSync(
+    leia,
+    [
+      `Motor XS ${version} - XS Prospecção`,
+      '',
+      'O que é: o programa que mantém o seu WhatsApp conectado para os disparos, funis e mensagens agendadas da XS.',
+      'Ele roda só no seu computador, só aceita conexões do próprio computador e do site da XS, e não envia seus dados para outros lugares.',
+      '',
+      'Como usar:',
+      '1. Extraia o "Motor XS.exe" numa pasta fixa (ex.: Documentos).',
+      '2. Dê dois cliques. Se o Windows mostrar "O Windows protegeu o computador", clique em "Mais informações" e depois em "Executar assim mesmo".',
+      '   Esse aviso aparece em programas novos que ainda não têm assinatura digital paga; não é sinal de vírus.',
+      '3. Deixe a janela preta aberta enquanto usa os disparos. Para fechar, feche a janela.',
+      '',
+      'Os dados do Motor (sessão do WhatsApp e campanhas) ficam na pasta "Motor XS - dados", ao lado do programa.',
+      'Para remover tudo, apague o programa e essa pasta.',
+    ].join('\r\n'),
+  )
+  execFileSync('powershell', ['-NoProfile', '-Command', `Compress-Archive -Path '${exe}','${leia}' -DestinationPath '${zip}' -CompressionLevel Optimal -Force`], { stdio: 'inherit' })
   console.log(`  Download: public/downloads/Motor-XS-Windows.zip (${(fs.statSync(zip).size / 1024 / 1024).toFixed(1)} MB) — publique o site para atualizar.\n`)
 }

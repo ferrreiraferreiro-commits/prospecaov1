@@ -1,16 +1,16 @@
 /**
- * Motor XS — servidor local do XS Prospecção.
+ * Motor XS — servidor local da XS Prospecção: só o WhatsApp (disparos, funis e mensagens agendadas).
+ * A busca de empresas roda no servidor da XS, não aqui.
  * Escuta só em 127.0.0.1 e só aceita chamadas do próprio app (localhost ou o domínio na Vercel).
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
 import { createCampaign, deleteCampaign, getCampaign, listCampaigns, markSynced, pauseCampaign, runningCount, sentPhones, startCampaign, summary } from './disparo.js'
-import { ackMaps, chromeExecutable, geocode, getMapsState, reverseGeocode, startMaps, stopMaps } from './maps.js'
 import { keepAwakeActive } from './keepAwake.js'
 import { storageDir } from './store.js'
 import { connect, disconnect, getWa, resumeStoredSession, sendText, shutdown } from './whatsapp.js'
 
-const VERSION = '1.2.0'
+const VERSION = '1.3.0'
 const PORT = Number(process.env.XS_PORT ?? 3077)
 
 const EXTRA_ORIGINS = (process.env.XS_ORIGINS ?? '')
@@ -65,39 +65,16 @@ app.get(
   '/health',
   wrap(() => {
     const wa = getWa()
-    const maps = getMapsState()
     return {
       ok: true,
       versao: VERSION,
-      navegador: Boolean(chromeExecutable()),
       whatsapp: { status: wa.status, user: wa.user },
-      maps: { active: maps.active, phase: maps.phase, runId: maps.runId, pendente: !maps.active && !maps.imported && maps.results.length > 0 },
       disparo: { running: runningCount() },
       agenda: { pendentes: agendaPending() },
       acordado: keepAwakeActive(),
     }
   }),
 )
-
-// ---------------------------------------------------------------- Maps
-app.get('/maps/estado', wrap(() => getMapsState()))
-app.post(
-  '/maps/iniciar',
-  wrap((req) => {
-    startMaps(req.body ?? {})
-    return { ok: true, runId: getMapsState().runId }
-  }),
-)
-app.post(
-  '/maps/parar',
-  wrap(async () => {
-    await stopMaps()
-    return { ok: true }
-  }),
-)
-app.post('/maps/ack', wrap((req) => ackMaps(String(req.body?.runId ?? ''))))
-app.get('/maps/geocode', wrap((req) => geocode(String(req.query.q ?? ''))))
-app.get('/maps/reverse', wrap((req) => reverseGeocode(Number(req.query.lat), Number(req.query.lng))))
 
 // ---------------------------------------------------------------- WhatsApp
 app.get('/whatsapp/status', wrap(() => getWa()))
@@ -152,10 +129,9 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log('  │  Motor XS ligado  ·  XS Prospecção         │')
   console.log(`  │  http://127.0.0.1:${PORT}                      │`)
   console.log('  │  Deixe esta janela aberta enquanto usa      │')
-  console.log('  │  a busca no Maps e o disparo de WhatsApp.   │')
+  console.log('  │  os disparos e mensagens de WhatsApp.       │')
   console.log('  └────────────────────────────────────────────┘')
   console.log(`  Dados locais: ${storageDir}`)
-  if (!chromeExecutable()) console.log('  Atenção: Chrome/Edge/Brave não encontrado — a busca no Maps não vai funcionar.')
   resumeStoredSession()
 })
 
@@ -167,7 +143,7 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 
 function bye() {
   shutdown()
-  void stopMaps().finally(() => process.exit(0))
+  process.exit(0)
 }
 process.on('SIGINT', bye)
 process.on('SIGTERM', bye)

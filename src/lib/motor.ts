@@ -3,8 +3,8 @@ import { create } from 'zustand'
 
 /**
  * Motor XS: programa local (pasta motor/) que roda no computador do usuário e
- * faz o que a Vercel não consegue — busca no Google Maps (navegador automatizado)
- * e sessão do WhatsApp para disparos. O app conversa com ele por HTTP em 127.0.0.1.
+ * mantém a sessão do WhatsApp para os disparos, funis e mensagens agendadas.
+ * O app conversa com ele por HTTP em 127.0.0.1.
  */
 
 const URL_KEY = 'xs-prospeccao:motor-url'
@@ -60,10 +60,11 @@ export type WaStatus = 'disconnected' | 'connecting' | 'qrcode' | 'connected'
 export interface MotorHealth {
   ok: boolean
   versao: string
-  navegador: boolean
+  /** Só o motor antigo (até 1.2) informava: tinha a busca no Maps */
+  navegador?: boolean
   whatsapp: { status: WaStatus; user: { id: string; name: string } | null }
   /** `pendente`/`runId` só vêm do motor 1.2+: há resultados que ainda não foram para os leads */
-  maps: { active: boolean; phase: string; runId?: string | null; pendente?: boolean }
+  maps?: { active: boolean; phase: string; runId?: string | null; pendente?: boolean }
   disparo: { running: number }
   agenda?: { pendentes: number }
   /** O motor está impedindo o Windows de suspender */

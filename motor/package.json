@@ -1,8 +1,8 @@
 {
   "name": "xs-motor",
   "private": true,
-  "version": "1.2.0",
-  "description": "Motor XS: busca no Google Maps e WhatsApp do XS Prospecção (roda no seu computador)",
+  "version": "1.3.0",
+  "description": "Motor XS: WhatsApp da XS Prospecção (disparos, funis e mensagens agendadas), roda no seu computador",
   "type": "module",
   "scripts": {
     "start": "tsx src/server.ts",
@@ -14,7 +14,6 @@
     "@whiskeysockets/baileys": "7.0.0-rc14",
     "express": "4.22.3",
     "pino": "10.3.1",
-    "puppeteer-core": "25.12.0",
     "qrcode": "1.5.4",
     "tsx": "^4.20.0"
   },
