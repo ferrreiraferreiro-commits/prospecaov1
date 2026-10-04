@@ -2,15 +2,18 @@
  * Motor WhatsApp XS — servidor local da XS Prospecção: só o WhatsApp (disparos, funis e mensagens agendadas).
  * A busca de empresas roda no servidor da XS, não aqui.
  * Escuta só em 127.0.0.1 e só aceita chamadas do próprio app (localhost ou o domínio na Vercel).
+ * O site fala com ele pela ponte da XS na internet (ponte.ts); o endereço local fica para o app em localhost.
  */
+import os from 'node:os'
 import express, { type NextFunction, type Request, type Response } from 'express'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
 import { createCampaign, deleteCampaign, getCampaign, listCampaigns, markSynced, pauseCampaign, runningCount, sentPhones, startCampaign, summary } from './disparo.js'
 import { keepAwakeActive } from './keepAwake.js'
+import { iniciarPonte } from './ponte.js'
 import { storageDir } from './store.js'
 import { connect, disconnect, getWa, resumeStoredSession, sendText, shutdown } from './whatsapp.js'
 
-const VERSION = '1.3.0'
+const VERSION = '1.4.0'
 const PORT = Number(process.env.XS_PORT ?? 3077)
 
 const EXTRA_ORIGINS = (process.env.XS_ORIGINS ?? '')
@@ -68,6 +71,7 @@ app.get(
     return {
       ok: true,
       versao: VERSION,
+      computador: os.hostname(),
       whatsapp: { status: wa.status, user: wa.user },
       disparo: { running: runningCount() },
       agenda: { pendentes: agendaPending() },
@@ -129,10 +133,11 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log('  │  Motor WhatsApp XS ligado · XS Prospecção  │')
   console.log(`  │  http://127.0.0.1:${PORT}                     │`)
   console.log('  │  Deixe esta janela aberta enquanto usa     │')
-  console.log('  │  os disparos e mensagens de WhatsApp.      │')
+  console.log('  │  o WhatsApp da XS (pode minimizar).        │')
   console.log('  └────────────────────────────────────────────┘')
   console.log(`  Dados locais: ${storageDir}`)
   resumeStoredSession()
+  iniciarPonte(PORT, VERSION)
 })
 
 server.on('error', (err: NodeJS.ErrnoException) => {

@@ -2,10 +2,11 @@ import { Bell, Camera, Database, Download, LogOut, Smartphone, Trash2, Upload } 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
-import { MOTOR_DOWNLOAD, MotorSteps, NavegadorBloqueou } from '../components/MotorOffline'
+import { MOTOR_DOWNLOAD, MotorSteps } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
+import { confirmAction } from '../components/kit'
 import { supabase } from '../data/supabaseClient'
 import { changePassword, isLegacyEmail, USUARIO_REGRA, usuarioValido } from '../lib/auth'
 import { formatDateTime } from '../lib/dates'
@@ -15,7 +16,7 @@ import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
 import { BIZ_TABLES, emptyBiz, type BizSnapshot } from '../lib/biz'
-import { DEFAULT_MOTOR_URL, getMotorUrl, setMotorUrl, useMotor } from '../lib/motor'
+import { DEFAULT_MOTOR_URL, desligarMotorDaConta, getMotorUrl, setMotorUrl, useMotor } from '../lib/motor'
 import { useAccount, useHasMotor } from '../store/useAccount'
 import { useBiz } from '../store/useBiz'
 
@@ -375,9 +376,11 @@ function MotorCard() {
   const online = useMotor((s) => s.online)
   const health = useMotor((s) => s.health)
   const check = useMotor((s) => s.check)
-  const bloqueado = useMotor((s) => s.bloqueado) && !online
+  const ligado = useMotor((s) => s.ligado)
+  const computador = useMotor((s) => s.computador)
   const toast = useApp((s) => s.toast)
   const [url, setUrl] = useState(getMotorUrl())
+  const [desligando, setDesligando] = useState(false)
   return (
     <Card
       id="motor"
@@ -385,13 +388,11 @@ function MotorCard() {
       description="Programa opcional que roda no seu computador e mantém o WhatsApp conectado para os disparos automáticos. A busca de empresas não precisa dele."
       actions={
         <span className={clsx('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium', online ? 'bg-go/10 text-emerald-300' : 'bg-tint/[0.04] text-fg-3')}>
-          <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : bloqueado ? 'bg-amber-400' : 'bg-fg-4')} />{' '}
-          {online ? `Ligado · v${health?.versao ?? ''}` : bloqueado ? 'Bloqueado pelo navegador' : 'Desligado'}
+          <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : 'bg-fg-4')} /> {online ? `Ligado · v${health?.versao ?? ''}` : 'Desligado'}
         </span>
       }
     >
       <div className="space-y-3 text-xs">
-        {bloqueado && <NavegadorBloqueou />}
         {online && health && (
           <dl className="grid grid-cols-2 gap-2">
             <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
@@ -406,28 +407,63 @@ function MotorCard() {
         )}
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
-            <MotorSteps https={window.location.protocol === 'https:'} />
+            <MotorSteps ligado={ligado} />
           </div>
           <a href={MOTOR_DOWNLOAD} download className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-[#3b7bf6]">
             <Download className="size-3.5" /> Baixar o Motor WhatsApp XS (Windows)
           </a>
         </div>
-        <div className="flex flex-wrap items-end gap-2 border-t border-line-soft pt-3">
-          <label className="block min-w-60 flex-1">
-            <span className="label">Endereço do motor</span>
-            <input className="input font-mono text-xs" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={DEFAULT_MOTOR_URL} />
-          </label>
-          <Button
-            size="sm"
-            onClick={async () => {
-              setMotorUrl(url)
-              await check()
-              toast(useMotor.getState().online ? 'Motor encontrado.' : 'Motor não respondeu nesse endereço.', useMotor.getState().online ? 'success' : 'error')
-            }}
-          >
-            Salvar e testar
-          </Button>
-        </div>
+        {supabase ? (
+          ligado && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
+              <p className="text-fg-2">
+                Ligado à sua conta{computador ? (
+                  <>
+                    {' '}
+                    no computador <strong className="text-fg">{computador}</strong>
+                  </>
+                ) : null}
+                . Para usar outro computador, é só abrir o motor nele.
+              </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={desligando}
+                onClick={async () => {
+                  if (!confirmAction('Desligar o motor da sua conta? Para usar de novo, abra o motor e ligue outra vez.')) return
+                  setDesligando(true)
+                  try {
+                    await desligarMotorDaConta(supabase!)
+                    toast('Motor desligado da conta.')
+                  } catch (err) {
+                    toast(err instanceof Error ? err.message : 'Não foi possível desligar.', 'error')
+                  } finally {
+                    setDesligando(false)
+                  }
+                }}
+              >
+                Desligar da conta
+              </Button>
+            </div>
+          )
+        ) : (
+          <div className="flex flex-wrap items-end gap-2 border-t border-line-soft pt-3">
+            <label className="block min-w-60 flex-1">
+              <span className="label">Endereço do motor</span>
+              <input className="input font-mono text-xs" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={DEFAULT_MOTOR_URL} />
+            </label>
+            <Button
+              size="sm"
+              onClick={async () => {
+                setMotorUrl(url)
+                await check()
+                toast(useMotor.getState().online ? 'Motor encontrado.' : 'Motor não respondeu nesse endereço.', useMotor.getState().online ? 'success' : 'error')
+              }}
+            >
+              Salvar e testar
+            </Button>
+          </div>
+        )}
       </div>
     </Card>
   )

@@ -9,6 +9,7 @@ import { Button, Spinner, WhatsAppIcon } from './components/ui'
 import { LocalRepository } from './data/localRepository'
 import { SupabaseRepository } from './data/supabaseRepository'
 import { supabase } from './data/supabaseClient'
+import { carregarMotorDaConta, guardarChavePendente } from './lib/motor'
 import { suporteUrl, useSuporteWhatsApp } from './lib/suporte'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
@@ -69,6 +70,7 @@ const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ defa
 const WhatsAppPage = lazyPage(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
 const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })))
 const TermsPage = lazyPage(() => import('./pages/TermsPage').then((m) => ({ default: m.TermsPage })))
+const ConectarMotorPage = lazyPage(() => import('./pages/ConectarMotorPage').then((m) => ({ default: m.ConectarMotorPage })))
 
 /** Política de Privacidade e Termos: abertas para todos, logado ou não, antes de qualquer carregamento. */
 const LEGAL_PATHS = ['/privacidade', '/termos']
@@ -106,6 +108,7 @@ function Routed() {
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />
           <Route path="whatsapp" element={m(<WhatsAppPage />)} />
+          <Route path="motor/conectar" element={m(<ConectarMotorPage />)} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
@@ -234,6 +237,7 @@ function SupabaseApp() {
     if (!userId) return
     initAll(new SupabaseRepository(client))
     void useAccount.getState().init(client, userId)
+    void carregarMotorDaConta(client)
   }, [userId, client])
 
   if (session === undefined) return <Splash text="Conectando…" />
@@ -262,6 +266,9 @@ function SupabaseApp() {
   }
   return <Loaded />
 }
+
+// O motor abre /motor/conectar#chave; se pedir login antes, a chave não se perde
+guardarChavePendente()
 
 export function App() {
   // Os links para essas páginas recarregam a página (<a href>), então basta olhar o caminho aqui

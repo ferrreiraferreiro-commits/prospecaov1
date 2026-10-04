@@ -72,6 +72,27 @@ ReadWritePaths=$DADOS
 WantedBy=multi-user.target
 EOF
 
+cat > /etc/systemd/system/xs-ponte.service <<EOF
+[Unit]
+Description=Ponte do Motor WhatsApp XS (site <-> motor no computador da pessoa)
+After=network.target
+
+[Service]
+User=xsbusca
+Environment=PORT=8090
+Environment=NODE_NO_WARNINGS=1
+ExecStart=/usr/bin/node $APP/ponte.ts
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 cat > /etc/systemd/system/xs-busca-importar.service <<EOF
 [Unit]
 Description=Importa a base aberta do CNPJ para a busca da XS
@@ -109,7 +130,12 @@ echo "== HTTPS (Caddy pega o certificado sozinho)"
 cat > /etc/caddy/Caddyfile <<EOF
 $DOMINIO {
 	encode gzip
-	reverse_proxy 127.0.0.1:8080
+	handle_path /ponte/* {
+		reverse_proxy 127.0.0.1:8090
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
 }
 EOF
 
@@ -121,7 +147,7 @@ if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then ufw 
 netfilter-persistent save >/dev/null 2>&1 || true
 
 systemctl daemon-reload
-systemctl enable --now xs-busca.service xs-busca-importar.timer
+systemctl enable --now xs-busca.service xs-ponte.service xs-busca-importar.timer
 systemctl restart caddy
 
 echo
