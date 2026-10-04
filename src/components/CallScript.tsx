@@ -120,7 +120,7 @@ export function CallScript({ lead, settings }: { lead: Lead; settings: Settings 
                   <span
                     className={clsx(
                       'num absolute top-2.5 left-3.5 flex size-5 items-center justify-center rounded-full text-[10px] font-semibold',
-                      current ? 'bg-gold text-[#1a1404]' : done ? 'bg-tint/[0.08] text-fg-3' : 'border border-line text-fg-4',
+                      current ? 'bg-gold text-on-gold' : done ? 'bg-tint/[0.08] text-fg-3' : 'border border-line text-fg-4',
                     )}
                   >
                     {i + 1}

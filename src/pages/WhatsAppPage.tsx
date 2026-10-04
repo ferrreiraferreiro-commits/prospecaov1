@@ -152,7 +152,7 @@ export function WhatsAppPage() {
           <Card title="Enviar mensagem de teste" description="Confira se está tudo certo antes de um disparo.">
             <div className="space-y-3">
               <Field label="Telefone (com DDD)">
-                <input className="input" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="(35) 99999-9999" />
+                <input className="input" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="(43) 99999-9999" />
               </Field>
               <Field label="Mensagem">
                 <textarea className="input" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} />

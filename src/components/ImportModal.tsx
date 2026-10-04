@@ -232,7 +232,7 @@ function ImportFlow({ onClose }: { onClose: () => void }) {
           <div>
             <textarea
               className="input min-h-48 resize-y font-mono text-xs"
-              placeholder={'Copie as linhas da planilha, junto com a linha dos títulos, e cole aqui:\n\nEmpresa\tTelefone\tCidade\nPadaria Sol\t(35) 99999-0000\tPoços de Caldas - MG'}
+              placeholder={'Copie as linhas da planilha, junto com a linha dos títulos, e cole aqui:\n\nEmpresa\tTelefone\tCidade\nPadaria Sol\t(43) 99999-0000\tLondrina - PR'}
               value={pasted}
               onChange={(e) => setPasted(e.target.value)}
               autoFocus
@@ -339,7 +339,7 @@ function ManualLead({ onDone }: { onDone: () => void }) {
       </div>
       <div>
         <label className="label" htmlFor="ml-tel">Telefone / WhatsApp</label>
-        <input id="ml-tel" className="input h-9" value={f.telefone} onChange={set('telefone')} inputMode="tel" placeholder="(35) 99999-0000" />
+        <input id="ml-tel" className="input h-9" value={f.telefone} onChange={set('telefone')} inputMode="tel" placeholder="(43) 99999-0000" />
       </div>
       <div>
         <label className="label" htmlFor="ml-nicho">Nicho</label>

@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * o e-mail do Auth correspondente (função email_para_login).
  *
  * As primeiras contas foram criadas só com usuário: o e-mail no Auth é interno
- * ("gabriel@prospeccao.local") e a senha foi guardada com um sufixo fixo. Elas
+ * ("usuario@prospeccao.local") e a senha foi guardada com um sufixo fixo. Elas
  * continuam entrando com a senha de sempre (por isso o sufixo segue aqui).
  */
 export const LOGIN_DOMAIN = 'prospeccao.local'

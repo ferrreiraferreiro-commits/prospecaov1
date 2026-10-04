@@ -610,7 +610,7 @@ function SuporteCard() {
   return (
     <Card title="Seu WhatsApp para renovações" description="Aparece no aviso de plano acabando e na tela de plano vencido, com o botão “Renovar pelo WhatsApp”.">
       <div className="flex max-w-md gap-2">
-        <input className="input num" inputMode="tel" placeholder="(11) 91234-5678" value={numero} onChange={(e) => setNumero(e.target.value)} />
+        <input className="input num" inputMode="tel" placeholder="(43) 91234-5678" value={numero} onChange={(e) => setNumero(e.target.value)} />
         <Button variant="primary" loading={salvando} disabled={(numero.trim() || null) === atual} onClick={() => void salvar()}>
           Salvar
         </Button>

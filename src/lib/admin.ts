@@ -63,7 +63,7 @@ export function fimSugerido(escolha: Escolha, c: Pick<Conta, 'plano' | 'plano_at
   return somarCiclo(escolha, atual && atual > now ? atual : now)
 }
 
-/** "gabriel" para logins por usuário; o e-mail nos outros. */
+/** O usuário (ex.: "ana.web") para logins por usuário; o e-mail nos outros. */
 export function loginDe(email: string | null): string {
   if (!email) return 'Sem e-mail'
   return email.endsWith(`@${LOGIN_DOMAIN}`) ? email.slice(0, -(LOGIN_DOMAIN.length + 1)) : email

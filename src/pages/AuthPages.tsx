@@ -200,7 +200,7 @@ export function SignupPage({ client }: { client: SupabaseClient }) {
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
-            placeholder="ex.: gabriel.sites"
+            placeholder="ex.: ana.web"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value.toLowerCase().replace(/\s+/g, ''))}
             required

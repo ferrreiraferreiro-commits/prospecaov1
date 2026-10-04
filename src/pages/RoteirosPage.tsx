@@ -410,8 +410,8 @@ const SAMPLE: Lead = {
   instagram: null,
   website: null,
   endereco: null,
-  cidade: 'Poços de Caldas',
-  estado: 'MG',
+  cidade: 'Londrina',
+  estado: 'PR',
   avaliacao: null,
   numero_avaliacoes: null,
   pasta: null,
@@ -441,7 +441,7 @@ function Preview({ roteiro }: { roteiro: Roteiro }) {
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_16rem]">
       <div>
-        <p className="mb-2 text-2xs text-fg-3">Exemplo com "Padaria Sol Nascente, Poços de Caldas". Clique numa etapa para destacá-la, como no Modo Ligação.</p>
+        <p className="mb-2 text-2xs text-fg-3">Exemplo com "Padaria Sol Nascente, Londrina". Clique numa etapa para destacá-la, como no Modo Ligação.</p>
         <ol className="space-y-2">
           {secoes.map((s, i) => (
             <li key={s.id}>

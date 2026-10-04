@@ -109,7 +109,7 @@ export function MapsPage() {
   async function locate(): Promise<Form['point']> {
     const q = form.location.trim()
     if (q.length < 2) {
-      toast('Digite a cidade (ex.: Poços de Caldas, MG).', 'error')
+      toast('Digite a cidade (ex.: Londrina, PR).', 'error')
       return null
     }
     setLocating(true)

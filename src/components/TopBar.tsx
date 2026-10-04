@@ -15,7 +15,7 @@ import { Avatar } from './Avatar'
 import { EscolherPlano } from './Planos'
 import { Popover } from './ui'
 
-/** Login atual: "gabriel" (usuário) ou o e-mail; `null` no modo local. */
+/** Login atual: o usuário (ex.: "ana.web") ou o e-mail; `null` no modo local. */
 function useLogin(): string | null {
   const [login, setLogin] = useState<string | null>(null)
   useEffect(() => {
