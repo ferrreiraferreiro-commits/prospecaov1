@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { formatPhone, whatsappChatUrl, whatsappTarget, type WhatsAppDestino } from '../lib/contact'
 import { timeHM } from '../lib/dates'
+import { motorFetch } from '../lib/motor'
 import type { Interaction, Lead } from '../lib/types'
 import { useApp } from '../store/useApp'
 
@@ -101,5 +102,33 @@ export function useCopyPhone() {
       }
     },
     [toast],
+  )
+}
+
+/**
+ * Manda a mensagem na hora pelo WhatsApp conectado no Motor WhatsApp XS (sem abrir o WhatsApp).
+ * Registra no histórico do lead como as mensagens abertas no WhatsApp.
+ */
+export function useSendViaMotor() {
+  const logMessage = useApp((s) => s.logMessage)
+  const toast = useApp((s) => s.toast)
+  return useCallback(
+    async (lead: Lead, text: string, modelo?: string | null): Promise<boolean> => {
+      const target = whatsappTarget(lead)
+      if (!target) {
+        toast('Este lead não tem WhatsApp nem telefone válido no cadastro.', 'error')
+        return false
+      }
+      try {
+        await motorFetch('/whatsapp/teste', { method: 'POST', json: { telefone: target.number, texto: text.trim() }, timeoutMs: 45_000 })
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Não foi possível enviar pelo Motor WhatsApp XS.', 'error')
+        return false
+      }
+      await logMessage(lead.id, text, modelo ? `${modelo} · enviada pelo Motor` : 'Enviada pelo Motor')
+      toast(`Mensagem enviada para ${lead.empresa}.`)
+      return true
+    },
+    [logMessage, toast],
   )
 }

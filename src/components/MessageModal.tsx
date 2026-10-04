@@ -1,18 +1,22 @@
 import clsx from 'clsx'
-import { Settings2 } from 'lucide-react'
+import { Send, Settings2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatPhone, whatsappTarget } from '../lib/contact'
 import { formatRelative } from '../lib/dates'
+import { useMotor } from '../lib/motor'
 import { fillMessage, getMessages, lastMessageAt, responsavelDoLead, variationIndex, variationsOf } from '../lib/messages'
 import type { Lead } from '../lib/types'
 import { useLead } from '../store/derived'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { Button, Modal, WhatsAppIcon } from './ui'
-import { useSendMessage, useWhatsApp } from './whatsapp'
+import { useSendMessage, useSendViaMotor, useWhatsApp } from './whatsapp'
 
-/** "Mandar mensagem": escolhe o modelo, confere o texto e abre o WhatsApp com ele escrito. */
+/**
+ * "Mandar mensagem": escolhe o modelo, confere o texto e abre o WhatsApp com ele escrito.
+ * Com o Motor ligado e o WhatsApp conectado, também dá para enviar na hora, sem abrir nada.
+ */
 export function MessageModal() {
   const target = useUi((s) => s.message)
   const openMessage = useUi((s) => s.openMessage)
@@ -27,6 +31,9 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
   const toast = useApp((s) => s.toast)
   const send = useSendMessage()
   const openChat = useWhatsApp()
+  const sendNow = useSendViaMotor()
+  const motorPronto = useMotor((s) => !!s.online && s.health?.whatsapp.status === 'connected')
+  const [enviando, setEnviando] = useState(false)
   const templates = getMessages(settings)
   const [templateId, setTemplateId] = useState(() => templates.find((t) => t.id === initialTemplate)?.id ?? templates[0]?.id)
   const template = templates.find((t) => t.id === templateId) ?? templates[0]
@@ -77,9 +84,9 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
             Abrir sem texto
           </Button>
           <Button
-            variant="primary"
+            variant={motorPronto ? 'secondary' : 'primary'}
             icon={<WhatsAppIcon className="size-3.5" />}
-            disabled={!target || !text.trim()}
+            disabled={!target || !text.trim() || enviando}
             onClick={() => {
               if (send(lead, text, template?.nome)) {
                 toast('Mensagem escrita no WhatsApp. Confira e aperte enviar lá.')
@@ -89,6 +96,22 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
           >
             Abrir no WhatsApp
           </Button>
+          {motorPronto && (
+            <Button
+              variant="go"
+              icon={<Send className="size-3.5" />}
+              loading={enviando}
+              disabled={!target || !text.trim()}
+              onClick={async () => {
+                setEnviando(true)
+                const ok = await sendNow(lead, text, template?.nome)
+                setEnviando(false)
+                if (ok) onClose()
+              }}
+            >
+              Enviar agora
+            </Button>
+          )}
         </>
       }
     >
@@ -137,7 +160,7 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
 
         <div>
           <label className="label" htmlFor="msg-text">
-            Texto (pode editar antes de abrir)
+            Texto (pode editar antes de enviar)
           </label>
           <textarea id="msg-text" className="input resize-y leading-5" rows={6} value={text} onChange={(e) => setText(e.target.value)} />
           {(semResponsavel || semNome) && (
@@ -156,7 +179,10 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
         </div>
 
         <p className="text-2xs leading-4 text-fg-4">
-          O WhatsApp abre com o texto pronto — nada é enviado sozinho. A mensagem fica no histórico do lead e o Status 2 vira “Mensagem enviada” se estiver vazio.
+          {motorPronto
+            ? '“Enviar agora” manda na hora pelo WhatsApp conectado no Motor. “Abrir no WhatsApp” só deixa o texto escrito para você conferir e enviar.'
+            : 'O WhatsApp abre com o texto pronto — nada é enviado sozinho.'}{' '}
+          A mensagem fica no histórico do lead e o Status 2 vira “Mensagem enviada” se estiver vazio.
         </p>
       </div>
     </Modal>
