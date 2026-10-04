@@ -22,14 +22,17 @@ const EXTRA_ORIGINS = (process.env.XS_ORIGINS ?? '')
   .map((o) => o.trim())
   .filter(Boolean)
 
-/** localhost em qualquer porta, os domínios do projeto na Vercel e os extras do .env */
+/**
+ * localhost em qualquer porta, o site da XS e os extras do .env.
+ * Só o endereço exato: qualquer pessoa pode criar "xs-prospeccao-outra-coisa.vercel.app".
+ */
 export function allowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false
   if (EXTRA_ORIGINS.includes(origin)) return true
   try {
     const u = new URL(origin)
     if ((u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.protocol === 'http:') return true
-    return u.protocol === 'https:' && /^xs-prospeccao[a-z0-9-]*\.vercel\.app$/.test(u.hostname)
+    return u.origin === 'https://xs-prospeccao.vercel.app'
   } catch {
     return false
   }

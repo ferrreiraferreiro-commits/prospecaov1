@@ -139,6 +139,18 @@ describe('login por usuário ou e-mail, senha e pagamentos', () => {
     expect(await signIn(client, 'ninguem', 'x')).toBe('Usuário, e-mail ou senha incorretos.')
     expect(tentativas).toHaveLength(2)
   })
+  it('o banco recebe a senha junto com o usuário; trava de tentativas aparece para a pessoa', async () => {
+    const chamadas: unknown[] = []
+    const client = {
+      rpc: async (fn: string, args: unknown) => {
+        chamadas.push({ fn, args })
+        return { data: null, error: { message: 'Muitas tentativas agora. Espere alguns minutos e tente de novo.' } }
+      },
+      auth: { signInWithPassword: async () => ({ error: null }) },
+    } as unknown as SupabaseClient
+    expect(await signIn(client, 'ana', 'segredo1')).toBe('Muitas tentativas agora. Espere alguns minutos e tente de novo.')
+    expect(chamadas).toEqual([{ fn: 'email_para_login', args: { u: 'ana', senha: 'segredo1' } }])
+  })
   it('regra do usuário no cadastro', () => {
     expect(usuarioValido('gabriel.sites')).toBe(true)
     expect(usuarioValido('ab')).toBe(false)

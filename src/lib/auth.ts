@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Entra com usuário OU e-mail. O usuário fica em profiles.usuario e o banco devolve
- * o e-mail do Auth correspondente (função email_para_login).
+ * o e-mail do Auth correspondente só para quem acerta a senha (função email_para_login).
  *
  * As primeiras contas foram criadas só com usuário: o e-mail no Auth é interno
  * ("usuario@prospeccao.local") e a senha foi guardada com um sufixo fixo. Elas
@@ -54,14 +54,18 @@ export function authErrorPt(message: string): string {
   return message
 }
 
-/** E-mail do Auth para o que foi digitado (e-mail como está; usuário pelo banco). */
-export async function emailDoLogin(client: SupabaseClient, login: string): Promise<string | null> {
+/**
+ * E-mail do Auth para o que foi digitado (e-mail como está; usuário pelo banco).
+ * O banco só devolve o e-mail de um usuário para quem acertou a senha, e trava depois de muitas erradas.
+ */
+export async function emailDoLogin(client: SupabaseClient, login: string, senha: string): Promise<{ email: string | null; erro?: string }> {
   const v = login.trim().toLowerCase()
-  if (v.includes('@')) return v
+  if (v.includes('@')) return { email: v }
   const usuario = normalizarUsuario(v)
-  if (!usuario) return null
-  const { data } = await client.rpc('email_para_login', { u: usuario })
-  return (data as string | null) ?? null
+  if (!usuario) return { email: null }
+  const { data, error } = await client.rpc('email_para_login', { u: usuario, senha })
+  if (error) return { email: null, erro: authErrorPt(error.message) }
+  return { email: (data as string | null) ?? null }
 }
 
 /**
@@ -69,7 +73,8 @@ export async function emailDoLogin(client: SupabaseClient, login: string): Promi
  * contas novas (e senhas trocadas pelo app), a senha como foi digitada.
  */
 export async function signIn(client: SupabaseClient, login: string, password: string): Promise<string | null> {
-  const email = await emailDoLogin(client, login)
+  const { email, erro } = await emailDoLogin(client, login, password)
+  if (erro) return erro
   if (!email) return CREDENCIAIS
   let last = ''
   for (const p of [password, toAuthPassword(password)]) {

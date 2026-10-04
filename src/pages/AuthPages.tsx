@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode
 import { Link, useNavigate } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
 import { Button } from '../components/ui'
-import { authErrorPt, emailDoLogin, isLegacyEmail, signIn, USUARIO_REGRA, usuarioValido } from '../lib/auth'
+import { authErrorPt, isLegacyEmail, normalizarUsuario, signIn, USUARIO_REGRA, usuarioValido } from '../lib/auth'
 import { suporteUrl, useSuporteWhatsApp } from '../lib/suporte'
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
@@ -243,16 +243,19 @@ export function ForgotPasswordPage({ client }: { client: SupabaseClient }) {
     setLoading(true)
     setError(null)
     setSemEmail(false)
-    const destino = await emailDoLogin(client, email)
-    // Conta só com usuário (sem e-mail): a senha nova vem pelo dono da XS
+    const digitado = email.trim().toLowerCase()
+    // Usuário: o banco nunca entrega o e-mail da conta, só diz se é uma conta antiga sem e-mail
+    if (!digitado.includes('@')) {
+      const { data } = await client.rpc('usuario_sem_email', { u: normalizarUsuario(digitado) })
+      setLoading(false)
+      // Conta só com usuário (sem e-mail): a senha nova vem pelo dono da XS
+      if (data === true) return setSemEmail(true)
+      return setError('Digite o e-mail da sua conta: o link vai para ele.')
+    }
+    const destino = digitado
     if (isLegacyEmail(destino)) {
       setLoading(false)
       return setSemEmail(true)
-    }
-    if (!destino) {
-      // Usuário que não existe: mesma resposta de sucesso, sem dizer se existe
-      setLoading(false)
-      return setSent(true)
     }
     const { error } = await client.auth.resetPasswordForEmail(destino, { redirectTo: `${window.location.origin}/redefinir-senha` })
     setLoading(false)

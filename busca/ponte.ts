@@ -73,16 +73,43 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
   return data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
 }
 
-/** Site da XS (Vercel) e o app rodando no próprio computador durante o desenvolvimento */
+/**
+ * Site da XS (Vercel) e o app rodando no próprio computador durante o desenvolvimento.
+ * Só o endereço exato: qualquer pessoa pode criar "xs-prospeccao-outra-coisa.vercel.app".
+ */
 export function origemPermitida(origin: string | undefined): boolean {
   if (!origin) return false
   try {
     const u = new URL(origin)
     if ((u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.protocol === 'http:') return true
-    return u.protocol === 'https:' && /^xs-prospeccao[a-z0-9-]*\.vercel\.app$/.test(u.hostname)
+    return u.origin === 'https://xs-prospeccao.vercel.app'
   } catch {
     return false
   }
+}
+
+/** Quantos motores novos um mesmo endereço de internet pode abrir a cada 10 minutos */
+const NOVOS_POR_IP = 20
+const novosPorIp = new Map<string, number>()
+setInterval(() => novosPorIp.clear(), 10 * 60_000).unref()
+
+/** O Caddy, na frente da ponte, põe o IP de quem chamou em X-Forwarded-For. */
+function ipDe(req: http.IncomingMessage): string {
+  return String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || '?'
+}
+
+/** Abre a vaga de um motor novo. Ponte cheia: libera primeiro quem está desligado. */
+export function abrirVaga(id: string, ip: string): Motor | null {
+  const usados = novosPorIp.get(ip) ?? 0
+  if (usados >= NOVOS_POR_IP) return null
+  if (motores.size >= MAX_MOTORES) {
+    for (const [outro, m] of motores) if (!online(m) && !m.pendentes.size) motores.delete(outro)
+    if (motores.size >= MAX_MOTORES) return null
+  }
+  novosPorIp.set(ip, usados + 1)
+  const m: Motor = { vistoEm: Date.now(), espera: null, esperaTimer: null, fila: [], pendentes: new Map() }
+  motores.set(id, m)
+  return m
 }
 
 function online(m: Motor | undefined): boolean {
@@ -191,12 +218,8 @@ export const server = http.createServer(async (req, res) => {
       return pedir(m!, body, res)
     }
     if (url.pathname === '/motor/esperar' || url.pathname === '/motor/responder') {
-      let m = motores.get(id)
-      if (!m) {
-        if (motores.size >= MAX_MOTORES) return send(res, 503, { error: 'Ponte cheia, tente de novo.' })
-        m = { vistoEm: Date.now(), espera: null, esperaTimer: null, fila: [], pendentes: new Map() }
-        motores.set(id, m)
-      }
+      const m = motores.get(id) ?? abrirVaga(id, ipDe(req))
+      if (!m) return send(res, 503, { error: 'Ponte cheia, tente de novo em alguns minutos.' })
       if (url.pathname === '/motor/esperar') return esperar(m, res)
       responder(m, body)
       return send(res, 200, { ok: true })
