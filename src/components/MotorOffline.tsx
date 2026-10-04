@@ -1,4 +1,4 @@
-import { Download, PlugZap, RefreshCw } from 'lucide-react'
+import { Download, PlugZap, RefreshCw, ShieldAlert } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMotor } from '../lib/motor'
 import { Button } from './ui'
@@ -21,10 +21,40 @@ export function MotorSteps({ https }: { https?: boolean }) {
   )
 }
 
+/** O motor pode até estar aberto, mas o navegador negou a este site falar com ele. */
+function NavegadorBloqueou() {
+  const host = typeof window !== 'undefined' ? window.location.host : 'o site'
+  return (
+    <section className="panel flex flex-col gap-3 border-red-400/30 bg-red-400/[0.05] px-4 py-3.5 sm:flex-row sm:items-start">
+      <ShieldAlert className="size-5 shrink-0 text-red-300" />
+      <div className="min-w-0 flex-1 text-xs">
+        <p className="mb-1.5 font-semibold text-fg">O navegador está bloqueando o Motor WhatsApp XS</p>
+        <p className="mb-1.5 text-fg-2">Se a janela preta do motor já está aberta, falta só liberar o acesso no navegador:</p>
+        <ol className="list-decimal space-y-0.5 pl-4 text-fg-2">
+          <li>
+            Clique no ícone à esquerda do endereço <strong className="text-fg">{host}</strong>, lá em cima.
+          </li>
+          <li>
+            Em <strong className="text-fg">Apps e serviços neste dispositivo</strong> (ou <strong className="text-fg">Rede local</strong>), escolha <strong className="text-fg">Permitir</strong>. Se não aparecer ali, abra <strong className="text-fg">Configurações do site</strong>.
+          </li>
+          <li>Recarregue a página.</li>
+        </ol>
+      </div>
+      <div className="flex shrink-0 flex-col gap-1.5">
+        <Button size="sm" icon={<RefreshCw className="size-3.5" />} onClick={() => window.location.reload()}>
+          Já liberei, recarregar
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 /** Explica como ligar o Motor WhatsApp XS quando uma tela precisa dele. */
 export function MotorOffline({ feature }: { feature: string }) {
   const check = useMotor((s) => s.check)
+  const bloqueado = useMotor((s) => s.bloqueado)
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+  if (bloqueado) return <NavegadorBloqueou />
   return (
     <section className="panel flex flex-col gap-3 border-amber-400/25 bg-amber-400/[0.04] px-4 py-3.5 sm:flex-row sm:items-start">
       <PlugZap className="size-5 shrink-0 text-amber-300" />

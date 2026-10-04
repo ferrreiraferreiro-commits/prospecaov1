@@ -12,6 +12,7 @@ import { planInfo, useAccount, useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { Avatar } from './Avatar'
+import { EscolherPlano } from './Planos'
 import { Popover } from './ui'
 
 /** Login atual: "gabriel" (usuário) ou o e-mail; `null` no modo local. */
@@ -275,6 +276,12 @@ function PlanCard() {
         </>
       ) : (
         <p className="mt-1.5 text-xs text-fg-2">{vitalicio ? 'Não acaba, é para sempre' : 'Sem data para acabar'}</p>
+      )}
+      {(profile?.plano === 'teste' || (profile?.plano === 'ativo' && plan.ate)) && (
+        <EscolherPlano
+          size="sm"
+          titulo={<p className="mt-2.5 mb-1.5 border-t border-line-soft pt-2.5 text-2xs font-medium text-fg-3">{profile.plano === 'teste' ? 'Assinar pelo WhatsApp' : 'Renovar pelo WhatsApp'}</p>}
+        />
       )}
     </div>
   )

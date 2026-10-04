@@ -75,25 +75,47 @@ interface MotorState {
   online: boolean | null
   health: MotorHealth | null
   checkedAt: number
+  /** O navegador negou o acesso a programas deste computador (o motor pode estar aberto) */
+  bloqueado: boolean
   check(): Promise<void>
   markOffline(): void
+}
+
+/**
+ * Chrome (e Edge) pedem permissão para um site público falar com programas do próprio
+ * computador. Se a pessoa negou ou fechou o aviso, o fetch falha igual a motor desligado.
+ * Os nomes mudaram entre versões, então pergunta pelos três.
+ */
+async function navegadorBloqueia(): Promise<boolean> {
+  if (!navigator.permissions) return false
+  for (const name of ['loopback-network', 'local-network-access', 'local-network']) {
+    try {
+      const { state } = await navigator.permissions.query({ name: name as PermissionName })
+      return state === 'denied'
+    } catch {
+      /* este navegador não conhece esse nome */
+    }
+  }
+  return false
 }
 
 export const useMotor = create<MotorState>()((set) => ({
   online: null,
   health: null,
   checkedAt: 0,
+  bloqueado: false,
   async check() {
     try {
       const res = await fetch(`${getMotorUrl()}/health`, { signal: AbortSignal.timeout(2500) })
       const health = (await res.json()) as MotorHealth
-      set({ online: res.ok, health, checkedAt: Date.now() })
+      set({ online: res.ok, health, checkedAt: Date.now(), bloqueado: false })
     } catch {
-      set({ online: false, health: null, checkedAt: Date.now() })
+      set({ online: false, health: null, checkedAt: Date.now(), bloqueado: await navegadorBloqueia() })
     }
   },
   markOffline() {
     set({ online: false, health: null, checkedAt: Date.now() })
+    void navegadorBloqueia().then((bloqueado) => set({ bloqueado }))
   },
 }))
 

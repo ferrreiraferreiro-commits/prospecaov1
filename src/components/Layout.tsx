@@ -32,7 +32,6 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
 import { useMotor, useMotorPolling } from '../lib/motor'
 import { formatDateTime } from '../lib/dates'
-import { suporteUrl, useSuporteWhatsApp } from '../lib/suporte'
 import { accessOf, planInfo, useAccount, useHasMotor, useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
@@ -40,8 +39,9 @@ import { ImportModal } from './ImportModal'
 import { LeadDrawer } from './LeadDrawer'
 import { MessageModal } from './MessageModal'
 import { OutcomeModal } from './OutcomeModal'
+import { EscolherPlano } from './Planos'
 import { TopBar } from './TopBar'
-import { Spinner, WhatsAppIcon } from './ui'
+import { Spinner } from './ui'
 import { useReminders } from './useReminders'
 
 interface NavItem {
@@ -283,7 +283,16 @@ function SideLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 function MotorPill({ collapsed }: { collapsed: boolean }) {
   const online = useMotor((s) => s.online)
   const wa = useMotor((s) => s.health?.whatsapp.status)
-  const label = online ? (wa === 'connected' ? 'Motor · WhatsApp on' : 'Motor online') : online === false ? 'Motor desligado' : 'Verificando motor…'
+  const bloqueado = useMotor((s) => s.bloqueado)
+  const label = online
+    ? wa === 'connected'
+      ? 'Motor · WhatsApp on'
+      : 'Motor online'
+    : online === false
+      ? bloqueado
+        ? 'Motor bloqueado pelo navegador'
+        : 'Motor desligado'
+      : 'Verificando motor…'
   return (
     <NavLink
       to="/configuracoes#motor"
@@ -386,10 +395,9 @@ function Toasts() {
 
 const AVISO_KEY = 'xs-prospeccao:aviso-plano'
 
-/** Faixa quando o teste ou o plano acaba em até 3 dias, com o botão de renovar pelo WhatsApp. */
+/** Faixa quando o teste ou o plano acaba em até 3 dias, com um botão por plano para assinar pelo WhatsApp. */
 function PlanoAviso() {
   const profile = useAccount((s) => s.profile)
-  const suporte = useSuporteWhatsApp()
   const plan = planInfo(profile)
   const [fechado, setFechado] = useState(() => {
     try {
@@ -405,9 +413,6 @@ function PlanoAviso() {
   const teste = profile.plano === 'teste'
   const horas = Math.ceil(falta / 3_600_000)
   const quando = horas < 24 ? `em ${horas} hora${horas === 1 ? '' : 's'}` : `em ${plan.dias} dias`
-  const texto = teste
-    ? `Oi! Estou no teste grátis da XS e quero assinar. Minha conta: ${profile.email ?? ''}`
-    : `Oi! Quero renovar meu plano ${plan.nome} da XS. Minha conta: ${profile.email ?? ''}`
 
   const fechar = () => {
     try {
@@ -425,16 +430,7 @@ function PlanoAviso() {
         {teste ? 'Seu teste grátis' : `Seu plano ${plan.nome}`} acaba <span className="font-semibold">{quando}</span>
         <span className="num text-amber-200/70"> · {formatDateTime(plan.ate)}</span>
       </p>
-      {suporte && (
-        <a
-          href={suporteUrl(suporte, texto)}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-7 items-center gap-1.5 rounded-md bg-go px-2.5 text-xs font-semibold text-[#04140c] transition-colors hover:bg-[#4ccb8d]"
-        >
-          <WhatsAppIcon className="size-3.5" /> {teste ? 'Assinar pelo WhatsApp' : 'Renovar pelo WhatsApp'}
-        </a>
-      )}
+      <EscolherPlano size="sm" />
       <button onClick={fechar} className="rounded-md p-1 text-amber-200/60 hover:bg-amber-400/10 hover:text-amber-100" aria-label="Fechar aviso">
         <X className="size-3.5" />
       </button>

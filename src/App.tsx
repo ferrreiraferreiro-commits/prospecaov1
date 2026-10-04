@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LogoMark } from './components/Brand'
 import { Layout } from './components/Layout'
+import { EscolherPlano } from './components/Planos'
 import { Welcome } from './components/Welcome'
 import { Button, Spinner, WhatsAppIcon } from './components/ui'
 import { LocalRepository } from './data/localRepository'
@@ -181,15 +182,18 @@ function Blocked({ motivo, email }: { motivo: keyof typeof BLOQUEIO; email: stri
         <p className="text-base font-semibold text-fg">{BLOQUEIO[motivo]}</p>
         <p className="max-w-sm text-xs text-fg-3">Seus leads e sua gestão continuam guardados. Fale com a gente para liberar o acesso de novo.</p>
       </div>
+      {motivo !== 'cancelado' && (
+        <EscolherPlano className="justify-center" titulo={<p className="-mb-2 text-2xs font-medium uppercase tracking-wide text-fg-3">Escolha seu plano</p>} />
+      )}
       <div className="flex flex-wrap justify-center gap-2">
-        {suporte && (
+        {motivo === 'cancelado' && suporte && (
           <a
             href={suporteUrl(suporte, texto)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-go px-4 text-sm font-semibold text-[#04140c] transition-colors hover:bg-[#4ccb8d]"
           >
-            <WhatsAppIcon className="size-4" /> {motivo === 'teste_acabou' ? 'Assinar pelo WhatsApp' : 'Renovar pelo WhatsApp'}
+            <WhatsAppIcon className="size-4" /> Falar pelo WhatsApp
           </a>
         )}
         {supabase && (
