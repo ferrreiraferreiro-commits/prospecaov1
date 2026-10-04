@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
 # Liga a ponte do Motor WhatsApp XS numa VPS que já tem a busca instalada (instalar.sh).
 # Na VPS, dentro da pasta com os arquivos .ts:
 #   sudo bash instalar-ponte.sh

@@ -1,3 +1,4 @@
+// © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 /**
  * Busca de empresas da XS (substitui o Motor XS na busca).
  *

@@ -1,3 +1,4 @@
+// © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 /**
  * Motor WhatsApp XS — servidor local da XS Prospecção: só o WhatsApp (disparos, funis e mensagens agendadas).
  * A busca de empresas roda no servidor da XS, não aqui.

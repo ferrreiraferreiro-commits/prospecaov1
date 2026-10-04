@@ -1,3 +1,4 @@
+-- © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
 -- Motor WhatsApp XS ligado à conta pela internet (ponte na VPS), sem o navegador chamar 127.0.0.1.
 -- O motor gera a chave e abre /motor/conectar#chave; o site guarda aqui e usa nas chamadas à ponte.
 -- Um motor por conta: ligar outro computador troca a chave.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
 # Instala o servidor de busca da XS numa VPS Ubuntu (testado na HostMF, x86, 2 GB; serve também na Oracle).
 #
 #   Na VM, dentro da pasta com os arquivos busca/*.ts e este script:

@@ -14,8 +14,8 @@ export const LEGAL: {
   foro: string | null
   atualizadoEm: string
 } = {
-  // TODO(jurídico): nome completo (pessoa física) ou razão social (empresa) responsável pela XS Prospecção
-  controlador: null,
+  // Titular da XS Prospecção (ver LICENSE e DIREITOS_AUTORAIS.md)
+  controlador: 'Gabriel Yamashita Marcelino',
   // TODO(jurídico): CPF ou CNPJ do responsável
   documento: null,
   // TODO(jurídico): endereço para correspondência
@@ -28,5 +28,5 @@ export const LEGAL: {
   // TODO(jurídico): cidade/UF do foro para os Termos de Uso
   foro: null,
   // Data desta versão dos textos. Atualize sempre que mudar o conteúdo das páginas.
-  atualizadoEm: '3 de outubro de 2026',
+  atualizadoEm: '4 de outubro de 2026',
 }

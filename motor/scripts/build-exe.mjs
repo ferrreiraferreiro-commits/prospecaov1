@@ -72,7 +72,7 @@ if (process.platform === 'win32') {
     '--set-icon', path.join(root, 'assets', 'icon.ico'),
     '--set-version-string', 'ProductName', 'Motor WhatsApp XS',
     '--set-version-string', 'FileDescription', 'Motor WhatsApp XS - XS Prospecção',
-    '--set-version-string', 'LegalCopyright', 'XS Prospecção',
+    '--set-version-string', 'LegalCopyright', '© 2026 Gabriel Yamashita Marcelino. Todos os direitos reservados.',
     '--set-version-string', 'CompanyName', 'XS Prospecção',
     '--set-version-string', 'OriginalFilename', 'Motor WhatsApp XS.exe',
     '--set-version-string', 'InternalName', 'Motor WhatsApp XS',
@@ -114,6 +114,9 @@ if (process.platform === 'win32') {
       '',
       'Os dados do Motor (sessão do WhatsApp e campanhas) ficam na pasta "Motor WhatsApp XS - dados", ao lado do programa.',
       'Para remover tudo, apague o programa e essa pasta.',
+      '',
+      '© 2026 Gabriel Yamashita Marcelino - XS Prospecção. Todos os direitos reservados.',
+      'Uso permitido só para assinantes da XS, conforme os termos em https://xs-prospeccao.vercel.app/termos.',
     ].join('\r\n'),
   )
   execFileSync('powershell', ['-NoProfile', '-Command', `Compress-Archive -Path '${exe}','${leia}' -DestinationPath '${zip}' -CompressionLevel Optimal -Force`], { stdio: 'inherit' })

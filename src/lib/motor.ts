@@ -1,3 +1,4 @@
+// © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useEffect } from 'react'
 import { create } from 'zustand'

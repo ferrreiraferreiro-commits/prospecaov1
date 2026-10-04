@@ -1,3 +1,4 @@
+// © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 /**
  * Liga o motor à XS pela internet, sem o navegador precisar chamar 127.0.0.1 (que o Chrome e o
  * Brave bloqueiam sem permissão). O motor pergunta à ponte (na VPS da XS) se há pedidos do site,

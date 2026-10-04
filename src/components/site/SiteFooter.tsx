@@ -30,7 +30,7 @@ export function SiteFooter() {
         </div>
         <div className="mt-10 flex flex-col gap-2 text-2xs text-fg-4 sm:flex-row sm:justify-between">
           <p>Captação e organização de clientes para quem vende sites e serviços digitais.</p>
-          <p>© {new Date().getFullYear()} XS Prospecção</p>
+          <p>© {new Date().getFullYear()} Gabriel Yamashita Marcelino · XS Prospecção. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

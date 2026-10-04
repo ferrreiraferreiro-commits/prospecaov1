@@ -1,3 +1,4 @@
+// © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 /**
  * Ponte do Motor WhatsApp XS (roda na VPS, ao lado da busca, atrás do Caddy em /ponte).
  *

@@ -1,3 +1,4 @@
+// © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 /**
  * Importador da base aberta do CNPJ (Receita Federal) para um SQLite pronto para busca.
  *

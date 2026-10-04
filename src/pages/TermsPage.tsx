@@ -166,8 +166,13 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          A XS, incluindo o código, o design, a marca e o Motor WhatsApp XS, pertence ao seu responsável. Estes Termos dão a você o direito de usar o serviço, não
-          a propriedade dele.
+          A XS, incluindo o código, o design, a marca, os textos e o Motor WhatsApp XS, pertence a{' '}
+          <Fill value={LEGAL.controlador} what="nome ou razão social" fallback="seu responsável" />. Todos os direitos reservados. Estes Termos dão a você o
+          direito de usar o serviço enquanto seu plano estiver ativo, não a propriedade dele.
+        </p>
+        <p>
+          Sem autorização por escrito do titular, não é permitido copiar, revender, alugar, publicar ou modificar a XS, criar um produto derivado dela, fazer
+          engenharia reversa do Motor WhatsApp XS ou contornar os planos e pagamentos.
         </p>
         <p>
           <strong>Os dados que você cadastra continuam sendo seus.</strong> Você pode exportá-los a qualquer momento pelo backup do app. Seus roteiros,

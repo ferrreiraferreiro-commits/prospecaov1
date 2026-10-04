@@ -1,3 +1,4 @@
+// © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 /**
  * Servidor de busca da XS (roda na VPS): procura empresas na base aberta do CNPJ.
  *

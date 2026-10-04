@@ -2,6 +2,8 @@
   "name": "xs-motor",
   "private": true,
   "version": "1.4.0",
+  "author": "Gabriel Yamashita Marcelino",
+  "license": "UNLICENSED",
   "description": "Motor XS: WhatsApp da XS Prospecção (disparos, funis e mensagens agendadas), roda no seu computador",
   "type": "module",
   "scripts": {

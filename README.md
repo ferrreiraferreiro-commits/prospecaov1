@@ -70,3 +70,9 @@ motor/src      server.ts (API local), maps.ts (busca), enrich.ts (links/telefone
 ```
 
 Regras que continuam valendo: dados importados não são inventados nem alterados; duplicidade só por telefone, lugar no Maps ou nome + endereço; o histórico do lead nunca é sobrescrito.
+
+## Direitos autorais
+
+© 2026 **Gabriel Yamashita Marcelino** — XS Prospecção. Todos os direitos reservados.
+
+Software proprietário: o `LICENSE` tem os termos e o [`DIREITOS_AUTORAIS.md`](DIREITOS_AUTORAIS.md) as regras para cópias, alterações e trabalho com IA. Nenhuma cópia, revenda ou alteração é permitida sem autorização por escrito do titular.
