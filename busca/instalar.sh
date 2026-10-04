@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala o servidor de busca da XS numa VM Ubuntu (Oracle Cloud Always Free, ARM ou x86).
+# Instala o servidor de busca da XS numa VPS Ubuntu (testado na HostMF, x86, 2 GB; serve também na Oracle).
 #
 #   Na VM, dentro da pasta com os arquivos busca/*.ts e este script:
 #   sudo bash instalar.sh 129-151-10-20.sslip.io
@@ -26,6 +26,12 @@ if ! command -v caddy >/dev/null; then
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
   apt-get update -y
   apt-get install -y caddy
+fi
+
+echo "== Memória extra (swap) para servidores pequenos"
+if ! swapon --show | grep -q .; then
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  grep -q "/swapfile" /etc/fstab || echo "/swapfile none swap sw 0 0" >> /etc/fstab
 fi
 
 echo "== Usuário, pastas e código"
@@ -107,10 +113,11 @@ $DOMINIO {
 }
 EOF
 
-echo "== Firewall do Ubuntu (a imagem da Oracle bloqueia tudo menos SSH)"
+echo "== Firewall: libera 80 e 443 (algumas imagens, como a da Oracle, bloqueiam tudo menos SSH)"
 for p in 80 443; do
-  iptables -C INPUT -p tcp -m state --state NEW --dport "$p" -j ACCEPT 2>/dev/null || iptables -I INPUT 5 -p tcp -m state --state NEW --dport "$p" -j ACCEPT
+  iptables -C INPUT -p tcp --dport "$p" -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport "$p" -j ACCEPT
 done
+if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then ufw allow 80/tcp; ufw allow 443/tcp; fi
 netfilter-persistent save >/dev/null 2>&1 || true
 
 systemctl daemon-reload

@@ -35,11 +35,21 @@ const arg = (name: string) => {
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a)
 
 // ---------------------------------------------------------------------------
-// Download (WebDAV público da Receita)
+// Download: Receita (WebDAV público) ou, se ela recusar, o espelho da Casa dos Dados.
+// O servidor da Receita derruba conexões de fora do Brasil; o espelho tem os mesmos arquivos.
 // ---------------------------------------------------------------------------
 
+const MIRROR = 'https://dados-abertos-rf-cnpj.casadosdados.com.br/arquivos'
+const WANTED = /^(Estabelecimentos|Empresas|Socios)\d\.zip$|^(Municipios|Cnaes|Qualificacoes)\.zip$/
+
+interface Source {
+  nome: string
+  month: string
+  files: { name: string; size: number; url: string; headers: Record<string, string> }[]
+}
+
 async function propfind(dir: string): Promise<{ href: string; size: number }[]> {
-  const res = await fetch(`${WEBDAV}/${dir}`, { method: 'PROPFIND', headers: { ...AUTH, Depth: '1' } })
+  const res = await fetch(`${WEBDAV}/${dir}`, { method: 'PROPFIND', headers: { ...AUTH, Depth: '1' }, signal: AbortSignal.timeout(30_000) })
   if (!res.ok) throw new Error(`Receita respondeu ${res.status} ao listar ${dir}`)
   const xml = await res.text()
   return [...xml.matchAll(/<d:response>([\s\S]*?)<\/d:response>/g)].map((m) => ({
@@ -48,29 +58,57 @@ async function propfind(dir: string): Promise<{ href: string; size: number }[]> 
   }))
 }
 
-async function latestMonth(): Promise<string> {
+async function receitaSource(wantMonth?: string): Promise<Source> {
   const months = (await propfind(''))
     .map((e) => /(\d{4}-\d{2})\/$/.exec(e.href)?.[1])
     .filter((m): m is string => !!m)
     .sort()
-  if (!months.length) throw new Error('Nenhum mês encontrado na Receita.')
-  return months[months.length - 1]
+  const month = wantMonth ?? months[months.length - 1]
+  if (!month || !months.includes(month)) throw new Error(`Mês ${wantMonth ?? ''} não encontrado na Receita.`)
+  const files = (await propfind(`${month}/`))
+    .map((e) => ({ name: path.basename(e.href), size: e.size }))
+    .filter((f) => WANTED.test(f.name))
+    .map((f) => ({ ...f, url: `${WEBDAV}/${month}/${f.name}`, headers: AUTH }))
+  return { nome: 'Receita Federal', month, files }
 }
 
-async function download(month: string, dir: string): Promise<void> {
-  const files = (await propfind(`${month}/`)).filter((e) => e.href.endsWith('.zip')).map((e) => ({ name: path.basename(e.href), size: e.size }))
-  const wanted = files.filter((f) => /^(Estabelecimentos|Empresas|Socios)\d\.zip$|^(Municipios|Cnaes|Qualificacoes)\.zip$/.test(f.name))
+async function mirrorSource(wantMonth?: string): Promise<Source> {
+  const html = await (await fetch(`${MIRROR}/`, { signal: AbortSignal.timeout(30_000) })).text()
+  const dirs = [...html.matchAll(/href="(\d{4}-\d{2}-\d{2})\/"/g)].map((m) => m[1]).sort()
+  const dir = wantMonth ? dirs.filter((d) => d.startsWith(wantMonth)).pop() : dirs[dirs.length - 1]
+  if (!dir) throw new Error(`Mês ${wantMonth ?? ''} não encontrado no espelho.`)
+  const list = await (await fetch(`${MIRROR}/${dir}/`, { signal: AbortSignal.timeout(30_000) })).text()
+  const names = [...new Set([...list.matchAll(/href="([A-Za-z]+\d?\.zip)"/g)].map((m) => m[1]))].filter((n) => WANTED.test(n))
+  const files = []
+  for (const name of names) {
+    const url = `${MIRROR}/${dir}/${name}`
+    const head = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(30_000) })
+    files.push({ name, size: Number(head.headers.get('content-length') ?? 0), url, headers: {} })
+  }
+  return { nome: `espelho Casa dos Dados (${dir})`, month: dir.slice(0, 7), files }
+}
+
+async function findSource(wantMonth?: string): Promise<Source> {
+  try {
+    return await receitaSource(wantMonth)
+  } catch (err) {
+    log(`Receita indisponível daqui (${String(err).slice(0, 80)}); usando o espelho`)
+    return await mirrorSource(wantMonth)
+  }
+}
+
+async function download(src: Source, dir: string): Promise<void> {
   fs.mkdirSync(dir, { recursive: true })
-  for (const f of wanted) {
+  for (const f of src.files) {
     const dest = path.join(dir, f.name)
-    if (fs.existsSync(dest) && fs.statSync(dest).size === f.size) continue
+    if (fs.existsSync(dest) && (!f.size || fs.statSync(dest).size === f.size)) continue
     for (let attempt = 1; ; attempt++) {
       try {
         log(`baixando ${f.name} (${(f.size / 1e6).toFixed(0)} MB)`)
-        const res = await fetch(`${WEBDAV}/${month}/${f.name}`, { headers: AUTH })
+        const res = await fetch(f.url, { headers: f.headers })
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
         await pipeline(Readable.fromWeb(res.body as import('node:stream/web').ReadableStream), fs.createWriteStream(`${dest}.part`))
-        if (fs.statSync(`${dest}.part`).size !== f.size) throw new Error('arquivo incompleto')
+        if (f.size && fs.statSync(`${dest}.part`).size !== f.size) throw new Error('arquivo incompleto')
         fs.renameSync(`${dest}.part`, dest)
         break
       } catch (err) {
@@ -104,11 +142,14 @@ const zipsOf = (dir: string, prefix: string) =>
 // ---------------------------------------------------------------------------
 
 
-async function build(dir: string, month: string) {
+async function build(dir: string, month: string, apagarZips: boolean) {
+  // Disco pequeno: cada .zip grande sai assim que foi lido
+  const done = (zip: string) => apagarZips && fs.rmSync(zip, { force: true })
   const tmp = `${DB_FILE}.novo`
   fs.rmSync(tmp, { force: true })
   const db = new DatabaseSync(tmp)
-  db.exec('PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-400000;')
+  // Pouca memória: cache de ~250 MB e arquivos temporários em disco (servidor de 1–2 GB)
+  db.exec('PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA temp_store=FILE; PRAGMA cache_size=-250000;')
   db.exec(SCHEMA)
   const t0 = Date.now()
 
@@ -164,6 +205,7 @@ async function build(dir: string, month: string) {
         f[3] === '1' ? 1 : 0,
       )
     }
+    done(zip)
   }
   db.exec('COMMIT')
   log(`estabelecimentos: ${ativas} ativos de ${lidas}`)
@@ -182,6 +224,7 @@ async function build(dir: string, month: string) {
       // Sem CPF: o do MEI vem dentro da razão social
       if (has.get(f[0])) insEmp.run(f[0], cleanName(f[1]), f[2], f[5])
     }
+    done(zip)
   }
   db.exec('COMMIT')
   const insSoc = db.prepare('INSERT INTO socio VALUES (?, ?, ?)')
@@ -193,6 +236,7 @@ async function build(dir: string, month: string) {
       // Só pessoas (identificador 2) e só quem tem estabelecimento ativo
       if (f[1] === '2' && has.get(f[0])) insSoc.run(f[0], f[2].trim(), f[4])
     }
+    done(zip)
   }
   db.exec('COMMIT')
 
@@ -212,7 +256,8 @@ async function build(dir: string, month: string) {
 // ---------------------------------------------------------------------------
 
 const local = arg('--local')
-const month = arg('--mes') ?? (local ? 'local' : await latestMonth())
+const src = local ? null : await findSource(arg('--mes'))
+const month = src?.month ?? arg('--mes') ?? 'local'
 const dir = local ? path.resolve(local) : path.join(DATA, 'receita', month)
 fs.mkdirSync(DATA, { recursive: true })
 if (process.argv.includes('--se-novo') && fs.existsSync(DB_FILE)) {
@@ -224,12 +269,10 @@ if (process.argv.includes('--se-novo') && fs.existsSync(DB_FILE)) {
     process.exit(0)
   }
 }
-if (!local) {
-  log(`mês ${month}`)
-  await download(month, dir)
+if (src) {
+  log(`mês ${month} · fonte: ${src.nome}`)
+  await download(src, dir)
 }
-await build(dir, month)
-// Apaga meses antigos baixados (fica só o atual)
-if (!local) {
-  for (const old of fs.readdirSync(path.join(DATA, 'receita'))) if (old !== month) fs.rmSync(path.join(DATA, 'receita', old), { recursive: true, force: true })
-}
+await build(dir, month, !local)
+// Os arquivos da Receita não servem mais depois de montado o banco
+if (!local) fs.rmSync(path.join(DATA, 'receita'), { recursive: true, force: true })
