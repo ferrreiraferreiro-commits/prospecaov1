@@ -1,7 +1,7 @@
 // Service worker do XS Prospecção: deixa o app instalável, abre rápido
 // e mostra a última versão da tela quando a internet cai. Os dados (Supabase)
 // nunca passam por aqui — só arquivos do próprio site.
-const CACHE = 'xs-v2'
+const CACHE = 'xs-v3'
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -18,15 +18,18 @@ self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/downloads/')) return
 
   // Páginas: sempre tenta a versão nova; sem internet, usa a última salva.
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE).then((c) => c.put('/index.html', copy))
+          // Só guarda páginas de verdade (nunca um download aberto na aba)
+          if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put('/index.html', copy))
+          }
           return res
         })
         .catch(() => caches.match('/index.html')),
