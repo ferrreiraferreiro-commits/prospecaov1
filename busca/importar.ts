@@ -17,8 +17,8 @@ import readline from 'node:readline'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { DatabaseSync } from 'node:sqlite'
-import { addressOf, cleanName, emailKind, norm, phoneOf, splitLine } from './lib.ts'
-import { markSharedDomains, SCHEMA } from './schema.ts'
+import { addressOf, cleanName, emailKind, joinRecords, norm, phoneOf, splitLine } from './lib.ts'
+import { INDEXES, markSharedDomains, SCHEMA } from './schema.ts'
 
 const SHARE = 'YggdBLfdninEJX9'
 const WEBDAV = 'https://arquivos.receitafederal.gov.br/public.php/webdav'
@@ -127,7 +127,7 @@ async function* rows(zip: string): AsyncGenerator<string[]> {
   const child = spawn('unzip', ['-p', zip], { stdio: ['ignore', 'pipe', 'inherit'] })
   child.stdout.setEncoding('latin1')
   const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity })
-  for await (const line of rl) if (line) yield splitLine(line)
+  for await (const rec of joinRecords(rl)) yield splitLine(rec)
 }
 
 const zipsOf = (dir: string, prefix: string) =>
@@ -167,6 +167,7 @@ async function build(dir: string, month: string, apagarZips: boolean) {
   const insEst = db.prepare('INSERT OR IGNORE INTO est VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
   let lidas = 0
   let ativas = 0
+  let curtas = 0
   db.exec('BEGIN')
   for (const zip of zipsOf(dir, 'Estabelecimentos')) {
     log(`lendo ${path.basename(zip)}`)
@@ -174,6 +175,11 @@ async function build(dir: string, month: string, apagarZips: boolean) {
       if (++lidas % 500_000 === 0) {
         db.exec('COMMIT; BEGIN')
         log(`${(lidas / 1e6).toFixed(1)} mi linhas · ${(ativas / 1e6).toFixed(2)} mi ativas`)
+      }
+      // Linha incompleta (registro quebrado que não deu para juntar): pula
+      if (f.length < 28) {
+        curtas++
+        continue
       }
       if (f[5] !== '02') continue
       ativas++
@@ -208,7 +214,7 @@ async function build(dir: string, month: string, apagarZips: boolean) {
     done(zip)
   }
   db.exec('COMMIT')
-  log(`estabelecimentos: ${ativas} ativos de ${lidas}`)
+  log(`estabelecimentos: ${ativas} ativos de ${lidas} (${curtas} linhas incompletas puladas)`)
   db.exec('CREATE INDEX est_basico ON est(basico)')
   log(`e-mails de provedor/contador desmarcados como site próprio: ${markSharedDomains(db)}`)
 
@@ -222,7 +228,7 @@ async function build(dir: string, month: string, apagarZips: boolean) {
     for await (const f of rows(zip)) {
       if (++n % 500_000 === 0) db.exec('COMMIT; BEGIN')
       // Sem CPF: o do MEI vem dentro da razão social
-      if (has.get(f[0])) insEmp.run(f[0], cleanName(f[1]), f[2], f[5])
+      if (f.length >= 6 && has.get(f[0])) insEmp.run(f[0], cleanName(f[1]), f[2], f[5])
     }
     done(zip)
   }
@@ -234,14 +240,14 @@ async function build(dir: string, month: string, apagarZips: boolean) {
     for await (const f of rows(zip)) {
       if (++n % 500_000 === 0) db.exec('COMMIT; BEGIN')
       // Só pessoas (identificador 2) e só quem tem estabelecimento ativo
-      if (f[1] === '2' && has.get(f[0])) insSoc.run(f[0], f[2].trim(), f[4])
+      if (f.length >= 5 && f[1] === '2' && has.get(f[0])) insSoc.run(f[0], f[2].trim(), f[4])
     }
     done(zip)
   }
   db.exec('COMMIT')
 
   log('criando índices')
-  db.exec('CREATE INDEX est_busca ON est(uf, mun, cnae); CREATE INDEX socio_basico ON socio(basico); ANALYZE;')
+  db.exec(`${INDEXES} ANALYZE;`)
   const meta = db.prepare('INSERT INTO meta VALUES (?, ?)')
   meta.run('mes', month)
   meta.run('gerado_em', new Date().toISOString())

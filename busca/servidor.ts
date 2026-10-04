@@ -100,6 +100,23 @@ interface Row {
   natureza: string | null
 }
 
+const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO']
+
+/** Celular primeiro (vira WhatsApp), depois as empresas mais novas (mais chance de ainda não ter site). */
+const before = (a: Row, b: Row) => (a.cel !== b.cel ? a.cel > b.cel : a.inicio > b.inicio)
+
+/** Junta várias listas já ordenadas (uma por cidade × atividade) numa só, na mesma ordem. */
+function* merge(iters: Iterator<Row>[]): Generator<Row> {
+  const live = iters.map((it) => ({ it, cur: it.next() })).filter((x) => !x.cur.done)
+  while (live.length) {
+    let best = 0
+    for (let i = 1; i < live.length; i++) if (before(live[i].cur.value as Row, live[best].cur.value as Row)) best = i
+    yield live[best].cur.value as Row
+    live[best].cur = live[best].it.next()
+    if (live[best].cur.done) live.splice(best, 1)
+  }
+}
+
 export function buscar(input: BuscaInput) {
   const t0 = Date.now()
   const d = getDb()
@@ -108,17 +125,18 @@ export function buscar(input: BuscaInput) {
   const muns = d.prepare('SELECT cod, nome FROM municipio WHERE nome_n = ?').all(nome) as { cod: number; nome: string }[]
   if (!muns.length) throw new HttpError(404, `Não achei a cidade "${input.cidade}". Escreva como "Campinas, SP".`)
   const munNome = new Map(muns.map((m) => [m.cod, m.nome]))
-  const ufFilter = uf ? 'e.uf = ? AND ' : ''
-  const munIn = `e.mun IN (${muns.map(() => '?').join(',')})`
+  const ufs = uf ? [uf] : UFS
   const bairros = (input.bairros ?? []).map(norm).filter(Boolean).slice(0, 20)
-  const bairroSql = bairros.length ? ` AND (${bairros.map(() => 'e.bairro_n LIKE ?').join(' OR ')})` : ''
-  const baseParams = [...(uf ? [uf] : []), ...muns.map((m) => m.cod), ...bairros.map((b) => `%${b}%`)]
+  const bairroSql = bairros.length ? ` AND (${bairros.map(() => 'bairro_n LIKE ?').join(' OR ')})` : ''
+  const bairroParams = bairros.map((b) => `%${b}%`)
 
   const knownPhones = new Set(input.conhecidos?.telefones ?? [])
   const knownCnpjs = new Set((input.conhecidos?.cnpjs ?? []).map((c) => c.replace(/\D/g, '')))
   const f = input.filtros ?? {}
   const seen = new Set<string>()
   const picked: (Row & { nicho: string; recurring: boolean })[] = []
+  const empresa = d.prepare('SELECT razao, porte, natureza FROM empresa WHERE basico = ?')
+  const withEmpresa = (r: Row): Row => ({ ...r, ...((empresa.get(r.basico) as Pick<Row, 'razao' | 'porte' | 'natureza'> | undefined) ?? { razao: null, porte: null, natureza: null }) })
   let found = 0
   let blocked = 0
   let fresh = 0
@@ -127,18 +145,46 @@ export function buscar(input: BuscaInput) {
   if (!niches.length) throw new HttpError(400, 'Escolha ao menos um nicho.')
 
   for (const label of niches) {
+    if (fresh >= meta) break
     const niche: Niche = resolveNiche(label, cnaeTable)
-    const cnaeSql = niche.cnaes.length ? ` AND e.cnae IN (${niche.cnaes.map(() => '?').join(',')})` : ''
-    // Celular primeiro (vira WhatsApp), depois as empresas mais novas (mais chance de ainda não ter site)
-    const sql = `SELECT e.*, p.razao, p.porte, p.natureza FROM est e LEFT JOIN empresa p ON p.basico = e.basico
-      WHERE ${ufFilter}${munIn}${bairroSql}${cnaeSql}
-      ORDER BY e.cel DESC, e.inicio DESC LIMIT ${niche.cnaes.length ? 20000 : 200000}`
-    const list = d.prepare(sql).all(...baseParams, ...niche.cnaes) as unknown as Row[]
-    for (const r of list) {
-      if (niche.nome && !niche.nome.test(norm(`${r.fantasia} ${r.razao ?? ''}`))) continue
-      found++
-      if (seen.has(r.cnpj)) continue
-      if (!passes(f.telefone, !!r.tel) || !passes(f.celular, r.cel === 1) || !passes(f.site, r.email_tipo === 2)) continue
+    const ranges = ufs.flatMap((u) => muns.map((m) => ({ uf: u, mun: m.cod })))
+    let rows: Iterable<Row>
+    if (niche.cnaes.length) {
+      // Uma leitura ordenada pelo índice para cada cidade × atividade: para assim que achar o suficiente
+      const iters = ranges.flatMap((r) =>
+        niche.cnaes.map(
+          (c) =>
+            d
+              .prepare(`SELECT * FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ? AND cnae = ?${bairroSql} ORDER BY cel DESC, inicio DESC`)
+              .iterate(r.uf, r.mun, c, ...bairroParams) as Iterator<Row>,
+        ),
+      )
+      rows = merge(iters)
+      // Quantas empresas existem nesse nicho e região (só no índice, sem ler os cadastros)
+      for (const r of ranges)
+        found += Number(
+          (
+            d
+              .prepare(`SELECT COUNT(*) n FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ? AND cnae IN (${niche.cnaes.map(() => '?').join(',')})${bairroSql}`)
+              .get(r.uf, r.mun, ...niche.cnaes, ...bairroParams) as { n: number }
+          ).n,
+        )
+    } else {
+      // Nicho sem atividade na Receita: procura pelo nome, na ordem do índice, até um limite
+      const iters = ranges.map((r) => d.prepare(`SELECT * FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ?${bairroSql} LIMIT 300000`).iterate(r.uf, r.mun, ...bairroParams) as Iterator<Row>)
+      rows = (function* () {
+        for (const it of iters) for (let x = it.next(); !x.done; x = it.next()) yield x.value as Row
+      })()
+    }
+    for (const raw of rows) {
+      if (seen.has(raw.cnpj)) continue
+      if (!passes(f.telefone, !!raw.tel) || !passes(f.celular, raw.cel === 1) || !passes(f.site, raw.email_tipo === 2)) continue
+      // Filtro pelo nome (pizzaria, barbearia…) precisa da razão social também
+      const r = niche.nome ? withEmpresa(raw) : raw
+      if (niche.nome) {
+        if (!niche.nome.test(norm(`${r.fantasia} ${r.razao ?? ''}`))) continue
+        if (!niche.cnaes.length) found++
+      }
       const known = knownCnpjs.has(r.cnpj) || [r.tel, r.tel2].some((t) => {
         const k = phoneKey(t)
         return !!k && knownPhones.has(k)
@@ -148,11 +194,10 @@ export function buscar(input: BuscaInput) {
         continue
       }
       seen.add(r.cnpj)
-      picked.push({ ...r, nicho: label, recurring: known })
+      picked.push({ ...(niche.nome ? r : withEmpresa(r)), nicho: label, recurring: known })
       if (!known) fresh++
       if (fresh >= meta) break
     }
-    if (fresh >= meta) break
   }
 
   const socios = d.prepare('SELECT nome, qualif FROM socio WHERE basico = ?')
@@ -202,15 +247,28 @@ export function buscar(input: BuscaInput) {
   return { results, stats: { found, approved: results.filter((r) => !r.recurring).length, blocked, recurring: blocked + results.filter((r) => r.recurring).length, mes, elapsedMs: Date.now() - t0 } }
 }
 
+const bairrosCache = new Map<string, { nome: string; empresas: number }[]>()
+
 export function bairrosDe(cidade: string, ufIn?: string) {
   const d = getDb()
   const { nome, uf } = parseCidade(cidade, ufIn)
+  const key = `${dbStamp}|${uf}|${nome}`
+  const hit = bairrosCache.get(key)
+  if (hit) return hit
   const muns = (d.prepare('SELECT cod FROM municipio WHERE nome_n = ?').all(nome) as { cod: number }[]).map((m) => m.cod)
   if (!muns.length) return []
-  const rows = d
-    .prepare(`SELECT bairro, COUNT(*) n FROM est WHERE ${uf ? 'uf = ? AND ' : ''}mun IN (${muns.map(() => '?').join(',')}) AND bairro <> '' GROUP BY bairro_n ORDER BY n DESC LIMIT 300`)
-    .all(...(uf ? [uf] : []), ...muns) as { bairro: string; n: number }[]
-  return rows.map((r) => ({ nome: titleCase(r.bairro), empresas: r.n }))
+  const counts = new Map<string, number>()
+  for (const u of uf ? [uf] : UFS)
+    for (const m of muns)
+      for (const r of d.prepare("SELECT bairro_n b, COUNT(*) n FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ? AND bairro_n <> '' GROUP BY bairro_n").all(u, m) as { b: string; n: number }[])
+        counts.set(r.b, (counts.get(r.b) ?? 0) + r.n)
+  const list = [...counts]
+    .sort((x, y) => y[1] - x[1])
+    .slice(0, 300)
+    .map(([b, n]) => ({ nome: titleCase(b), empresas: n }))
+  if (bairrosCache.size > 500) bairrosCache.clear()
+  bairrosCache.set(key, list)
+  return list
 }
 
 // ---------------------------------------------------------------------------

@@ -3,13 +3,24 @@ import os from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { cleanName, emailKind, isJunkName, norm, phoneOf, splitLine, titleCase } from '../busca/lib'
+import { cleanName, emailKind, isJunkName, joinRecords, norm, phoneOf, splitLine, titleCase } from '../busca/lib'
 import { resolveNiche } from '../busca/nichos'
-import { markSharedDomains, SCHEMA } from '../busca/schema'
+import { INDEXES, markSharedDomains, SCHEMA } from '../busca/schema'
 
 describe('base do CNPJ: limpeza dos dados', () => {
   it('lê a linha da Receita (aspas e ; dentro do campo)', () => {
     expect(splitLine('"A";"B;C";"D""E";""')).toEqual(['A', 'B;C', 'D"E', ''])
+  })
+
+  it('junta registro quebrado em duas linhas (quebra de linha dentro de um campo)', async () => {
+    async function* src() {
+      yield '"1";"A";"COMPLEMENTO'
+      yield 'CONTINUA";"X"'
+      yield '"2";"B";"C"'
+    }
+    const out: string[][] = []
+    for await (const r of joinRecords(src())) out.push(splitLine(r))
+    expect(out).toEqual([['1', 'A', 'COMPLEMENTO CONTINUA', 'X'], ['2', 'B', 'C']])
   })
 
   it('devolve o 9 do celular que a Receita corta e tira o 0 do DDD', () => {
@@ -101,6 +112,7 @@ beforeAll(async () => {
     INSERT INTO empresa VALUES ('11111111', 'MARIA SOUZA', '2135', '01'), ('22222222', 'CLINICA B LTDA', '2062', '03');
     INSERT INTO socio VALUES ('22222222', 'PEDRO SOCIO', '22'), ('22222222', 'JOAO ADMIN', '49');
   `)
+  db.exec(INDEXES)
   db.close()
   process.env.XS_DADOS = dir
   process.env.XS_BUSCA_TOKEN = TOKEN

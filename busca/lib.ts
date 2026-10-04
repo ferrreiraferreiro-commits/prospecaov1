@@ -120,3 +120,23 @@ export function addressOf(f: { tipo: string; logradouro: string; numero: string;
   const parts = [rua ? `${rua}, ${num}` : '', titleCase(f.bairro), [titleCase(f.cidade), f.uf].filter(Boolean).join(' - ')]
   return parts.filter(Boolean).join(' - ')
 }
+
+/**
+ * Junta registros que vieram quebrados em várias linhas (campo entre aspas com
+ * quebra de linha dentro, ex.: complemento de endereço). Um registro só termina
+ * quando o número de aspas está equilibrado.
+ */
+export async function* joinRecords(lines: AsyncIterable<string>): AsyncGenerator<string> {
+  let pending = ''
+  for await (const line of lines) {
+    const rec = pending ? `${pending} ${line}` : line
+    // Aspas duplicadas ("") dentro do campo não mudam o equilíbrio
+    if ((rec.split('"').length - 1) % 2 === 1 && rec.length < 20_000) {
+      pending = rec
+      continue
+    }
+    pending = ''
+    if (rec) yield rec
+  }
+  if (pending) yield pending
+}

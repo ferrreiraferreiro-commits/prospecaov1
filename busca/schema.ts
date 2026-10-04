@@ -16,6 +16,15 @@ CREATE TABLE socio (basico TEXT, nome TEXT, qualif TEXT);
 `
 
 /**
+ * Índices da busca. est_ordem guarda as empresas já na ordem da resposta (cidade → atividade →
+ * celular primeiro → mais novas) e com o bairro junto: a busca lê só o começo e para.
+ */
+export const INDEXES = `
+CREATE INDEX est_ordem ON est(uf, mun, cnae, cel DESC, inicio DESC, bairro_n);
+CREATE INDEX socio_basico ON socio(basico);
+`
+
+/**
  * Domínio de e-mail usado por várias empresas diferentes não é site de nenhuma delas:
  * é provedor (ex.: provedor de internet da cidade), escritório de contabilidade ou rede.
  * Esses e-mails deixam de contar como "domínio próprio" (tipo 3 = e-mail de terceiros).
