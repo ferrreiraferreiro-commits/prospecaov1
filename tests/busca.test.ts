@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanName, emailKind, isJunkName, joinRecords, norm, phoneOf, splitLine, titleCase } from '../busca/lib'
 import { resolveNiche } from '../busca/nichos'
-import { INDEXES, markSharedDomains, SCHEMA } from '../busca/schema'
+import { buildBairroCounts, INDEXES, markSharedDomains, SCHEMA } from '../busca/schema'
 
 describe('base do CNPJ: limpeza dos dados', () => {
   it('lê a linha da Receita (aspas e ; dentro do campo)', () => {
@@ -113,6 +113,7 @@ beforeAll(async () => {
     INSERT INTO socio VALUES ('22222222', 'PEDRO SOCIO', '22'), ('22222222', 'JOAO ADMIN', '49');
   `)
   db.exec(INDEXES)
+  buildBairroCounts(db)
   db.close()
   process.env.XS_DADOS = dir
   process.env.XS_BUSCA_TOKEN = TOKEN
@@ -156,6 +157,14 @@ describe('busca na base do CNPJ', () => {
   it('filtra por bairro e acha pizzaria pelo nome', () => {
     expect(mod.buscar({ cidade: 'Campinas, SP', nichos: ['Dentista'], bairros: ['Cambuí'], meta: 10 }).results).toHaveLength(1)
     expect(mod.buscar({ cidade: 'Campinas, SP', nichos: ['Pizzaria'], meta: 10 }).results.map((x) => x.name)).toEqual(['Pizzaria Bella'])
+  })
+
+  it('sugere bairros com mais empresas e reconhece nicho dentro do texto', () => {
+    expect(mod.bairrosDe('Campinas, SP')).toEqual([
+      { nome: 'Centro', empresas: 4 },
+      { nome: 'Cambui', empresas: 1 },
+    ])
+    expect(mod.buscar({ cidade: 'Campinas, SP', nichos: ['pizzaria artesanal'], meta: 10 }).results.map((x) => x.name)).toEqual(['Pizzaria Bella'])
   })
 
   it('avisa quando a cidade não existe', () => {

@@ -168,6 +168,8 @@ async function build(dir: string, month: string, apagarZips: boolean) {
   let lidas = 0
   let ativas = 0
   let curtas = 0
+  // Empresas por bairro, contadas na mesma leitura (recontar 28 mi de linhas no fim é lento)
+  const bairros = new Map<string, { uf: string; mun: number; b: string; nome: string; n: number }>()
   db.exec('BEGIN')
   for (const zip of zipsOf(dir, 'Estabelecimentos')) {
     log(`lendo ${path.basename(zip)}`)
@@ -190,6 +192,13 @@ async function build(dir: string, month: string, apagarZips: boolean) {
       const other = main === p1 ? p2 : p1
       const email = f[27].trim().toLowerCase()
       const mun = Number(f[20])
+      const bn = norm(f[17])
+      if (bn) {
+        const k = `${f[19]}|${mun}|${bn}`
+        const c = bairros.get(k)
+        if (c) c.n++
+        else bairros.set(k, { uf: f[19], mun, b: bn, nome: f[17].trim(), n: 1 })
+      }
       insEst.run(
         f[0] + f[1] + f[2],
         f[0],
@@ -215,6 +224,12 @@ async function build(dir: string, month: string, apagarZips: boolean) {
   }
   db.exec('COMMIT')
   log(`estabelecimentos: ${ativas} ativos de ${lidas} (${curtas} linhas incompletas puladas)`)
+  const insBairro = db.prepare('INSERT INTO bairro_count VALUES (?, ?, ?, ?, ?)')
+  db.exec('BEGIN')
+  for (const c of bairros.values()) insBairro.run(c.uf, c.mun, c.b, c.nome, c.n)
+  db.exec('COMMIT')
+  log(`bairros: ${bairros.size}`)
+  bairros.clear()
   db.exec('CREATE INDEX est_basico ON est(basico)')
   log(`e-mails de provedor/contador desmarcados como site próprio: ${markSharedDomains(db)}`)
 
@@ -247,7 +262,8 @@ async function build(dir: string, month: string, apagarZips: boolean) {
   db.exec('COMMIT')
 
   log('criando índices')
-  db.exec(`${INDEXES} ANALYZE;`)
+  db.exec(INDEXES)
+  db.exec('ANALYZE;')
   const meta = db.prepare('INSERT INTO meta VALUES (?, ?)')
   meta.run('mes', month)
   meta.run('gerado_em', new Date().toISOString())

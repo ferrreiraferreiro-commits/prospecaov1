@@ -86,6 +86,11 @@ export function resolveNiche(label: string, cnaeTable: { cod: string; desc_n: st
   // Plural simples: "barbearias" → "BARBEARIA"
   const singular = key.replace(/S\b/g, '')
   if (NICHES[singular]) return NICHES[singular]
+  // "Hamburgueria artesanal", "barbearia masculina": contém um nicho conhecido
+  const known = Object.keys(NICHES)
+    .filter((k) => ` ${singular} `.includes(` ${k} `) || ` ${key} `.includes(` ${k} `))
+    .sort((a, b) => b.length - a.length)[0]
+  if (known) return NICHES[known]
   const words = singular.split(' ').filter((w) => w.length >= 3 && !STOP.has(w))
   if (words.length) {
     const hits = cnaeTable.filter((c) => words.every((w) => c.desc_n.includes(w.slice(0, Math.max(4, w.length - 2))))).map((c) => c.cod)

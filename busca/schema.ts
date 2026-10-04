@@ -13,6 +13,7 @@ CREATE TABLE est (
 ) WITHOUT ROWID;
 CREATE TABLE empresa (basico TEXT PRIMARY KEY, razao TEXT, natureza TEXT, porte TEXT) WITHOUT ROWID;
 CREATE TABLE socio (basico TEXT, nome TEXT, qualif TEXT);
+CREATE TABLE bairro_count (uf TEXT, mun INTEGER, bairro_n TEXT, bairro TEXT, n INTEGER, PRIMARY KEY (uf, mun, bairro_n)) WITHOUT ROWID;
 `
 
 /**
@@ -39,4 +40,11 @@ export function markSharedDomains(db: DatabaseSync, minCompanies = 5): number {
   `)
   const r = db.prepare(`UPDATE est SET email_tipo = 3 WHERE email_tipo = 2 AND substr(email, instr(email, '@') + 1) IN (SELECT dominio FROM dominio_compartilhado)`).run()
   return Number(r.changes)
+}
+
+/** Bairros com quantas empresas cada um tem, por cidade (para sugerir bairros sem contar milhões de linhas). */
+export function buildBairroCounts(db: DatabaseSync): void {
+  db.exec(`CREATE TABLE IF NOT EXISTS bairro_count (uf TEXT, mun INTEGER, bairro_n TEXT, bairro TEXT, n INTEGER, PRIMARY KEY (uf, mun, bairro_n)) WITHOUT ROWID;
+    DELETE FROM bairro_count;
+    INSERT INTO bairro_count SELECT uf, mun, bairro_n, MAX(bairro), COUNT(*) FROM est WHERE bairro_n <> '' GROUP BY uf, mun, bairro_n;`)
 }

@@ -103,15 +103,16 @@ interface Row {
 const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO']
 
 /** Celular primeiro (vira WhatsApp), depois as empresas mais novas (mais chance de ainda não ter site). */
-const before = (a: Row, b: Row) => (a.cel !== b.cel ? a.cel > b.cel : a.inicio > b.inicio)
+type Key = { cnpj: string; cel: number; inicio: string }
+const before = (a: Key, b: Key) => (a.cel !== b.cel ? a.cel > b.cel : a.inicio > b.inicio)
 
 /** Junta várias listas já ordenadas (uma por cidade × atividade) numa só, na mesma ordem. */
-function* merge(iters: Iterator<Row>[]): Generator<Row> {
+function* merge(iters: Iterator<Key>[]): Generator<Key> {
   const live = iters.map((it) => ({ it, cur: it.next() })).filter((x) => !x.cur.done)
   while (live.length) {
     let best = 0
-    for (let i = 1; i < live.length; i++) if (before(live[i].cur.value as Row, live[best].cur.value as Row)) best = i
-    yield live[best].cur.value as Row
+    for (let i = 1; i < live.length; i++) if (before(live[i].cur.value as Key, live[best].cur.value as Key)) best = i
+    yield live[best].cur.value as Key
     live[best].cur = live[best].it.next()
     if (live[best].cur.done) live.splice(best, 1)
   }
@@ -129,6 +130,11 @@ export function buscar(input: BuscaInput) {
   const bairros = (input.bairros ?? []).map(norm).filter(Boolean).slice(0, 20)
   const bairroSql = bairros.length ? ` AND (${bairros.map(() => 'bairro_n LIKE ?').join(' OR ')})` : ''
   const bairroParams = bairros.map((b) => `%${b}%`)
+  // Celular também está no índice: filtra sem abrir o cadastro
+  const celSql = input.filtros?.celular === 1 ? ' AND cel = 1' : input.filtros?.celular === -1 ? ' AND cel = 0' : ''
+  const rowByCnpj = d.prepare('SELECT * FROM est WHERE cnpj = ?')
+  // Teto de tempo: busca por nome em cidade grande devolve o que achou até aqui
+  const deadline = t0 + 4000
 
   const knownPhones = new Set(input.conhecidos?.telefones ?? [])
   const knownCnpjs = new Set((input.conhecidos?.cnpjs ?? []).map((c) => c.replace(/\D/g, '')))
@@ -144,22 +150,27 @@ export function buscar(input: BuscaInput) {
   const niches = [...new Set(input.nichos.map((n) => n.trim()).filter(Boolean))].slice(0, 10)
   if (!niches.length) throw new HttpError(400, 'Escolha ao menos um nicho.')
 
+  // Leituras abertas no banco: fechadas no fim (uma leitura parada no meio segura o arquivo)
+  const open: Iterator<unknown>[] = []
+  const track = <T,>(it: Iterator<T>) => (open.push(it), it)
+  try {
   for (const label of niches) {
     if (fresh >= meta) break
     const niche: Niche = resolveNiche(label, cnaeTable)
     const ranges = ufs.flatMap((u) => muns.map((m) => ({ uf: u, mun: m.cod })))
-    let rows: Iterable<Row>
+    let keys: Iterable<{ cnpj: string }>
     if (niche.cnaes.length) {
       // Uma leitura ordenada pelo índice para cada cidade × atividade: para assim que achar o suficiente
       const iters = ranges.flatMap((r) =>
-        niche.cnaes.map(
-          (c) =>
+        niche.cnaes.map((c) =>
+          track(
             d
-              .prepare(`SELECT * FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ? AND cnae = ?${bairroSql} ORDER BY cel DESC, inicio DESC`)
-              .iterate(r.uf, r.mun, c, ...bairroParams) as Iterator<Row>,
+              .prepare(`SELECT cnpj, cel, inicio FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ? AND cnae = ?${celSql}${bairroSql} ORDER BY cel DESC, inicio DESC`)
+              .iterate(r.uf, r.mun, c, ...bairroParams) as Iterator<Key>,
+          ),
         ),
       )
-      rows = merge(iters)
+      keys = merge(iters)
       // Quantas empresas existem nesse nicho e região (só no índice, sem ler os cadastros)
       for (const r of ranges)
         found += Number(
@@ -171,13 +182,19 @@ export function buscar(input: BuscaInput) {
         )
     } else {
       // Nicho sem atividade na Receita: procura pelo nome, na ordem do índice, até um limite
-      const iters = ranges.map((r) => d.prepare(`SELECT * FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ?${bairroSql} LIMIT 300000`).iterate(r.uf, r.mun, ...bairroParams) as Iterator<Row>)
-      rows = (function* () {
-        for (const it of iters) for (let x = it.next(); !x.done; x = it.next()) yield x.value as Row
+      const iters = ranges.map(
+        (r) => track(d.prepare(`SELECT cnpj FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ?${celSql}${bairroSql} LIMIT 300000`).iterate(r.uf, r.mun, ...bairroParams) as Iterator<{ cnpj: string }>),
+      )
+      keys = (function* () {
+        for (const it of iters) for (let x = it.next(); !x.done; x = it.next()) yield x.value as { cnpj: string }
       })()
     }
-    for (const raw of rows) {
-      if (seen.has(raw.cnpj)) continue
+    let scanned = 0
+    for (const key of keys) {
+      if (++scanned % 200 === 0 && Date.now() > deadline) break
+      if (seen.has(key.cnpj)) continue
+      const raw = rowByCnpj.get(key.cnpj) as Row | undefined
+      if (!raw) continue
       if (!passes(f.telefone, !!raw.tel) || !passes(f.celular, raw.cel === 1) || !passes(f.site, raw.email_tipo === 2)) continue
       // Filtro pelo nome (pizzaria, barbearia…) precisa da razão social também
       const r = niche.nome ? withEmpresa(raw) : raw
@@ -198,6 +215,10 @@ export function buscar(input: BuscaInput) {
       if (!known) fresh++
       if (fresh >= meta) break
     }
+  }
+
+  } finally {
+    for (const it of open) it.return?.()
   }
 
   const socios = d.prepare('SELECT nome, qualif FROM socio WHERE basico = ?')
@@ -258,10 +279,11 @@ export function bairrosDe(cidade: string, ufIn?: string) {
   const muns = (d.prepare('SELECT cod FROM municipio WHERE nome_n = ?').all(nome) as { cod: number }[]).map((m) => m.cod)
   if (!muns.length) return []
   const counts = new Map<string, number>()
-  for (const u of uf ? [uf] : UFS)
-    for (const m of muns)
-      for (const r of d.prepare("SELECT bairro_n b, COUNT(*) n FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ? AND bairro_n <> '' GROUP BY bairro_n").all(u, m) as { b: string; n: number }[])
-        counts.set(r.b, (counts.get(r.b) ?? 0) + r.n)
+  const pronta = !!d.prepare("SELECT 1 FROM sqlite_master WHERE name = 'bairro_count'").get()
+  const sql = pronta
+    ? 'SELECT bairro_n b, n FROM bairro_count WHERE uf = ? AND mun = ?'
+    : "SELECT bairro_n b, COUNT(*) n FROM est INDEXED BY est_ordem WHERE uf = ? AND mun = ? AND bairro_n <> '' GROUP BY bairro_n"
+  for (const u of uf ? [uf] : UFS) for (const m of muns) for (const r of d.prepare(sql).all(u, m) as { b: string; n: number }[]) counts.set(r.b, (counts.get(r.b) ?? 0) + r.n)
   const list = [...counts]
     .sort((x, y) => y[1] - x[1])
     .slice(0, 300)
