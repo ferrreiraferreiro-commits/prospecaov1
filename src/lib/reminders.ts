@@ -23,7 +23,7 @@ function minus(hm: string, minutes: number): string {
  * - Retorno com horário: na hora marcada.
  * - Retornos por período (manhã/tarde/noite): um aviso só, no início do período.
  * - Reunião com horário: 10 minutos antes.
- * Só olha o dia de hoje — atrasos de outros dias ficam no sino e na tela Hoje.
+ * Só olha o dia de hoje — atrasos de outros dias ficam no sino e no Painel.
  */
 export function dueReminders(followups: Followup[], meetings: Meeting[], leads: Lead[], fired: Set<string>, now: Date = new Date()): Reminder[] {
   const today = todayKey(now)

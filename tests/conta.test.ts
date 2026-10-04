@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isBlockReport, parseLeadsAny, parseSheet, splitRows } from '../src/lib/sheet'
-import { accessOf, type Profile } from '../src/store/useAccount'
+import { accessOf, planInfo, type Profile } from '../src/store/useAccount'
 
 describe('importar planilha', () => {
   it('lê CSV com ponto e vírgula, aspas e colunas extras', () => {
@@ -56,5 +56,25 @@ describe('acesso da conta', () => {
   it('assinante e vitalício entram sem contagem; sem perfil não bloqueia', () => {
     expect(accessOf({ ...base, plano: 'ativo', teste_ate: '2020-01-01T00:00:00Z' }, now)).toEqual({ ok: true, diasDeTeste: null, horasDeTeste: null })
     expect(accessOf(null, now)).toEqual({ ok: true, diasDeTeste: null, horasDeTeste: null })
+  })
+  it('plano pago bloqueia depois de vencer', () => {
+    const mensal: Profile = { ...base, plano: 'ativo', ciclo: 'mensal', plano_ate: '2026-11-03T12:00:00Z' }
+    expect(accessOf(mensal, now)).toEqual({ ok: true, diasDeTeste: null, horasDeTeste: null })
+    expect(accessOf({ ...mensal, plano_ate: '2026-10-03T11:00:00Z' }, now)).toEqual({ ok: false, motivo: 'plano_venceu' })
+  })
+})
+
+describe('plano no menu do perfil', () => {
+  const base: Profile = { user_id: 'u', email: null, nome: null, cidade: null, plano: 'teste', teste_ate: '2026-10-04T12:00:00Z', recursos: [], boas_vindas_feitas: true }
+  const now = Date.parse('2026-10-03T12:00:00Z')
+
+  it('mostra o nome do plano e quando acaba', () => {
+    expect(planInfo(base, now)).toEqual({ nome: 'Teste grátis', ate: '2026-10-04T12:00:00Z', dias: 1 })
+    expect(planInfo({ ...base, plano: 'vitalicio' }, now)).toEqual({ nome: 'Vitalício', ate: null, dias: null })
+    expect(planInfo({ ...base, plano: 'ativo', ciclo: 'trimestral', plano_ate: '2027-01-03T12:00:00Z' }, now)).toEqual({ nome: 'Trimestral', ate: '2027-01-03T12:00:00Z', dias: 92 })
+    expect(planInfo({ ...base, plano: 'ativo', ciclo: 'semanal', plano_ate: '2026-10-10T12:00:00Z' }, now)?.nome).toBe('Semanal')
+    expect(planInfo({ ...base, plano: 'ativo', ciclo: 'diario' }, now)).toEqual({ nome: 'Diário', ate: null, dias: null })
+    expect(planInfo({ ...base, plano: 'ativo' }, now)?.nome).toBe('Assinatura')
+    expect(planInfo(null, now)).toBeNull()
   })
 })

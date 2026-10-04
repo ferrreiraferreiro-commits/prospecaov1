@@ -133,7 +133,7 @@ export function CallModePage() {
     if (goNext && nextId) go(nextId)
     else if (goNext && !nextId) {
       toast('Fila concluída. Bom trabalho!', 'info')
-      navigate('/hoje')
+      navigate('/')
     } else {
       setCallId(null)
       setFormKey((k) => k + 1)

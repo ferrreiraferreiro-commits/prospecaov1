@@ -11,7 +11,6 @@ import {
   Send,
   Smartphone,
   Sparkles,
-  Sun,
   Users,
 } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
@@ -133,11 +132,6 @@ export function PainelPage() {
         <Card
           title="Para hoje"
           description="Retornos e reuniões, na ordem do horário."
-          actions={
-            <Link to="/hoje" className="inline-flex items-center gap-1 text-xs font-medium text-blue-300 hover:text-blue-200">
-              Abrir Hoje <ArrowRight className="size-3.5" />
-            </Link>
-          }
           bodyClass="p-0"
         >
           {plan.followups.length + plan.reunioesHoje.length === 0 ? (
@@ -231,7 +225,7 @@ export function PainelPage() {
             {motor ? (
               <Shortcut to="/disparo" icon={<Send />} label="Novo disparo" hint={wa?.status === 'connected' ? `WhatsApp: ${wa.user?.name ?? 'conectado'}` : 'WhatsApp desconectado'} />
             ) : (
-              <Shortcut to="/hoje" icon={<Sun />} label="Ligações de hoje" hint={`${plan.followups.length} retorno(s)`} />
+              <Shortcut to="/ligacao" icon={<Headphones />} label="Ligações de hoje" hint={`${plan.followups.length} retorno(s)`} />
             )}
             <Shortcut to="/leads" icon={<PhoneCall />} label="Lista de leads" hint={`${metrics.naoTrabalhados} sem contato`} />
             <Shortcut to="/precificacao" icon={<Sparkles />} label="Calcular orçamento" hint="Precificação" />

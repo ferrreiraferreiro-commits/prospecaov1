@@ -61,7 +61,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       const open = list[0]
-      return open ? open.focus() : self.clients.openWindow('/hoje')
+      return open ? open.focus() : self.clients.openWindow('/')
     }),
   )
 })

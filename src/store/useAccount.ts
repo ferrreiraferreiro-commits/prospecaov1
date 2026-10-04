@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { create } from 'zustand'
 
+/** De quanto em quanto tempo o plano pago renova. */
+export type Ciclo = 'diario' | 'semanal' | 'mensal' | 'trimestral'
+
 /** Conta na XS: quem é, plano/teste e recursos liberados (tabela `profiles`). */
 export interface Profile {
   user_id: string
@@ -9,6 +12,9 @@ export interface Profile {
   cidade: string | null
   plano: 'teste' | 'ativo' | 'cancelado' | 'vitalicio'
   teste_ate: string
+  /** Plano ativo: ciclo e até quando vale (vazio = sem data para acabar) */
+  ciclo?: Ciclo | null
+  plano_ate?: string | null
   /** Ex.: 'motor' = busca no Maps e WhatsApp pelo Motor WhatsApp XS */
   recursos: string[]
   boas_vindas_feitas: boolean
@@ -90,14 +96,42 @@ export function useHasMotor(): boolean {
   return useAccount((s) => !s.profile || s.profile.recursos.includes('motor'))
 }
 
-export type Access = { ok: true; diasDeTeste: number | null; horasDeTeste: number | null } | { ok: false; motivo: 'teste_acabou' | 'cancelado' }
+export type Access = { ok: true; diasDeTeste: number | null; horasDeTeste: number | null } | { ok: false; motivo: 'teste_acabou' | 'plano_venceu' | 'cancelado' }
 
 /** Pode entrar no app? No teste, quantos dias faltam. */
 export function accessOf(profile: Profile | null, now = Date.now()): Access {
   if (!profile) return { ok: true, diasDeTeste: null, horasDeTeste: null }
   if (profile.plano === 'cancelado') return { ok: false, motivo: 'cancelado' }
+  if (profile.plano === 'ativo' && profile.plano_ate && Date.parse(profile.plano_ate) <= now) return { ok: false, motivo: 'plano_venceu' }
   if (profile.plano !== 'teste') return { ok: true, diasDeTeste: null, horasDeTeste: null }
   const left = Date.parse(profile.teste_ate) - now
   if (left <= 0) return { ok: false, motivo: 'teste_acabou' }
   return { ok: true, diasDeTeste: Math.ceil(left / 86_400_000), horasDeTeste: Math.ceil(left / 3_600_000) }
+}
+
+const CICLOS: Record<Ciclo, string> = { diario: 'Diário', semanal: 'Semanal', mensal: 'Mensal', trimestral: 'Trimestral' }
+
+export interface PlanInfo {
+  nome: string
+  /** Quando acaba (ISO); `null` = não acaba */
+  ate: string | null
+  /** Dias até acabar, arredondado para cima */
+  dias: number | null
+}
+
+/** Nome do plano e quando acaba, para o menu do perfil. */
+export function planInfo(profile: Profile | null, now = Date.now()): PlanInfo | null {
+  if (!profile) return null
+  const nome =
+    profile.plano === 'vitalicio'
+      ? 'Vitalício'
+      : profile.plano === 'teste'
+        ? 'Teste grátis'
+        : profile.plano === 'cancelado'
+          ? 'Cancelado'
+          : profile.ciclo
+            ? CICLOS[profile.ciclo]
+            : 'Assinatura'
+  const ate = profile.plano === 'teste' ? profile.teste_ate : profile.plano === 'ativo' ? (profile.plano_ate ?? null) : null
+  return { nome, ate, dias: ate ? Math.max(0, Math.ceil((Date.parse(ate) - now) / 86_400_000)) : null }
 }

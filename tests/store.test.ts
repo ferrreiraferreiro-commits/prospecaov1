@@ -67,7 +67,7 @@ describe('fluxo de prospecção (store + repositório local)', () => {
     expect(reloaded.followups).toHaveLength(1)
     expect(reloaded.interactions.find((i) => i.id === call.id)?.status).toBe('follow_up')
 
-    // Amanhã ele aparece na lista "Para ligar" e na tela Hoje
+    // Amanhã ele aparece na lista "Para ligar" e no Painel
     const tomorrow = addDays(todayKey(), 1)
     const index = buildIndex(s.followups, s.meetings, s.interactions)
     expect(matchesQuick('para_ligar', s.leads[1], index, new Set(), tomorrow)).toBe(true)

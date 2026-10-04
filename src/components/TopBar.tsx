@@ -1,13 +1,14 @@
 import clsx from 'clsx'
-import { Bell, CalendarCheck, CalendarClock, LogOut, Monitor, Moon, Sun, UserRound } from 'lucide-react'
+import { Bell, CalendarCheck, CalendarClock, Crown, LogOut, Monitor, Moon, Sun, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../data/supabaseClient'
 import { LOGIN_DOMAIN } from '../lib/auth'
-import { formatDayLabel, periodoLabel } from '../lib/dates'
+import { formatDateTime, formatDayLabel, periodoLabel } from '../lib/dates'
 import { buildTodayPlan } from '../lib/selectors'
 import { useTheme, type ThemePref } from '../lib/theme'
 import { useIndex, useMetrics, useToday } from '../store/derived'
+import { planInfo, useAccount } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { Avatar } from './Avatar'
@@ -99,11 +100,11 @@ function NotificationBell() {
           <button
             onClick={() => {
               setOpen(false)
-              navigate('/hoje')
+              navigate('/')
             }}
             className="mt-2 w-full rounded-md border border-line py-2 text-xs font-medium text-fg-2 hover:bg-hover hover:text-fg"
           >
-            Abrir a tela Hoje
+            Ver no Painel
           </button>
         </div>
       </Popover>
@@ -173,6 +174,8 @@ function UserMenu({ compact }: { compact?: boolean }) {
             </div>
           </div>
 
+          <PlanCard />
+
           <dl className="mt-3 space-y-1.5 border-t border-line-soft pt-3 text-xs">
             <MenuRow label="Ligações hoje">
               <span className="num">
@@ -224,6 +227,43 @@ function UserMenu({ compact }: { compact?: boolean }) {
         </div>
       </Popover>
     </>
+  )
+}
+
+/** Plano da conta e quando acaba. */
+function PlanCard() {
+  const profile = useAccount((s) => s.profile)
+  const plan = planInfo(profile)
+  if (!plan) return null
+  const vitalicio = profile?.plano === 'vitalicio'
+  const perto = plan.dias !== null && plan.dias <= 3
+  return (
+    <div className="mt-3 rounded-lg border border-line-soft bg-ink px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-2xs font-medium text-fg-3">Seu plano</span>
+        <span
+          className={clsx(
+            'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold',
+            vitalicio ? 'bg-gold/15 text-gold' : 'bg-tint/[0.07] text-fg',
+          )}
+        >
+          {vitalicio && <Crown className="size-3" />}
+          {plan.nome}
+        </span>
+      </div>
+      {plan.ate ? (
+        <>
+          <p className="mt-1.5 text-xs text-fg-2">
+            Acaba em <span className="num font-medium text-fg">{formatDateTime(plan.ate)}</span>
+          </p>
+          <p className={clsx('num mt-0.5 text-2xs', perto ? 'text-amber-200' : 'text-fg-3')}>
+            {plan.dias === 0 ? 'Acaba hoje' : plan.dias === 1 ? 'Falta 1 dia' : `Faltam ${plan.dias} dias`}
+          </p>
+        </>
+      ) : (
+        <p className="mt-1.5 text-xs text-fg-2">{vitalicio ? 'Não acaba, é para sempre' : 'Sem data para acabar'}</p>
+      )}
+    </div>
   )
 }
 

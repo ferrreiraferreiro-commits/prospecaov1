@@ -459,7 +459,7 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// Retornos (tela Hoje)
+// Retornos (Para hoje)
 // ---------------------------------------------------------------------------
 
 const TODAY = [
@@ -490,7 +490,7 @@ function TodayMock() {
 
   return (
     <Frame
-      title="Hoje"
+      title="Para hoje"
       meta={
         <span className="num flex items-center gap-2">
           {done.size} de {TODAY.length} feitos

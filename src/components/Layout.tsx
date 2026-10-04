@@ -20,7 +20,6 @@ import {
   Send,
   Smartphone,
   Sparkles,
-  Sun,
   TriangleAlert,
   Workflow,
   Users,
@@ -31,7 +30,6 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
 import { useMotor, useMotorPolling } from '../lib/motor'
-import { useMetrics } from '../store/derived'
 import { accessOf, useAccount, useHasMotor } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
@@ -58,7 +56,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/', label: 'Painel', icon: LayoutDashboard, end: true },
       { to: '/leads', label: 'Leads', icon: LayoutList },
-      { to: '/hoje', label: 'Hoje', icon: Sun },
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
       { to: '/maps', label: 'Buscar empresas', icon: MapPinned },
@@ -95,8 +92,8 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
 const MOBILE: NavItem[] = [
   { to: '/', label: 'Painel', icon: LayoutDashboard, end: true },
   { to: '/leads', label: 'Leads', icon: LayoutList },
-  { to: '/hoje', label: 'Hoje', icon: Sun },
   { to: '/ligacao', label: 'Ligação', icon: Headphones },
+  { to: '/maps', label: 'Buscar', icon: MapPinned },
 ]
 
 /** Menu da conta: sem o Motor, somem os itens que dependem dele (e grupos vazios). */
@@ -125,8 +122,6 @@ function readCollapsed(): boolean {
 export function Layout() {
   const { pathname } = useLocation()
   const full = pathname.startsWith('/ligacao')
-  const metrics = useMetrics()
-  const badge = metrics.followupsHoje
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [sheet, setSheet] = useState(false)
   const motor = useHasMotor()
@@ -172,7 +167,7 @@ export function Layout() {
               <ul className="space-y-0.5">
                 {group.items.map((item) => (
                   <li key={item.to}>
-                    <SideLink item={item} collapsed={collapsed} badge={item.to === '/hoje' ? badge : 0} />
+                    <SideLink item={item} collapsed={collapsed} />
                   </li>
                 ))}
               </ul>
@@ -226,14 +221,11 @@ export function Layout() {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              clsx('relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium', isActive ? 'text-blue-400' : 'text-fg-3')
+              clsx('flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium', isActive ? 'text-blue-400' : 'text-fg-3')
             }
           >
             <item.icon className="size-[18px]" strokeWidth={1.75} />
             {item.label}
-            {item.to === '/hoje' && badge > 0 && (
-              <span className="num absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-sky-400 px-1 text-center text-[9px] leading-4 font-semibold text-ink">{badge}</span>
-            )}
           </NavLink>
         ))}
         <button onClick={() => setSheet(true)} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-fg-3">
@@ -254,7 +246,7 @@ export function Layout() {
   )
 }
 
-function SideLink({ item, collapsed, badge }: { item: NavItem; collapsed: boolean; badge: number }) {
+function SideLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   return (
     <NavLink
       to={item.to}
@@ -273,16 +265,6 @@ function SideLink({ item, collapsed, badge }: { item: NavItem; collapsed: boolea
           {isActive && <span className="absolute top-2 bottom-2 -left-2.5 w-[3px] rounded-r bg-blue-500" />}
           <item.icon className={clsx('size-[17px] shrink-0', isActive && 'text-blue-400')} strokeWidth={1.75} />
           {!collapsed && <span className="truncate">{item.label}</span>}
-          {badge > 0 && (
-            <span
-              className={clsx(
-                'num min-w-[18px] rounded-full bg-sky-400 px-1 text-center text-[10px] leading-[18px] font-semibold text-ink',
-                collapsed ? 'absolute top-0.5 right-1' : 'ml-auto',
-              )}
-            >
-              {badge}
-            </span>
-          )}
         </>
       )}
     </NavLink>

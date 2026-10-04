@@ -10,7 +10,6 @@ import { SupabaseRepository } from './data/supabaseRepository'
 import { supabase } from './data/supabaseClient'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
-import { HojePage } from './pages/HojePage'
 import { ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pages/AuthPages'
 import { LandingPage } from './pages/LandingPage'
 import { PainelPage } from './pages/PainelPage'
@@ -94,7 +93,6 @@ function Routed() {
         <Route element={<Layout />}>
           <Route index element={<PainelPage />} />
           <Route path="leads" element={<CentralPage />} />
-          <Route path="hoje" element={<HojePage />} />
           <Route path="ligacao" element={<CallModeEntry />} />
           <Route path="ligacao/:id" element={<CallModePage />} />
           <Route path="roteiros" element={<RoteirosPage />} />
@@ -158,12 +156,18 @@ function Loaded() {
   return <Routed />
 }
 
-function Blocked({ motivo }: { motivo: 'teste_acabou' | 'cancelado' }) {
+const BLOQUEIO = {
+  teste_acabou: 'Seu teste grátis terminou',
+  plano_venceu: 'Seu plano venceu',
+  cancelado: 'Sua assinatura está pausada',
+}
+
+function Blocked({ motivo }: { motivo: keyof typeof BLOQUEIO }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
       <LogoMark size={64} />
       <div className="space-y-1">
-        <p className="text-base font-semibold text-fg">{motivo === 'teste_acabou' ? 'Seu teste grátis terminou' : 'Sua assinatura está pausada'}</p>
+        <p className="text-base font-semibold text-fg">{BLOQUEIO[motivo]}</p>
         <p className="max-w-sm text-xs text-fg-3">Seus leads e sua gestão continuam guardados. Fale com a gente para liberar o acesso de novo.</p>
       </div>
       {supabase && (

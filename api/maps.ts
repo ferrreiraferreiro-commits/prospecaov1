@@ -117,10 +117,11 @@ async function requireAccess(authorization: string | undefined) {
   if (!userRes.ok) throw new HttpError(401, 'Sua sessão expirou. Entre de novo.')
   const user = (await userRes.json()) as { id: string }
   // RLS: com o token do próprio usuário, só a linha dele volta
-  const profRes = await fetch(`${url}/rest/v1/profiles?select=plano,teste_ate&user_id=eq.${user.id}`, { headers, signal: AbortSignal.timeout(6000) })
-  const [profile] = profRes.ok ? ((await profRes.json()) as { plano: string; teste_ate: string }[]) : []
+  const profRes = await fetch(`${url}/rest/v1/profiles?select=*&user_id=eq.${user.id}`, { headers, signal: AbortSignal.timeout(6000) })
+  const [profile] = profRes.ok ? ((await profRes.json()) as { plano: string; teste_ate: string; plano_ate?: string | null }[]) : []
   if (profile?.plano === 'cancelado') throw new HttpError(403, 'Sua assinatura está pausada.')
   if (profile?.plano === 'teste' && Date.parse(profile.teste_ate) <= Date.now()) throw new HttpError(403, 'Seu teste grátis terminou.')
+  if (profile?.plano === 'ativo' && profile.plano_ate && Date.parse(profile.plano_ate) <= Date.now()) throw new HttpError(403, 'Seu plano venceu.')
 }
 
 /** Chama o servidor de busca na VPS. */

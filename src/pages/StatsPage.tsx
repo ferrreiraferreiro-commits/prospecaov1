@@ -155,7 +155,7 @@ export function StatsPage() {
           <section className="panel px-5 py-4">
             <h2 className="mb-1 text-[13px] font-semibold">Reuniões e vendas</h2>
             <p className="mb-3 text-2xs text-fg-3">
-              Registre como foi cada reunião (na tela Hoje ou na ficha do lead) para ver quantas viram venda.
+              Registre como foi cada reunião (na ficha do lead) para ver quantas viram venda.
               {vendas.semResultado > 0 && <span className="text-gold"> {vendas.semResultado} sem resultado registrado.</span>}
             </p>
             <div className="mb-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
