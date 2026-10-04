@@ -48,7 +48,7 @@ function asProfile(c: Conta): Profile {
 }
 
 function nomeDe(c: Conta): string {
-  return c.nome || loginDe(c.email)
+  return c.nome || c.usuario || loginDe(c.email)
 }
 
 export function ContasPage() {
@@ -88,7 +88,6 @@ export function ContasPage() {
       vencendo: pagantes.filter((c) => c.plano_ate && Date.parse(c.plano_ate) - now <= 3 * DIA).length,
       vitalicio: lista.filter((c) => c.plano === 'vitalicio').length,
       bloqueadas: lista.filter((c) => c.plano === 'cancelado' || vencida(c, now)).length,
-      semEmail: lista.filter((c) => isLegacyEmail(c.email)).length,
     }
   }, [contas, now])
 
@@ -101,7 +100,7 @@ export function ContasPage() {
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return (contas ?? []).filter((c) => {
-      if (q && ![c.nome, c.email, c.cidade].some((v) => v?.toLowerCase().includes(q))) return false
+      if (q && ![c.nome, c.usuario, c.email, c.cidade].some((v) => v?.toLowerCase().includes(q))) return false
       if (filtro === 'teste') return c.plano === 'teste' && !vencida(c, now)
       if (filtro === 'pagantes') return c.plano === 'ativo' && !vencida(c, now)
       if (filtro === 'vitalicio') return c.plano === 'vitalicio'
@@ -145,13 +144,6 @@ export function ContasPage() {
         <Stat label="Vitalício" value={resumo.vitalicio} tone="gold" icon={<Crown />} />
         <Stat label="Contas" value={resumo.total} icon={<Users />} hint={`${resumo.bloqueadas} sem acesso`} />
       </div>
-
-      {resumo.semEmail > 0 && (
-        <p className="rounded-lg border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2.5 text-xs text-amber-100">
-          {resumo.semEmail === 1 ? '1 conta ainda entra' : `${resumo.semEmail} contas ainda entram`} pelo nome de usuário antigo. Elas cadastram o e-mail no próximo acesso, ou você cadastra
-          em “Gerenciar” → Acesso. Até lá, se a pessoa sair da conta, ela não consegue entrar de novo.
-        </p>
-      )}
 
       <Card bodyClass="p-0">
         <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-4 py-3">
@@ -254,8 +246,8 @@ function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; p
           {nomeDe(conta)}
           {conta.admin && <ShieldCheck className="size-3.5 shrink-0 text-blue-300" aria-label="Dono" />}
         </p>
-        <p className={clsx('truncate text-2xs', legacy ? 'text-amber-200/80' : 'text-fg-3')}>
-          {legacy ? `Sem e-mail · usuário ${loginDe(conta.email)}` : conta.email}
+        <p className="truncate text-2xs text-fg-3">
+          {[conta.usuario && `@${conta.usuario}`, legacy ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')}
           {conta.cidade ? ` · ${conta.cidade}` : ''}
         </p>
       </div>
@@ -300,7 +292,7 @@ function ContaModal({
 }) {
   const [aba, setAba] = useState<Aba>('plano')
   return (
-    <Modal open onClose={onClose} title={nomeDe(conta)} subtitle={isLegacyEmail(conta.email) ? `Usuário ${loginDe(conta.email)} · sem e-mail` : conta.email} width="max-w-xl">
+    <Modal open onClose={onClose} title={nomeDe(conta)} subtitle={[conta.usuario && `@${conta.usuario}`, isLegacyEmail(conta.email) ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')} width="max-w-xl">
       <div className="border-b border-line-soft px-5 py-2.5">
         <Segmented
           value={aba}
@@ -560,7 +552,7 @@ function AcessoAba({ conta, onMudou }: { conta: Conta; onMudou: () => void }) {
     <div className="space-y-5 px-5 py-4">
       <div>
         <p className="label">E-mail de acesso</p>
-        {legacy && <p className="mb-2 text-2xs text-amber-200/80">Esta conta ainda entra pelo usuário antigo “{loginDe(conta.email)}”. Cadastre o e-mail dela.</p>}
+        {legacy && <p className="mb-2 text-2xs text-amber-200/80">Esta conta não tem e-mail (entra só pelo usuário). Com e-mail, a pessoa consegue recuperar a senha sozinha.</p>}
         <div className="flex gap-2">
           <input type="email" className="input" placeholder="email@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           <Button variant="primary" loading={salvandoEmail} disabled={!email.includes('@') || email.trim().toLowerCase() === conta.email} onClick={() => void salvarEmail()}>

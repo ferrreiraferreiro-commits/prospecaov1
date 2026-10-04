@@ -7,7 +7,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
 import { supabase } from '../data/supabaseClient'
-import { changePassword } from '../lib/auth'
+import { changePassword, isLegacyEmail, USUARIO_REGRA, usuarioValido } from '../lib/auth'
 import { formatDateTime } from '../lib/dates'
 import { getAvisosOn, notificationPermission, setAvisosOn, showSystemNotification } from '../lib/notify'
 import { isIos, isStandalone, useInstall } from '../lib/pwa'
@@ -455,11 +455,12 @@ function AcessoCard() {
   }
 
   return (
-    <Card id="acesso" title="Acesso e senha" description="Você entra na XS com este e-mail.">
-      <p className="mb-4 flex items-center gap-2 text-xs">
-        <span className="text-fg-3">E-mail</span>
-        <span className="font-medium text-fg">{email ?? 'Não informado'}</span>
-      </p>
+    <Card id="acesso" title="Acesso e senha" description="Você entra na XS com o usuário ou com o e-mail.">
+      <div className="mb-5 grid gap-3 border-b border-line-soft pb-5 sm:grid-cols-2">
+        <UsuarioCampo />
+        <EmailCampo email={email} />
+      </div>
+      <p className="mb-2 text-xs font-semibold text-fg">Trocar senha</p>
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -487,5 +488,93 @@ function AcessoCard() {
         </div>
       </form>
     </Card>
+  )
+}
+
+/** Nome de usuário: escolher ou trocar (precisa estar livre). */
+function UsuarioCampo() {
+  const toast = useApp((s) => s.toast)
+  const profile = useAccount((s) => s.profile)
+  const atual = profile?.usuario ?? ''
+  const [valor, setValor] = useState(atual)
+  const [salvando, setSalvando] = useState(false)
+  useEffect(() => setValor(atual), [atual])
+  const v = valor.trim().toLowerCase()
+
+  const salvar = async () => {
+    if (!supabase || !profile) return
+    if (!usuarioValido(v)) return toast(USUARIO_REGRA, 'error')
+    setSalvando(true)
+    const { error } = await supabase.rpc('definir_meu_usuario', { u: v })
+    setSalvando(false)
+    if (error) return toast(error.message, 'error')
+    useAccount.setState({ profile: { ...profile, usuario: v } })
+    toast(`Pronto. Agora você também entra com “${v}”.`)
+  }
+
+  return (
+    <div>
+      <label className="label" htmlFor="ac-usuario">Usuário</label>
+      <div className="flex gap-2">
+        <input
+          id="ac-usuario"
+          className="input"
+          autoCapitalize="none"
+          spellCheck={false}
+          placeholder="Escolha um usuário"
+          value={valor}
+          onChange={(e) => setValor(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+        />
+        <Button size="sm" className="h-8" loading={salvando} disabled={!v || v === atual} onClick={() => void salvar()}>
+          Salvar
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** E-mail da conta. Conta só com usuário pode cadastrar um (serve para recuperar a senha). */
+function EmailCampo({ email }: { email: string | null }) {
+  const toast = useApp((s) => s.toast)
+  const profile = useAccount((s) => s.profile)
+  const [novo, setNovo] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const semEmail = isLegacyEmail(email)
+
+  const salvar = async () => {
+    if (!supabase || !profile) return
+    setSalvando(true)
+    const { error } = await supabase.rpc('definir_meu_email', { novo })
+    if (error) {
+      setSalvando(false)
+      return toast(error.message, 'error')
+    }
+    await supabase.auth.refreshSession()
+    await useAccount.getState().init(supabase, profile.user_id)
+    setSalvando(false)
+    toast('E-mail salvo. Ele serve para entrar e para recuperar a senha.')
+  }
+
+  if (!semEmail) {
+    return (
+      <div>
+        <span className="label">E-mail</span>
+        <p className="flex h-8 items-center text-xs font-medium text-fg">{email ?? 'Não informado'}</p>
+      </div>
+    )
+  }
+  return (
+    <div>
+      <label className="label" htmlFor="ac-email">
+        E-mail <span className="font-normal text-fg-4">(opcional)</span>
+      </label>
+      <div className="flex gap-2">
+        <input id="ac-email" type="email" className="input" placeholder="seu@email.com" value={novo} onChange={(e) => setNovo(e.target.value)} />
+        <Button size="sm" className="h-8" loading={salvando} disabled={!novo.includes('@')} onClick={() => void salvar()}>
+          Salvar
+        </Button>
+      </div>
+      <p className="mt-1 text-2xs text-fg-4">Sem e-mail, se esquecer a senha só o suporte consegue gerar outra.</p>
+    </div>
   )
 }

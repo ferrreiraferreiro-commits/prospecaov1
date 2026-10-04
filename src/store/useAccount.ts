@@ -8,6 +8,8 @@ export type Ciclo = 'diario' | 'semanal' | 'mensal' | 'trimestral'
 export interface Profile {
   user_id: string
   email: string | null
+  /** Nome de usuário para entrar (além do e-mail) */
+  usuario?: string | null
   nome: string | null
   cidade: string | null
   plano: 'teste' | 'ativo' | 'cancelado' | 'vitalicio'

@@ -142,6 +142,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
   const [theme, setTheme] = useTheme()
   const navigate = useNavigate()
   const admin = useIsAdmin()
+  const usuario = useAccount((s) => s.profile?.usuario ?? null)
 
   const fullName = settings.nome_vendedor.trim() || (login ? login.charAt(0).toUpperCase() + login.slice(1) : 'Você')
   const firstName = fullName.split(/\s+/)[0]
@@ -171,7 +172,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
             <Avatar src={settings.avatar} name={fullName} size={40} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-fg">{fullName}</p>
-              <p className="truncate text-xs text-fg-3">{login ?? 'Modo local (este navegador)'}</p>
+              <p className="truncate text-xs text-fg-3">{usuario ? `@${usuario}` : (login ?? 'Modo local (este navegador)')}</p>
             </div>
           </div>
 

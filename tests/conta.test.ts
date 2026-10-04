@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isBlockReport, parseLeadsAny, parseSheet, splitRows } from '../src/lib/sheet'
 import { accessOf, planInfo, type Profile } from '../src/store/useAccount'
 import { escolhaAtual, fimSugerido, gerarSenha, loginDe, recebidoNoMes, somarCiclo } from '../src/lib/admin'
-import { isLegacyEmail, signIn, SO_EMAIL, toAuthPassword } from '../src/lib/auth'
+import { isLegacyEmail, normalizarUsuario, signIn, toAuthPassword, usuarioValido } from '../src/lib/auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 describe('importar planilha', () => {
@@ -108,10 +108,12 @@ describe('tela Contas', () => {
   })
 })
 
-describe('login só por e-mail, senha e pagamentos', () => {
-  const fakeClient = (senhaCerta: string) => {
+describe('login por usuário ou e-mail, senha e pagamentos', () => {
+  // Banco de mentira: usuário → e-mail do Auth, e a senha certa
+  const fakeClient = (senhaCerta: string, usuarios: Record<string, string> = {}) => {
     const tentativas: { email: string; password: string }[] = []
     const client = {
+      rpc: async (_fn: string, args: { u: string }) => ({ data: usuarios[args.u] ?? null }),
       auth: {
         signInWithPassword: async (c: { email: string; password: string }) => {
           tentativas.push(c)
@@ -122,19 +124,27 @@ describe('login só por e-mail, senha e pagamentos', () => {
     return { client, tentativas }
   }
 
-  it('recusa nome de usuário e o e-mail interno antigo', async () => {
-    const { client, tentativas } = fakeClient('x')
-    expect(await signIn(client, 'gabriel', '123')).toBe(SO_EMAIL)
-    expect(await signIn(client, 'gabriel@prospeccao.local', '123')).toBe(SO_EMAIL)
-    expect(tentativas).toHaveLength(0)
+  it('entra pelo usuário (conta antiga, com a senha de sempre)', async () => {
+    const { client, tentativas } = fakeClient(toAuthPassword('minhasenha'), { gabriel: 'gabriel@prospeccao.local' })
+    expect(await signIn(client, ' Gabriel ', 'minhasenha')).toBeNull()
+    expect(tentativas.map((t) => t.email)).toEqual(['gabriel@prospeccao.local', 'gabriel@prospeccao.local'])
     expect(isLegacyEmail('Gabriel@prospeccao.local')).toBe(true)
     expect(isLegacyEmail('gabriel@gmail.com')).toBe(false)
   })
-  it('conta antiga com e-mail novo ainda entra com a senha de sempre', async () => {
-    const { client, tentativas } = fakeClient(toAuthPassword('minhasenha'))
-    expect(await signIn(client, ' Gabriel@Gmail.com ', 'minhasenha')).toBeNull()
-    expect(tentativas.map((t) => t.email)).toEqual(['gabriel@gmail.com', 'gabriel@gmail.com'])
-    expect(await signIn(fakeClient('outra').client, 'a@b.com', 'errada')).toBe('E-mail ou senha incorretos.')
+  it('entra pelo e-mail; usuário que não existe nem tenta', async () => {
+    const { client, tentativas } = fakeClient('nova123', { ana: 'ana@gmail.com' })
+    expect(await signIn(client, 'ANA@gmail.com', 'nova123')).toBeNull()
+    expect(await signIn(client, 'ana', 'nova123')).toBeNull()
+    expect(tentativas.map((t) => t.email)).toEqual(['ana@gmail.com', 'ana@gmail.com'])
+    expect(await signIn(client, 'ninguem', 'x')).toBe('Usuário, e-mail ou senha incorretos.')
+    expect(tentativas).toHaveLength(2)
+  })
+  it('regra do usuário no cadastro', () => {
+    expect(usuarioValido('gabriel.sites')).toBe(true)
+    expect(usuarioValido('ab')).toBe(false)
+    expect(usuarioValido('com espaço')).toBe(false)
+    expect(usuarioValido('Maiuscula')).toBe(false)
+    expect(normalizarUsuario(' João Silva ')).toBe('joao.silva')
   })
   it('gera senha provisória fácil de ditar', () => {
     const s = gerarSenha()

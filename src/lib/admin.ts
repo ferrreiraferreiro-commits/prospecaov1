@@ -6,6 +6,7 @@ import { LOGIN_DOMAIN } from './auth'
 export interface Conta {
   user_id: string
   email: string | null
+  usuario: string | null
   nome: string | null
   cidade: string | null
   plano: Profile['plano']

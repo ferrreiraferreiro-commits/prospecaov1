@@ -8,11 +8,10 @@ import { Button, Spinner, WhatsAppIcon } from './components/ui'
 import { LocalRepository } from './data/localRepository'
 import { SupabaseRepository } from './data/supabaseRepository'
 import { supabase } from './data/supabaseClient'
-import { isLegacyEmail } from './lib/auth'
 import { suporteUrl, useSuporteWhatsApp } from './lib/suporte'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
-import { CadastrarEmailPage, ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pages/AuthPages'
+import { ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pages/AuthPages'
 import { LandingPage } from './pages/LandingPage'
 import { PainelPage } from './pages/PainelPage'
 import type { Repository } from './data/repository'
@@ -154,14 +153,6 @@ function Loaded() {
         <p className="max-w-md text-xs text-fg-3">{loadError ?? bizError}</p>
         <Button onClick={() => repo && initAll(repo)}>Tentar de novo</Button>
       </div>
-    )
-  }
-  // Conta antiga, do login por nome de usuário: cadastra o e-mail antes de tudo
-  if (supabase && profile && isLegacyEmail(profile.email)) {
-    return (
-      <BrowserRouter>
-        <CadastrarEmailPage client={supabase} login={profile.email!.split('@')[0]} onDone={() => void useAccount.getState().init(supabase, profile.user_id)} />
-      </BrowserRouter>
     )
   }
   const access = accessOf(profile)

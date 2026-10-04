@@ -1,10 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ArrowLeft, CalendarClock, Headphones, MailCheck, Wallet } from 'lucide-react'
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
 import { Button } from '../components/ui'
-import { authErrorPt, signIn, SO_EMAIL } from '../lib/auth'
+import { authErrorPt, emailDoLogin, isLegacyEmail, signIn, USUARIO_REGRA, usuarioValido } from '../lib/auth'
 import { suporteUrl, useSuporteWhatsApp } from '../lib/suporte'
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
@@ -85,7 +85,6 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const suporte = useSuporteWhatsApp()
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -108,7 +107,7 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
       }
     >
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
-        <Input id="lg-email" label="E-mail" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="seu@email.com" value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus />
+        <Input id="lg-email" label="Usuário ou e-mail" autoComplete="username" autoCapitalize="none" spellCheck={false} value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus />
         <Input
           id="lg-pass"
           label="Senha"
@@ -123,16 +122,7 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
             </Link>
           }
         />
-        {error && (
-          <ErrorText>
-            {error}
-            {error === SO_EMAIL && suporte && (
-              <a href={suporteUrl(suporte, 'Oi! Eu entrava na XS com nome de usuário e preciso cadastrar meu e-mail.')} target="_blank" rel="noreferrer" className="mt-1.5 block font-medium text-red-200 underline">
-                Falar no WhatsApp
-              </a>
-            )}
-          </ErrorText>
-        )}
+        {error && <ErrorText>{error}</ErrorText>}
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
           Entrar
         </Button>
@@ -143,21 +133,30 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
 
 export function SignupPage({ client }: { client: SupabaseClient }) {
   const [nome, setNome] = useState('')
+  const [usuario, setUsuario] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sentTo, setSentTo] = useState<string | null>(null)
+  const livre = useUsuarioLivre(client, usuario)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    const u = usuario.trim().toLowerCase()
+    if (!usuarioValido(u)) return setError(USUARIO_REGRA)
     if (password.length < 6) return setError('A senha precisa ter pelo menos 6 caracteres.')
     setLoading(true)
     setError(null)
+    const { data: disponivel } = await client.rpc('usuario_disponivel', { u })
+    if (disponivel === false) {
+      setLoading(false)
+      return setError('Esse usuário já está em uso. Escolha outro.')
+    }
     const { data, error } = await client.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { nome: nome.trim() }, emailRedirectTo: `${window.location.origin}/` },
+      options: { data: { nome: nome.trim(), usuario: u }, emailRedirectTo: `${window.location.origin}/` },
     })
     setLoading(false)
     if (error) return setError(authErrorPt(error.message))
@@ -194,6 +193,21 @@ export function SignupPage({ client }: { client: SupabaseClient }) {
     >
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <Input id="cd-nome" label="Seu nome" autoComplete="name" value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus />
+        <div>
+          <Input
+            id="cd-usuario"
+            label="Usuário"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="ex.: gabriel.sites"
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+            required
+            aside={<UsuarioStatus estado={livre} />}
+          />
+          <p className="mt-1 text-2xs text-fg-4">Você entra com o usuário ou com o e-mail.</p>
+        </div>
         <Input id="cd-email" label="E-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <Input id="cd-pass" label="Senha" type="password" autoComplete="new-password" minLength={6} placeholder="Pelo menos 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required />
         {error && <ErrorText>{error}</ErrorText>}
@@ -220,13 +234,27 @@ export function ForgotPasswordPage({ client }: { client: SupabaseClient }) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [semEmail, setSemEmail] = useState(false)
   const [sent, setSent] = useState(false)
+  const suporte = useSuporteWhatsApp()
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/redefinir-senha` })
+    setSemEmail(false)
+    const destino = await emailDoLogin(client, email)
+    // Conta só com usuário (sem e-mail): a senha nova vem pelo dono da XS
+    if (isLegacyEmail(destino)) {
+      setLoading(false)
+      return setSemEmail(true)
+    }
+    if (!destino) {
+      // Usuário que não existe: mesma resposta de sucesso, sem dizer se existe
+      setLoading(false)
+      return setSent(true)
+    }
+    const { error } = await client.auth.resetPasswordForEmail(destino, { redirectTo: `${window.location.origin}/redefinir-senha` })
     setLoading(false)
     if (error) return setError(authErrorPt(error.message))
     setSent(true)
@@ -235,7 +263,7 @@ export function ForgotPasswordPage({ client }: { client: SupabaseClient }) {
   return (
     <AuthShell
       title="Recuperar a senha"
-      subtitle={sent ? 'Se esse e-mail tiver conta, o link para criar uma senha nova já está a caminho.' : 'Digite o e-mail da sua conta. Mandamos um link para criar uma senha nova.'}
+      subtitle={sent ? 'Se essa conta existir, o link para criar uma senha nova já foi para o e-mail dela.' : 'Digite seu usuário ou e-mail. Mandamos um link para o e-mail da conta.'}
       footer={
         <Link to="/entrar" className="font-medium text-blue-300 hover:text-blue-200">
           Voltar para entrar
@@ -244,8 +272,18 @@ export function ForgotPasswordPage({ client }: { client: SupabaseClient }) {
     >
       {!sent && (
         <form onSubmit={(e) => void submit(e)} className="space-y-4">
-          <Input id="rs-email" label="E-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+          <Input id="rs-email" label="Usuário ou e-mail" autoComplete="username" autoCapitalize="none" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
           {error && <ErrorText>{error}</ErrorText>}
+          {semEmail && (
+            <ErrorText>
+              Essa conta não tem e-mail cadastrado, então o link não tem para onde ir. Fale com a gente para receber uma senha nova.
+              {suporte && (
+                <a href={suporteUrl(suporte, `Oi! Esqueci a senha da XS. Meu usuário: ${email.trim()}`)} target="_blank" rel="noreferrer" className="mt-1.5 block font-medium text-red-200 underline">
+                  Falar no WhatsApp
+                </a>
+              )}
+            </ErrorText>
+          )}
           <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
             Enviar link
           </Button>
@@ -286,51 +324,40 @@ export function NewPasswordPage({ client, onDone }: { client: SupabaseClient; on
   )
 }
 
-/**
- * Conta antiga (entrava por nome de usuário): cadastra um e-mail de verdade antes de
- * continuar, porque a entrada agora é só por e-mail. A senha continua a mesma.
- */
-export function CadastrarEmailPage({ client, login, onDone }: { client: SupabaseClient; login: string; onDone: () => void }) {
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+type Livre = 'vazio' | 'invalido' | 'checando' | 'livre' | 'ocupado'
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    const { error } = await client.rpc('definir_meu_email', { novo: email })
-    if (error) {
-      setLoading(false)
-      return setError(error.message)
+/** Confere no banco, com uma pausa curta, se o usuário digitado está livre. */
+function useUsuarioLivre(client: SupabaseClient, usuario: string): Livre {
+  const u = usuario.trim().toLowerCase()
+  const [res, setRes] = useState<{ u: string; livre: boolean } | null>(null)
+  useEffect(() => {
+    if (!usuarioValido(u)) return
+    let vivo = true
+    const t = setTimeout(() => {
+      void client.rpc('usuario_disponivel', { u }).then(({ data }) => {
+        if (vivo) setRes({ u, livre: data !== false })
+      })
+    }, 400)
+    return () => {
+      vivo = false
+      clearTimeout(t)
     }
-    // Sessão nova já com o e-mail novo
-    await client.auth.refreshSession()
-    onDone()
-  }
+  }, [client, u])
+  if (!u) return 'vazio'
+  if (!usuarioValido(u)) return 'invalido'
+  if (res?.u !== u) return 'checando'
+  return res.livre ? 'livre' : 'ocupado'
+}
 
-  return (
-    <AuthShell
-      title="Cadastre seu e-mail"
-      subtitle={
-        <>
-          Agora a XS entra só pelo e-mail, não mais pelo usuário <span className="text-fg">{login}</span>. Cadastre o seu para continuar.
-        </>
-      }
-      footer={
-        <button type="button" onClick={() => void client.auth.signOut()} className="text-fg-3 hover:text-fg">
-          Sair
-        </button>
-      }
-    >
-      <form onSubmit={(e) => void submit(e)} className="space-y-4">
-        <Input id="ce-email" label="Seu e-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-        <p className="text-2xs text-fg-3">Da próxima vez, entre com esse e-mail e a mesma senha de sempre.</p>
-        {error && <ErrorText>{error}</ErrorText>}
-        <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
-          Salvar e continuar
-        </Button>
-      </form>
-    </AuthShell>
-  )
+const LIVRE_TEXTO: Record<Exclude<Livre, 'vazio'>, [string, string]> = {
+  invalido: ['3 a 30: letras, números, . _ -', 'text-fg-4'],
+  checando: ['Conferindo…', 'text-fg-4'],
+  livre: ['Disponível', 'text-emerald-300'],
+  ocupado: ['Já está em uso', 'text-red-300'],
+}
+
+function UsuarioStatus({ estado }: { estado: Livre }) {
+  if (estado === 'vazio') return null
+  const [texto, cor] = LIVRE_TEXTO[estado]
+  return <span className={`text-2xs ${cor}`}>{texto}</span>
 }
