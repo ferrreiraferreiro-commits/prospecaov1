@@ -12,6 +12,7 @@ import { changePassword, isLegacyEmail, USUARIO_REGRA, usuarioValido } from '../
 import { formatDateTime } from '../lib/dates'
 import { getAvisosOn, notificationPermission, setAvisosOn, showSystemNotification } from '../lib/notify'
 import { InstalarApp } from '../components/InstalarApp'
+import { GoogleKeyCard } from '../components/GoogleKeyCard'
 import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
@@ -172,6 +173,8 @@ export function SettingsPage() {
       </Card>
 
       {supabase && <AcessoCard />}
+
+      <GoogleKeyCard />
 
       <Card
         title="WhatsApp"

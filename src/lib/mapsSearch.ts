@@ -1,8 +1,9 @@
 import { mapsKey, phoneKey } from './duplicates'
+import { normalizeKey } from './statuses'
 import type { ParsedLead } from './parser'
 import type { Lead } from './types'
 
-/** Empresa encontrada pela busca da XS (base pública do CNPJ, pelo servidor de busca). */
+/** Empresa encontrada pela busca da XS (base aberta de comércios, ou Google Maps com a chave do usuário). */
 export interface MapsResult {
   id: string
   name: string
@@ -25,7 +26,13 @@ export interface MapsResult {
   enrichmentSource: string
   hasWhatsapp: boolean
   recurring: boolean
-  /** Campos que vêm da base do CNPJ */
+  /** De onde veio: base aberta (Overture Maps) ou Google Maps */
+  source?: 'base' | 'google'
+  /** Categoria do Google (ex.: "Barbearia") */
+  category?: string
+  /** Página do Facebook (base aberta) */
+  facebook?: string
+  /** Campos de importações antigas (base do CNPJ) */
   email?: string
   phone2?: string
   /** Domínio do e-mail próprio: candidato a site (conferido se "Conferir os sites" estiver ligado) */
@@ -38,7 +45,10 @@ export interface MapsResult {
 
 export type Mode = 1 | 0 | -1
 
+export type SearchSource = 'base' | 'google'
+
 export interface MapsSearchInput {
+  source: SearchSource
   niches: string[]
   /** "Cidade, UF" */
   location: string
@@ -87,35 +97,21 @@ export const PHASE_LABEL: Record<MapsPhase, string> = {
   error: 'Erro',
 }
 
-export const POPULAR_NICHES = [
-  'Barbearia',
-  'Salão de beleza',
-  'Clínica odontológica',
-  'Clínica de estética',
-  'Academia',
-  'Pet shop',
-  'Clínica veterinária',
-  'Oficina mecânica',
-  'Restaurante',
-  'Pizzaria',
-  'Hamburgueria',
-  'Padaria',
-  'Imobiliária',
-  'Escritório de advocacia',
-  'Contabilidade',
-  'Loja de roupas',
-  'Ótica',
-  'Auto escola',
-  'Estúdio de tatuagem',
-  'Fisioterapia',
-]
+/** Nome + cidade: só para lugares da base aberta sem telefone (não têm outro jeito de comparar). */
+export function nameCityKey(nome: string | null | undefined, cidade: string | null | undefined): string | null {
+  const n = normalizeKey(nome ?? '')
+  return n ? `${n}|${normalizeKey(cidade ?? '')}` : null
+}
 
-/** Chaves (telefone, lugar no Maps e CNPJ) dos leads que já estão no app — a busca pula esses. */
-export function knownKeys(leads: Pick<Lead, 'telefone' | 'whatsapp' | 'maps_url' | 'cnpj'>[]): { phones: string[]; maps: string[]; cnpjs: string[] } {
+/** Chaves (telefone, lugar no Maps, CNPJ e nome + cidade) dos leads que já estão no app — a busca pula esses. */
+export function knownKeys(leads: Pick<Lead, 'telefone' | 'whatsapp' | 'maps_url' | 'cnpj' | 'empresa' | 'cidade'>[]): { phones: string[]; maps: string[]; cnpjs: string[]; names: string[] } {
   const phones = new Set<string>()
   const maps = new Set<string>()
   const cnpjs = new Set<string>()
+  const names = new Set<string>()
   for (const l of leads) {
+    const nk = nameCityKey(l.empresa, l.cidade)
+    if (nk) names.add(nk)
     for (const t of [l.telefone, l.whatsapp]) {
       const k = phoneKey(t)
       if (k) phones.add(k)
@@ -125,7 +121,7 @@ export function knownKeys(leads: Pick<Lead, 'telefone' | 'whatsapp' | 'maps_url'
     const c = (l.cnpj ?? '').replace(/\D/g, '')
     if (c.length === 14) cnpjs.add(c)
   }
-  return { phones: [...phones], maps: [...maps], cnpjs: [...cnpjs] }
+  return { phones: [...phones], maps: [...maps], cnpjs: [...cnpjs], names: [...names] }
 }
 
 const NICHE_CASE = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
@@ -133,7 +129,12 @@ const NICHE_CASE = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : 
 /** Converte um resultado do Maps no formato de importação dos leads. */
 export function mapsToParsed(r: MapsResult, index: number): ParsedLead {
   const fromReceita = r.enrichmentSource.startsWith('Receita')
-  const extras: Record<string, string> = { Origem: fromReceita ? 'Busca de empresas (base pública do CNPJ)' : 'Busca no Maps (XS)' }
+  const extras: Record<string, string> = {
+    Origem: fromReceita ? 'Busca de empresas (base pública do CNPJ)' : r.source === 'base' ? 'Busca de empresas (base aberta)' : 'Busca de empresas (Google Maps)',
+  }
+  if (r.category && normalizeKey(r.category) !== normalizeKey(r.niche)) extras['Categoria no Google'] = r.category
+  if (r.facebook) extras.Facebook = r.facebook
+  if (r.cep) extras.CEP = r.cep
   if (r.razao && r.razao !== r.name) extras['Razão social'] = r.razao
   if (r.email) extras['E-mail'] = r.email
   if (r.phone2) extras['Telefone 2'] = r.phone2

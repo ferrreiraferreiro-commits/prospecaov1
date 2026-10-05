@@ -80,7 +80,7 @@ describe('busca no Maps vai direto para os leads', () => {
     expect(n).toBe(2)
     const { leads, imports } = useApp.getState()
     expect(leads.map((l) => l.empresa)).toEqual(['Empresa a', 'Empresa b'])
-    expect(imports[0].arquivo).toBe('Maps · barbearia · Poços de Caldas, MG')
+    expect(imports[0].arquivo).toBe('Google Maps · barbearia · Poços de Caldas, MG')
   })
 
   it('pula quem já está nos leads (telefone ou lugar no Maps) e não duplica ao repetir', async () => {
