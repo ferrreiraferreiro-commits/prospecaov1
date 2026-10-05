@@ -154,7 +154,7 @@ describe('Disparo', () => {
     expect(funnelMessages(funnel)).toBe(2)
   })
 
-  it('monta etapas, rodízio de variações e deixa {saudacao} para o motor', () => {
+  it('monta etapas, rodízio de variações e deixa {saudacao} para a hora do envio', () => {
     const { etapas, destinatarios } = buildCampaignPayload(funnel, [lead(), lead({ id: 'l2', empresa: 'Pet Shop Amigo' })], DEFAULT_SETTINGS)
     expect(etapas).toEqual([{ tipo: 'mensagem' }, { tipo: 'espera', ms: 30_000 }, { tipo: 'mensagem' }])
     expect(destinatarios[0].textos[0]).toBe('{saudacao}! Vi a Padaria Sol Nascente em Poços de Caldas.')

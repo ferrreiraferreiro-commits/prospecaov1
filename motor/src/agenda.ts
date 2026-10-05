@@ -1,11 +1,10 @@
 /**
  * Agendamentos de WhatsApp: "manda esta mensagem para tal pessoa amanhã às 8h".
  * Fica em motor/storage/agendamentos.json e é enviado pelo próprio motor no horário,
- * desde que o computador esteja ligado e o WhatsApp conectado.
+ * desde que o WhatsApp esteja conectado.
  */
 import { randomInt, randomUUID } from 'node:crypto'
 import { finalizeText } from './disparo.js'
-import { setKeepAwake } from './keepAwake.js'
 import { readJson, writeJson } from './store.js'
 import { formatBrazilPhone, getWa, isValidBrazilWhatsApp, samePhone, sendText, waEvents } from './whatsapp.js'
 
@@ -40,7 +39,6 @@ for (const a of list) if (a.status === 'enviando') a.status = 'agendado'
 
 function save() {
   writeJson(FILE, list)
-  setKeepAwake('agenda', list.some((a) => a.status === 'agendado'))
 }
 save()
 

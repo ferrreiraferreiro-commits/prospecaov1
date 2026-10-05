@@ -97,7 +97,7 @@ const sections: LegalSection[] = [
             públicos da empresa são consultados na BrasilAPI.
           </>,
           <>
-            <strong>Pelo WhatsApp</strong>: se você usar o disparo automático e conectar o seu WhatsApp ao Motor WhatsApp XS (programa opcional), a confirmação de entrega, de leitura e as respostas às mensagens
+            <strong>Pelo WhatsApp</strong>: se você conectar o seu WhatsApp à XS para o disparo automático, a confirmação de entrega, de leitura e as respostas às mensagens
             enviadas pela XS entram no histórico do lead.
           </>,
         ]}
@@ -160,8 +160,8 @@ const sections: LegalSection[] = [
           ligado ao seu usuário, e o banco aplica regras de acesso por linha: uma conta só consegue ler e alterar os próprios dados.
         </p>
         <p>
-          Se você usar o <strong>Motor WhatsApp XS</strong> (programa opcional, só para o disparo automático no WhatsApp), ele guarda no seu computador a sessão do
-          WhatsApp e as campanhas de envio. Essas informações não são enviadas para os nossos servidores.
+          Se você conectar o seu <strong>WhatsApp</strong> à XS (para disparos, funis e mensagens agendadas), a sessão do WhatsApp, as campanhas, os
+          agendamentos e as respostas recebidas ficam guardados no servidor da XS (VPS), separados por conta e acessíveis só com o seu login.
         </p>
         <p>
           Algumas preferências ficam salvas no seu navegador (veja <a href="#navegador">Cookies e armazenamento no navegador</a>).
@@ -188,6 +188,10 @@ const sections: LegalSection[] = [
               da busca e, para pular quem você já tem, os telefones da sua lista, que são usados só durante a busca e não ficam guardados.
             </>,
             <>
+              <strong>Servidor de WhatsApp da XS (o mesmo VPS, no Canadá)</strong>: mantém o WhatsApp que você conectar, com as campanhas, os
+              agendamentos, os nomes e telefones dos destinatários, os textos enviados e as respostas recebidas, para fazer os envios e mostrar os resultados.
+            </>,
+            <>
               <strong>Google (Places API)</strong>: só se você colocar a sua chave do Google. A busca envia ao Google o tipo de negócio e a cidade,
               usando a sua chave, que fica guardada na sua conta da XS e só é usada nas suas buscas.
             </>,
@@ -195,7 +199,7 @@ const sections: LegalSection[] = [
               <strong>Overture Maps Foundation</strong>: origem da base aberta de comércios (dados abertos, licença CDLA Permissive 2.0).
             </>,
             <>
-              <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pelo Motor WhatsApp XS saem da sua própria conta de WhatsApp, conectada por QR Code.
+              <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pela XS saem da sua própria conta de WhatsApp, conectada por QR Code.
             </>,
             <>
               <strong>BrasilAPI</strong>: consulta de dados públicos de CNPJ.
@@ -258,7 +262,7 @@ const sections: LegalSection[] = [
             'Conexão com o site e com o banco de dados por HTTPS.',
             'Login com e-mail e senha; a senha é guardada em formato de hash pelo serviço de autenticação.',
             'Separação de dados por usuário diretamente no banco de dados.',
-            'O Motor WhatsApp XS só aceita conexões do próprio computador e só responde ao app da XS.',
+            'O WhatsApp de cada conta roda separado no servidor da XS, sem porta aberta para a internet, e só atende pedidos feitos com o login da própria conta.',
           ]}
         />
         <p>
@@ -282,7 +286,10 @@ const sections: LegalSection[] = [
           são apagados do banco de dados. Cópias de segurança mantidas pelos provedores de infraestrutura podem levar algum tempo para serem
           substituídas, e algumas informações podem ser mantidas quando a lei exigir.
         </p>
-        <p>Os dados guardados no seu computador pelo Motor WhatsApp XS ficam sob o seu controle e podem ser apagados excluindo a pasta de dados do programa.</p>
+        <p>
+          A sessão do WhatsApp é apagada do servidor quando você clica em <strong>Desconectar</strong> na tela Conexão. As campanhas e os agendamentos
+          ficam guardados enquanto a sua conta existir, e você pode excluí-los no próprio app.
+        </p>
       </>
     ),
   },

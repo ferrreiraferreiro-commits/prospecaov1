@@ -2,11 +2,9 @@ import { Bell, Camera, Database, Download, LogOut, Trash2, Upload } from 'lucide
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
-import { MOTOR_DOWNLOAD, MotorSteps } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Segmented } from '../components/ui'
 import { getWhatsAppDestino, setWhatsAppDestino } from '../components/whatsapp'
-import { confirmAction } from '../components/kit'
 import { supabase } from '../data/supabaseClient'
 import { changePassword, isLegacyEmail, USUARIO_REGRA, usuarioValido } from '../lib/auth'
 import { formatDateTime } from '../lib/dates'
@@ -17,8 +15,8 @@ import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
 import { BIZ_TABLES, emptyBiz, type BizSnapshot } from '../lib/biz'
-import { DEFAULT_MOTOR_URL, desligarMotorDaConta, getMotorUrl, setMotorUrl, useMotor } from '../lib/motor'
-import { useAccount, useHasMotor } from '../store/useAccount'
+import { useWaServico } from '../lib/waServico'
+import { useAccount, useHasWhatsApp } from '../store/useAccount'
 import { useBiz } from '../store/useBiz'
 
 
@@ -38,8 +36,7 @@ function Card({ id, title, description, children, actions }: { id?: string; titl
 }
 
 export function SettingsPage() {
-  const motor = useHasMotor()
-  const nuvem = useMotor((s) => s.nuvem)
+  const temWhatsApp = useHasWhatsApp()
   const settings = useApp((s) => s.settings)
   const imports = useApp((s) => s.imports)
   const leads = useApp((s) => s.leads)
@@ -52,7 +49,7 @@ export function SettingsPage() {
   const avatarRef = useRef<HTMLInputElement>(null)
   const { hash } = useLocation()
 
-  // Links como /configuracoes#motor levam direto à seção
+  // Links como /configuracoes#whatsapp levam direto à seção
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [hash])
@@ -130,7 +127,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="Ajustes" subtitle={motor ? 'Perfil, avisos, Motor WhatsApp XS e backup.' : 'Perfil, avisos e backup.'} />
+      <PageHeader title="Ajustes" subtitle={temWhatsApp ? 'Perfil, avisos, WhatsApp e backup.' : 'Perfil, avisos e backup.'} />
 
       <Card id="perfil" title="Meu perfil" description="O primeiro nome entra no roteiro como {nome}." actions={<Button variant="primary" size="sm" onClick={saveProfile}>Salvar perfil</Button>}>
         <div className="mb-4 flex items-center gap-3">
@@ -347,18 +344,18 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      {motor && (nuvem ? <WhatsAppNuvemCard /> : <MotorCard />)}
+      {temWhatsApp && <WhatsAppCard />}
 
     </div>
   )
 }
 
-/** Modo nuvem: o WhatsApp roda na XS, não há motor para baixar. */
-function WhatsAppNuvemCard() {
-  const online = useMotor((s) => s.online)
-  const wa = useMotor((s) => s.health?.whatsapp)
+/** O WhatsApp roda na nuvem da XS: aqui só a situação e o atalho para a Conexão. */
+function WhatsAppCard() {
+  const online = useWaServico((s) => s.online)
+  const wa = useWaServico((s) => s.health?.whatsapp)
   return (
-    <Card id="motor" title="WhatsApp" description="O WhatsApp dos disparos, funis e mensagens agendadas roda na nuvem da XS. Não precisa instalar nada.">
+    <Card id="whatsapp" title="WhatsApp" description="O WhatsApp dos disparos, funis e mensagens agendadas roda na nuvem da XS. Não precisa instalar nada.">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="flex items-center gap-2 text-fg-2">
           <span className={clsx('size-2 rounded-full', online ? (wa?.status === 'connected' ? 'bg-go' : 'bg-amber-400') : 'bg-red-400')} />
@@ -367,103 +364,6 @@ function WhatsAppNuvemCard() {
         <Link to="/whatsapp" className="inline-flex h-8 items-center rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-[#3b7bf6]">
           Abrir Conexão
         </Link>
-      </div>
-    </Card>
-  )
-}
-
-function MotorCard() {
-  const online = useMotor((s) => s.online)
-  const health = useMotor((s) => s.health)
-  const check = useMotor((s) => s.check)
-  const ligado = useMotor((s) => s.ligado)
-  const computador = useMotor((s) => s.computador)
-  const toast = useApp((s) => s.toast)
-  const [url, setUrl] = useState(getMotorUrl())
-  const [desligando, setDesligando] = useState(false)
-  return (
-    <Card
-      id="motor"
-      title="Motor WhatsApp XS"
-      description="Programa opcional que roda no seu computador e mantém o WhatsApp conectado para os disparos automáticos. A busca de empresas não precisa dele."
-      actions={
-        <span className={clsx('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium', online ? 'bg-go/10 text-emerald-300' : 'bg-tint/[0.04] text-fg-3')}>
-          <span className={clsx('size-1.5 rounded-full', online ? 'bg-go' : 'bg-fg-4')} /> {online ? `Ligado · v${health?.versao ?? ''}` : 'Desligado'}
-        </span>
-      }
-    >
-      <div className="space-y-3 text-xs">
-        {online && health && (
-          <dl className="grid grid-cols-2 gap-2">
-            <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
-              <dt className="text-[10px] text-fg-4">WhatsApp</dt>
-              <dd className="text-fg">{health.whatsapp.status === 'connected' ? (health.whatsapp.user?.name ?? 'Conectado') : 'Desconectado'}</dd>
-            </div>
-            <div className="rounded-md border border-line-soft bg-ink px-2.5 py-1.5">
-              <dt className="text-[10px] text-fg-4">Disparos em andamento</dt>
-              <dd className="text-fg">{health.disparo.running}</dd>
-            </div>
-          </dl>
-        )}
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <MotorSteps ligado={ligado} />
-          </div>
-          <a href={MOTOR_DOWNLOAD} download className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-[#3b7bf6]">
-            <Download className="size-3.5" /> Baixar o Motor WhatsApp XS (Windows)
-          </a>
-        </div>
-        {supabase ? (
-          ligado && (
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
-              <p className="text-fg-2">
-                Ligado à sua conta{computador ? (
-                  <>
-                    {' '}
-                    no computador <strong className="text-fg">{computador}</strong>
-                  </>
-                ) : null}
-                . Para usar outro computador, é só abrir o motor nele.
-              </p>
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={desligando}
-                onClick={async () => {
-                  if (!confirmAction('Desligar o motor da sua conta? Para usar de novo, abra o motor e ligue outra vez.')) return
-                  setDesligando(true)
-                  try {
-                    await desligarMotorDaConta(supabase!)
-                    toast('Motor desligado da conta.')
-                  } catch (err) {
-                    toast(err instanceof Error ? err.message : 'Não foi possível desligar.', 'error')
-                  } finally {
-                    setDesligando(false)
-                  }
-                }}
-              >
-                Desligar da conta
-              </Button>
-            </div>
-          )
-        ) : (
-          <div className="flex flex-wrap items-end gap-2 border-t border-line-soft pt-3">
-            <label className="block min-w-60 flex-1">
-              <span className="label">Endereço do motor</span>
-              <input className="input font-mono text-xs" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={DEFAULT_MOTOR_URL} />
-            </label>
-            <Button
-              size="sm"
-              onClick={async () => {
-                setMotorUrl(url)
-                await check()
-                toast(useMotor.getState().online ? 'Motor encontrado.' : 'Motor não respondeu nesse endereço.', useMotor.getState().online ? 'success' : 'error')
-              }}
-            >
-              Salvar e testar
-            </Button>
-          </div>
-        )}
       </div>
     </Card>
   )

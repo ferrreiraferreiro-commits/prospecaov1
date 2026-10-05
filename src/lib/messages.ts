@@ -71,7 +71,7 @@ export function fillMessage(text: string, lead: Lead, settings: Settings, now: D
     nome: settings.nome_vendedor.trim().split(/\s+/)[0] ?? '',
     servico: settings.servico.trim() || 'desenvolvimento de sites',
   }
-  // Variáveis em `keep` ficam no texto (ex.: {saudacao} resolvida pelo Motor na hora do envio)
+  // Variáveis em `keep` ficam no texto (ex.: {saudacao} resolvida pelo WhatsApp da XS na hora do envio)
   const vars = Object.fromEntries(Object.entries(all).filter(([k]) => !keep.includes(k)))
   const filled = text.replace(/\{\s*(\w+)\s*\}/g, (m, key: string) => (key in vars ? vars[key] : m))
   return filled

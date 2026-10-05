@@ -4,18 +4,18 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatPhone, whatsappTarget } from '../lib/contact'
 import { formatRelative } from '../lib/dates'
-import { useMotor } from '../lib/motor'
+import { useWaServico } from '../lib/waServico'
 import { fillMessage, getMessages, lastMessageAt, responsavelDoLead, variationIndex, variationsOf } from '../lib/messages'
 import type { Lead } from '../lib/types'
 import { useLead } from '../store/derived'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { Button, Modal, WhatsAppIcon } from './ui'
-import { useSendMessage, useSendViaMotor, useWhatsApp } from './whatsapp'
+import { useSendMessage, useSendNow, useWhatsApp } from './whatsapp'
 
 /**
  * "Mandar mensagem": escolhe o modelo, confere o texto e abre o WhatsApp com ele escrito.
- * Com o Motor ligado e o WhatsApp conectado, também dá para enviar na hora, sem abrir nada.
+ * Com o WhatsApp conectado na XS, também dá para enviar na hora, sem abrir nada.
  */
 export function MessageModal() {
   const target = useUi((s) => s.message)
@@ -31,8 +31,8 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
   const toast = useApp((s) => s.toast)
   const send = useSendMessage()
   const openChat = useWhatsApp()
-  const sendNow = useSendViaMotor()
-  const motorPronto = useMotor((s) => !!s.online && s.health?.whatsapp.status === 'connected')
+  const sendNow = useSendNow()
+  const waPronto = useWaServico((s) => !!s.online && s.health?.whatsapp.status === 'connected')
   const [enviando, setEnviando] = useState(false)
   const templates = getMessages(settings)
   const [templateId, setTemplateId] = useState(() => templates.find((t) => t.id === initialTemplate)?.id ?? templates[0]?.id)
@@ -84,7 +84,7 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
             Abrir sem texto
           </Button>
           <Button
-            variant={motorPronto ? 'secondary' : 'primary'}
+            variant={waPronto ? 'secondary' : 'primary'}
             icon={<WhatsAppIcon className="size-3.5" />}
             disabled={!target || !text.trim() || enviando}
             onClick={() => {
@@ -96,7 +96,7 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
           >
             Abrir no WhatsApp
           </Button>
-          {motorPronto && (
+          {waPronto && (
             <Button
               variant="go"
               icon={<Send className="size-3.5" />}
@@ -179,8 +179,8 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
         </div>
 
         <p className="text-2xs leading-4 text-fg-4">
-          {motorPronto
-            ? '“Enviar agora” manda na hora pelo WhatsApp conectado no Motor. “Abrir no WhatsApp” só deixa o texto escrito para você conferir e enviar.'
+          {waPronto
+            ? '“Enviar agora” manda na hora pelo seu WhatsApp conectado na XS. “Abrir no WhatsApp” só deixa o texto escrito para você conferir e enviar.'
             : 'O WhatsApp abre com o texto pronto — nada é enviado sozinho.'}{' '}
           A mensagem fica no histórico do lead e o Status 2 vira “Mensagem enviada” se estiver vazio.
         </p>

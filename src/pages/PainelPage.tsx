@@ -22,8 +22,8 @@ import { monthKey, PROJECT_STATUS, projectProgress, summarize } from '../lib/biz
 import { formatDayLabel, formatLongToday, periodoLabel } from '../lib/dates'
 import { formatMoney } from '../lib/insights'
 import { saudacao } from '../lib/messages'
-import { useMotor } from '../lib/motor'
-import { useHasMotor } from '../store/useAccount'
+import { useWaServico } from '../lib/waServico'
+import { useHasWhatsApp } from '../store/useAccount'
 import { buildTodayPlan, todayQueue } from '../lib/selectors'
 import type { StatusId } from '../lib/types'
 import { useIndex, useMetrics, useToday } from '../store/derived'
@@ -55,10 +55,9 @@ export function PainelPage() {
   const projects = useBiz((s) => s.projects)
   const transactions = useBiz((s) => s.transactions)
   const payments = useBiz((s) => s.client_payments)
-  const motorOnline = useMotor((s) => s.online)
-  const wa = useMotor((s) => s.health?.whatsapp)
-  const motor = useHasMotor()
-  const nuvem = useMotor((s) => s.nuvem)
+  const waOnline = useWaServico((s) => s.online)
+  const wa = useWaServico((s) => s.health?.whatsapp)
+  const temWhatsApp = useHasWhatsApp()
 
   const plan = useMemo(
     () => buildTodayPlan(leads, interactions, index, meetings, today, settings.max_tentativas),
@@ -223,7 +222,7 @@ export function PainelPage() {
         <Card title="Atalhos">
           <div className="grid grid-cols-2 gap-2">
             <Shortcut to="/maps" icon={<MapPinned />} label="Buscar empresas" hint="Na hora, com telefone" />
-            {motor ? (
+            {temWhatsApp ? (
               <Shortcut to="/disparo" icon={<Send />} label="Novo disparo" hint={wa?.status === 'connected' ? `WhatsApp: ${wa.user?.name ?? 'conectado'}` : 'WhatsApp desconectado'} />
             ) : (
               <Shortcut to="/ligacao" icon={<Headphones />} label="Ligações de hoje" hint={`${plan.followups.length} retorno(s)`} />
@@ -231,8 +230,8 @@ export function PainelPage() {
             <Shortcut to="/leads" icon={<PhoneCall />} label="Lista de leads" hint={`${metrics.naoTrabalhados} sem contato`} />
             <Shortcut to="/precificacao" icon={<Sparkles />} label="Calcular orçamento" hint="Precificação" />
             <Shortcut to="/clientes" icon={<Users />} label="Clientes" hint={`${clientesAtivos.length} ativos`} />
-            {motor ? (
-              <Shortcut to="/whatsapp" icon={<Smartphone />} label="Conectar WhatsApp" hint={motorOnline ? (wa?.status === 'connected' ? 'Conectado' : 'Ler QR Code') : nuvem ? 'Serviço indisponível' : 'Motor desligado'} />
+            {temWhatsApp ? (
+              <Shortcut to="/whatsapp" icon={<Smartphone />} label="Conectar WhatsApp" hint={waOnline ? (wa?.status === 'connected' ? 'Conectado' : 'Ler QR Code') : 'Serviço indisponível'} />
             ) : (
               <Shortcut to="/financeiro" icon={<BadgeDollarSign />} label="Financeiro" hint={`Saldo ${formatMoney(fin.saldo)}`} />
             )}

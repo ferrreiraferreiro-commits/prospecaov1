@@ -1,4 +1,4 @@
-import { motorFetch } from './motor'
+import { waFetch } from './waServico'
 import { saudacao } from './messages'
 import { useApp } from '../store/useApp'
 
@@ -69,7 +69,7 @@ export function quickTimes(now = new Date()): { label: string; iso: string }[] {
 
 /** Leva envios e respostas dos agendamentos para o histórico dos leads (uma vez só). */
 export async function syncAgenda(): Promise<number> {
-  const list = await motorFetch<Agendamento[]>('/agenda', { timeoutMs: 6000 })
+  const list = await waFetch<Agendamento[]>('/agenda', { timeoutMs: 6000 })
   const app = useApp.getState()
   const exists = new Set(app.leads.map((l) => l.id))
   const itens: { id: string; envio: boolean; respostas: number }[] = []
@@ -88,6 +88,6 @@ export async function syncAgenda(): Promise<number> {
     }
     itens.push({ id: a.id, envio: precisaEnvio || a.sincEnvio, respostas: a.respostas.length })
   }
-  if (itens.length) await motorFetch('/agenda/sincronizado', { method: 'POST', json: { itens } })
+  if (itens.length) await waFetch('/agenda/sincronizado', { method: 'POST', json: { itens } })
   return itens.length
 }

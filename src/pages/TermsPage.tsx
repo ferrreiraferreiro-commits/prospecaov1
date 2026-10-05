@@ -97,7 +97,7 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          A XS depende de serviços de terceiros, como Supabase (banco de dados e login), Vercel (hospedagem), um servidor próprio de busca, Overture
+          A XS depende de serviços de terceiros, como Supabase (banco de dados e login), Vercel (hospedagem), um servidor próprio (busca e WhatsApp), Overture
           Maps (base aberta de comércios), Google (Places API, com a sua chave), BrasilAPI (consulta de CNPJ) e OpenStreetMap (mapas). A lista completa está na <a href="/privacidade#terceiros">Política de Privacidade</a>.
         </p>
         <p>
@@ -108,20 +108,19 @@ const sections: LegalSection[] = [
     ),
   },
   {
-    id: 'motor',
-    title: 'Motor WhatsApp XS',
+    id: 'whatsapp',
+    title: 'WhatsApp da XS',
     body: (
       <>
         <p>
-          O disparo automático no WhatsApp (envios em massa, funis e mensagens agendadas) funciona pelo <strong>Motor WhatsApp XS</strong>, um programa opcional
-          para Windows que você baixa dentro do app e roda no seu computador. Todo o resto, inclusive a busca de empresas, funciona direto no
-          navegador, no computador ou no celular.
+          O disparo automático no WhatsApp (envios em massa, funis e mensagens agendadas) roda nos servidores da XS. Você conecta o seu número por
+          QR Code dentro do app, sem instalar nada, e os envios continuam mesmo com o seu computador desligado.
         </p>
         <Dash
           items={[
-            'O Motor precisa ficar aberto enquanto os envios acontecem.',
-            'Ele só aceita conexões do próprio computador e guarda os dados dele numa pasta local, sob o seu controle.',
-            'Você é responsável pelo computador onde o Motor roda, inclusive pelo acesso de outras pessoas a ele.',
+            'Cada conta tem a sua própria conexão de WhatsApp, separada das outras.',
+            'O número de conexões ao mesmo tempo é limitado. Sem vaga, o recurso pode ficar indisponível por um tempo.',
+            'Você pode desconectar o seu WhatsApp a qualquer momento na tela Conexão.',
           ]}
         />
       </>
@@ -137,7 +136,7 @@ const sections: LegalSection[] = [
           serviços a XS funciona.
         </p>
         <p>
-          <strong>WhatsApp</strong>: o Motor WhatsApp XS conecta a sua própria conta de WhatsApp por QR Code, da mesma forma que o WhatsApp Web, e as mensagens
+          <strong>WhatsApp</strong>: a XS conecta a sua própria conta de WhatsApp por QR Code, da mesma forma que o WhatsApp Web, e as mensagens
           saem do seu número. Essa conexão não usa a API oficial do WhatsApp para empresas. O WhatsApp pode limitar ou bloquear números que enviam muitas
           mensagens ou recebem denúncias. A XS ajuda com intervalos entre envios e pausa automática, mas não garante que isso não aconteça. O uso e o
           conteúdo das mensagens são de sua responsabilidade.
@@ -167,13 +166,13 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          A XS, incluindo o código, o design, a marca, os textos e o Motor WhatsApp XS, pertence a{' '}
+          A XS, incluindo o código, o design, a marca e os textos, pertence a{' '}
           <Fill value={LEGAL.controlador} what="nome ou razão social" fallback="seu responsável" />. Todos os direitos reservados. Estes Termos dão a você o
           direito de usar o serviço enquanto seu plano estiver ativo, não a propriedade dele.
         </p>
         <p>
           Sem autorização por escrito do titular, não é permitido copiar, revender, alugar, publicar ou modificar a XS, criar um produto derivado dela, fazer
-          engenharia reversa do Motor WhatsApp XS ou contornar os planos e pagamentos.
+          engenharia reversa do serviço ou contornar os planos e pagamentos.
         </p>
         <p>
           <strong>Os dados que você cadastra continuam sendo seus.</strong> Você pode exportá-los a qualquer momento pelo backup do app. Seus roteiros,

@@ -3,7 +3,7 @@ import { stepDelayMs, type Funnel } from './biz'
 import { digits } from './contact'
 import { fillMessage, saudacao } from './messages'
 import { syncAgenda } from './agenda'
-import { motorFetch, useMotor } from './motor'
+import { waFetch, useWaServico } from './waServico'
 import type { Lead, Settings } from './types'
 import { useApp } from '../store/useApp'
 
@@ -91,7 +91,7 @@ export function phoneKeyBr(phone: string): string {
   return d.length >= 10 ? `${d.slice(0, 2)}${d.slice(-8)}` : d
 }
 
-/** Etapas do funil para o motor + textos de cada lead (variações em rodízio, {saudacao} fica para a hora do envio). */
+/** Etapas do funil para o WhatsApp da XS + textos de cada lead (variações em rodízio, {saudacao} fica para a hora do envio). */
 export function buildCampaignPayload(funnel: Funnel, leads: Lead[], settings: Settings) {
   const etapas = funnel.etapas
     .filter((s) => (s.tipo === 'mensagem' ? s.variacoes.some((v) => v.trim()) : true))
@@ -114,10 +114,10 @@ export function buildCampaignPayload(funnel: Funnel, leads: Lead[], settings: Se
  * o envio vira "mensagem" e cada resposta vira uma anotação.
  */
 export async function syncCampaigns(): Promise<number> {
-  const list = await motorFetch<CampaignSummary[]>('/disparo/campanhas', { timeoutMs: 6000 })
+  const list = await waFetch<CampaignSummary[]>('/disparo/campanhas', { timeoutMs: 6000 })
   let total = 0
   for (const c of list.filter((x) => x.pendentesSync > 0)) {
-    const detail = await motorFetch<CampaignDetail>(`/disparo/campanhas/${c.id}`)
+    const detail = await waFetch<CampaignDetail>(`/disparo/campanhas/${c.id}`)
     const app = useApp.getState()
     const exists = new Set(app.leads.map((l) => l.id))
     const itens: { id: string; envio: boolean; respostas: number }[] = []
@@ -133,14 +133,14 @@ export async function syncCampaigns(): Promise<number> {
       itens.push({ id: r.id, envio: precisaEnvio || r.sincEnvio, respostas: r.respostas.length })
       total++
     }
-    if (itens.length) await motorFetch(`/disparo/campanhas/${c.id}/sincronizado`, { method: 'POST', json: { itens } })
+    if (itens.length) await waFetch(`/disparo/campanhas/${c.id}/sincronizado`, { method: 'POST', json: { itens } })
   }
   return total
 }
 
-/** Sincroniza em segundo plano enquanto o motor está ligado (a cada 20 s). */
+/** Sincroniza em segundo plano enquanto o WhatsApp da XS responde (a cada 20 s). */
 export function useDisparoSync() {
-  const online = useMotor((s) => s.online)
+  const online = useWaServico((s) => s.online)
   useEffect(() => {
     if (!online) return
     let busy = false
@@ -151,7 +151,7 @@ export function useDisparoSync() {
         await syncCampaigns()
         await syncAgenda()
       } catch {
-        /* motor ocupado ou desligado: tenta de novo depois */
+        /* serviço ocupado ou fora do ar: tenta de novo depois */
       } finally {
         busy = false
       }

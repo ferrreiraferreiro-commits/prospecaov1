@@ -1,16 +1,15 @@
 {
   "name": "xs-motor",
   "private": true,
-  "version": "1.4.0",
+  "version": "2.0.0",
   "author": "Gabriel Yamashita Marcelino",
   "license": "UNLICENSED",
-  "description": "Motor XS: WhatsApp da XS Prospecção (disparos, funis e mensagens agendadas), roda no seu computador",
+  "description": "WhatsApp da XS Prospecção (disparos, funis e mensagens agendadas): um por conta, na VPS da XS (whatsapp-cloud/)",
   "type": "module",
   "scripts": {
     "start": "tsx src/server.ts",
     "check": "tsc --noEmit",
-    "test": "node --import tsx --test src/*.test.ts",
-    "build:exe": "node scripts/build-exe.mjs"
+    "test": "node --import tsx --test src/*.test.ts"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc14",
@@ -24,8 +23,6 @@
     "@types/node": "^24.0.0",
     "@types/qrcode": "^1.5.5",
     "esbuild": "^0.28.2",
-    "postject": "^1.0.0-alpha.6",
-    "rcedit": "^4.0.1",
     "typescript": "^5.9.0"
   }
 }

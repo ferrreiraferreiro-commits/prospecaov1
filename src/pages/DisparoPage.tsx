@@ -3,7 +3,7 @@ import { ChevronDown, CircleStop, Megaphone, Play, Plus, RefreshCw, Send, Trash2
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, Field, Pill, SearchInput, Stat } from '../components/kit'
-import { MotorOffline } from '../components/MotorOffline'
+import { WhatsAppIndisponivel } from '../components/WhatsAppIndisponivel'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Progress, StatusBadge } from '../components/ui'
 import { funnelMessages } from '../lib/biz'
@@ -19,16 +19,15 @@ import {
   type CampaignDetail,
   type CampaignSummary,
 } from '../lib/disparo'
-import { motorFetch, useMotor } from '../lib/motor'
+import { waFetch, useWaServico } from '../lib/waServico'
 import { normalizeKey, STATUSES } from '../lib/statuses'
 import type { StatusId } from '../lib/types'
 import { useApp } from '../store/useApp'
 import { useBiz } from '../store/useBiz'
 
 export function DisparoPage() {
-  const online = useMotor((s) => s.online)
-  const wa = useMotor((s) => s.health?.whatsapp)
-  const nuvem = useMotor((s) => s.nuvem)
+  const online = useWaServico((s) => s.online)
+  const wa = useWaServico((s) => s.health?.whatsapp)
   const toast = useApp((s) => s.toast)
   const [params] = useSearchParams()
   const [campaigns, setCampaigns] = useState<CampaignSummary[]>([])
@@ -36,9 +35,9 @@ export function DisparoPage() {
 
   const refresh = useCallback(async () => {
     try {
-      setCampaigns(await motorFetch<CampaignSummary[]>('/disparo/campanhas', { timeoutMs: 6000 }))
+      setCampaigns(await waFetch<CampaignSummary[]>('/disparo/campanhas', { timeoutMs: 6000 }))
     } catch {
-      /* motor desligado */
+      /* WhatsApp indisponível */
     }
   }, [])
 
@@ -87,7 +86,7 @@ export function DisparoPage() {
         }
       />
 
-      {online === false && <MotorOffline feature="O disparo" />}
+      {online === false && <WhatsAppIndisponivel />}
       {online && wa?.status !== 'connected' && (
         <div className="panel flex flex-wrap items-center gap-3 border-amber-400/25 px-4 py-3 text-xs">
           <span className="size-2 rounded-full bg-amber-400" />
@@ -120,7 +119,7 @@ export function DisparoPage() {
         <h2 className="text-[13px] font-semibold">Campanhas</h2>
         {campaigns.length === 0 ? (
           <div className="panel">
-            <Empty icon={<Megaphone />} title={online ? 'Nenhuma campanha ainda' : nuvem ? 'O serviço de WhatsApp está indisponível no momento' : 'Ligue o Motor WhatsApp XS para ver as campanhas'}>
+            <Empty icon={<Megaphone />} title={online ? 'Nenhuma campanha ainda' : 'O serviço de WhatsApp está indisponível no momento'}>
               Monte um funil em Funis, escolha os leads e crie a campanha aqui.
             </Empty>
           </div>
@@ -156,7 +155,7 @@ function CampaignCard({ c, onChange }: { c: CampaignSummary; onChange: () => Pro
 
   const loadDetail = useCallback(async () => {
     try {
-      setDetail(await motorFetch<CampaignDetail>(`/disparo/campanhas/${c.id}`))
+      setDetail(await waFetch<CampaignDetail>(`/disparo/campanhas/${c.id}`))
     } catch {
       /* ignora */
     }
@@ -169,7 +168,7 @@ function CampaignCard({ c, onChange }: { c: CampaignSummary; onChange: () => Pro
   async function act(path: string, body?: unknown, method = 'POST') {
     setBusy(true)
     try {
-      await motorFetch(`/disparo/campanhas/${c.id}${path}`, { method, json: body })
+      await waFetch(`/disparo/campanhas/${c.id}${path}`, { method, json: body })
       await onChange()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha.', 'error')
@@ -340,7 +339,7 @@ function NewCampaign({ initialFunnel, onCancel, onCreated }: { initialFunnel: st
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    motorFetch<string[]>('/disparo/enviados')
+    waFetch<string[]>('/disparo/enviados')
       .then((list) => setEnviados(new Set(list)))
       .catch(() => undefined)
   }, [])
@@ -379,12 +378,12 @@ function NewCampaign({ initialFunnel, onCancel, onCreated }: { initialFunnel: st
     setSaving(true)
     try {
       const payload = buildCampaignPayload(funnel, chosen, settings)
-      const created = await motorFetch<CampaignSummary>('/disparo/campanhas', {
+      const created = await waFetch<CampaignSummary>('/disparo/campanhas', {
         method: 'POST',
         json: { nome: nome.trim() || `${funnel.nome} · ${new Date().toLocaleDateString('pt-BR')}`, funil: funnel.nome, delayMin, delayMax, ...payload },
       })
       if (startNow) {
-        await motorFetch(`/disparo/campanhas/${created.id}/iniciar`, { method: 'POST', json: {} }).catch((err) => toast(err instanceof Error ? err.message : 'Campanha criada, mas não iniciou.', 'error'))
+        await waFetch(`/disparo/campanhas/${created.id}/iniciar`, { method: 'POST', json: {} }).catch((err) => toast(err instanceof Error ? err.message : 'Campanha criada, mas não iniciou.', 'error'))
       }
       toast(`Campanha criada com ${created.total} lead(s).`)
       await onCreated()
@@ -406,7 +405,7 @@ function NewCampaign({ initialFunnel, onCancel, onCreated }: { initialFunnel: st
   }
 
   return (
-    <Card title="Nova campanha" description="Escolha o funil, os leads e o intervalo. O motor envia um lead por vez." actions={<Button size="sm" variant="ghost" icon={<X className="size-3.5" />} onClick={onCancel} aria-label="Fechar" />}>
+    <Card title="Nova campanha" description="Escolha o funil, os leads e o intervalo. A XS envia um lead por vez." actions={<Button size="sm" variant="ghost" icon={<X className="size-3.5" />} onClick={onCancel} aria-label="Fechar" />}>
       <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto]">

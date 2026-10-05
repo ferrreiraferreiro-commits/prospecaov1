@@ -6,7 +6,6 @@
  * estado fica em motor/storage/*.json — os leads continuam no XS Prospecção.
  */
 import { randomInt, randomUUID } from 'node:crypto'
-import { setKeepAwake } from './keepAwake.js'
 import { readJson, writeJson } from './store.js'
 import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, receiptOf, samePhone, waEvents, withTimeout, type ReceiptStatus } from './whatsapp.js'
 
@@ -79,7 +78,6 @@ function save(now = false) {
     saveTimer = null
     writeJson(FILE, campaigns)
     writeJson(SENT_FILE, sent)
-    setKeepAwake('disparo', campaigns.some((c) => c.status === 'enviando' || c.status === 'fila'))
   }
   if (now) write()
   else saveTimer = setTimeout(write, 400)

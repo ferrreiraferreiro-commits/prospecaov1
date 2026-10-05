@@ -1,9 +1,5 @@
 {
-  "redirects": [
-    { "source": "/downloads/Motor-XS-Windows.zip", "destination": "/downloads/Motor-WhatsApp-XS.zip", "permanent": false },
-    { "source": "/downloads/Motor-XS.zip", "destination": "/downloads/Motor-WhatsApp-XS.zip", "permanent": false }
-  ],
-  "rewrites": [{ "source": "/((?!api/|downloads/).*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
   "crons": [{ "path": "/api/keepalive", "schedule": "0 12 * * *" }],
   "headers": [
     {

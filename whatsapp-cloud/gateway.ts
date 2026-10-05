@@ -4,7 +4,7 @@
  *
  *   site (navegador) ──HTTPS──▶ Caddy /whatsapp/* ──▶ gateway (127.0.0.1:8092) ──▶ Motor da conta (127.0.0.1:<porta>)
  *
- * Cada conta tem o seu próprio WhatsApp: um Motor separado (o mesmo programa do computador, pasta motor/,
+ * Cada conta tem o seu próprio WhatsApp: um serviço de WhatsApp separado (pasta motor/,
  * ligado com XS_MODO=nuvem), com a sua pasta de dados e a sua porta, só em 127.0.0.1 — nenhuma porta de
  * Motor fica aberta para a internet. Todo pedido precisa do login da pessoa na XS (o token do Supabase),
  * conferido no próprio Supabase, e é repassado só ao Motor DELA.
@@ -12,14 +12,14 @@
  * Sessões:
  *   - fixas (XS_CLOUD_SESSOES + XS_CLOUD_USUARIOS): ex. "principal", do dono. Sobem com a VPS (systemd).
  *   - automáticas (XS_CLOUD_TODOS=1): toda conta com plano em dia e o recurso "motor" ganha a sua na
- *     primeira vez, até XS_CLOUD_MAX Motores ligados. Quem passar do limite continua no Motor do computador.
+ *     primeira vez, até XS_CLOUD_MAX Motores ligados. Quem passar do limite vê "indisponível" até abrir vaga.
  *     O gateway liga/desliga cada Motor pelo systemd (xs-whatsapp-motor@<sessao>, regra do polkit).
  *     Motor sem WhatsApp conectado e sem uso há 30 min é desligado (libera memória); com WhatsApp
  *     conectado fica ligado e volta sozinho quando a VPS reinicia.
  *
  * GET  /saude                aberto: o gateway e os Motores estão de pé?
  * GET  /acesso               esta conta usa o WhatsApp na nuvem?
- * *    /motor/<caminho>      repassa ao Motor da conta (mesmos caminhos do Motor local)
+ * *    /motor/<caminho>      repassa ao WhatsApp da conta (/health, /whatsapp/…, /disparo/…, /agenda…)
  *
  * Variáveis (arquivo /etc/xs-whatsapp/gateway.env na VPS):
  *   PORT=8092  HOST=127.0.0.1
@@ -198,7 +198,7 @@ function automatica(userId: string): Sessao | null {
   return r && NOME_OK.test(r.nome) ? sessao(r.nome, r.porta, false) : null
 }
 
-/** Sessão da conta: a fixa, a automática que ela já tem, ou uma nova (se couber). null = usa o Motor do computador. */
+/** Sessão da conta: a fixa, a automática que ela já tem, ou uma nova (se couber). null = sem WhatsApp na nuvem agora. */
 export function sessaoDa(conta: Conta): Promise<Sessao | null> {
   const fixa = usuarios.get(conta.id.toLowerCase()) ?? (conta.usuario ? usuarios.get(conta.usuario.toLowerCase()) : undefined)
   if (fixa) return Promise.resolve(fixas.get(fixa) ?? null)
@@ -382,7 +382,7 @@ export function ajustarResposta(caminho: string, body: unknown, s: Sessao): unkn
   const b = { ...(body as Record<string, unknown>) }
   if ('error' in b) b.error = limparMensagem(b.error) ?? MSG_GENERICA
   if (caminho === '/health') {
-    delete b.computador
+    delete b.computador // versões antigas do serviço mandavam o nome da máquina
     delete b.acordado
     b.nuvem = true
     if (b.whatsapp && typeof b.whatsapp === 'object') b.whatsapp = { ...(b.whatsapp as object), sessaoSalva: credsSalvas(s) }

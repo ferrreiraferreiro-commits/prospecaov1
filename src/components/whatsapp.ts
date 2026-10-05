@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { formatPhone, whatsappChatUrl, whatsappTarget, type WhatsAppDestino } from '../lib/contact'
 import { timeHM } from '../lib/dates'
-import { motorFetch } from '../lib/motor'
+import { waFetch } from '../lib/waServico'
 import type { Interaction, Lead } from '../lib/types'
 import { useApp } from '../store/useApp'
 
@@ -106,10 +106,10 @@ export function useCopyPhone() {
 }
 
 /**
- * Manda a mensagem na hora pelo WhatsApp conectado no Motor WhatsApp XS (sem abrir o WhatsApp).
+ * Manda a mensagem na hora pelo WhatsApp conectado na XS (sem abrir o WhatsApp).
  * Registra no histórico do lead como as mensagens abertas no WhatsApp.
  */
-export function useSendViaMotor() {
+export function useSendNow() {
   const logMessage = useApp((s) => s.logMessage)
   const toast = useApp((s) => s.toast)
   return useCallback(
@@ -120,12 +120,12 @@ export function useSendViaMotor() {
         return false
       }
       try {
-        await motorFetch('/whatsapp/teste', { method: 'POST', json: { telefone: target.number, texto: text.trim() }, timeoutMs: 45_000 })
+        await waFetch('/whatsapp/teste', { method: 'POST', json: { telefone: target.number, texto: text.trim() }, timeoutMs: 45_000 })
       } catch (err) {
-        toast(err instanceof Error ? err.message : 'Não foi possível enviar pelo Motor WhatsApp XS.', 'error')
+        toast(err instanceof Error ? err.message : 'Não foi possível enviar pelo WhatsApp.', 'error')
         return false
       }
-      await logMessage(lead.id, text, modelo ? `${modelo} · enviada pelo Motor` : 'Enviada pelo Motor')
+      await logMessage(lead.id, text, modelo ? `${modelo} · enviada pela XS` : 'Enviada pela XS')
       toast(`Mensagem enviada para ${lead.empresa}.`)
       return true
     },

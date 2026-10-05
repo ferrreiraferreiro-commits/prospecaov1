@@ -2,7 +2,7 @@
 # © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
 #
 # Liga o WhatsApp na nuvem (modo WHATSAPP_ENGINE=cloud) numa VPS que já tem a busca da XS (Caddy + Node 24).
-# Não mexe na busca, na base aberta nem na ponte do Motor local: só acrescenta serviços novos.
+# Não mexe na busca nem na base aberta: só acrescenta os serviços do WhatsApp.
 #
 # Na VPS, dentro da pasta descompactada do pacote (com motor/ e whatsapp-cloud/):
 #   sudo bash whatsapp-cloud/instalar.sh gabriel
@@ -109,7 +109,6 @@ Group=xswhatsapp
 # Porta: a do dono fica em /etc; a de cada conta, o gateway escreve em $DADOS/portas
 EnvironmentFile=-$CONF/motor-%i.env
 EnvironmentFile=-$DADOS/portas/%i.env
-Environment=XS_MODO=nuvem
 Environment=XS_STORAGE=$DADOS/%i
 # Agendamentos, saudação (Bom dia/Boa tarde) e logs no horário de Brasília, seja qual for o país da VPS
 Environment=TZ=America/Sao_Paulo

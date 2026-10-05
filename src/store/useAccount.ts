@@ -95,8 +95,8 @@ export const useAccount = create<AccountState>()((set, get) => ({
   },
 }))
 
-/** A conta pode usar o Motor WhatsApp XS (busca no Maps, disparo e agendamento pelo WhatsApp)? */
-export function useHasMotor(): boolean {
+/** A conta pode usar o WhatsApp da XS (disparo, funis e agendamento)? No banco, o recurso se chama "motor". */
+export function useHasWhatsApp(): boolean {
   return useAccount((s) => !s.profile || s.profile.recursos.includes('motor'))
 }
 

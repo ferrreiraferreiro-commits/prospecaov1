@@ -28,5 +28,5 @@ export const LEGAL: {
   // TODO(jurídico): cidade/UF do foro para os Termos de Uso
   foro: null,
   // Data desta versão dos textos. Atualize sempre que mudar o conteúdo das páginas.
-  atualizadoEm: '4 de outubro de 2026',
+  atualizadoEm: '5 de outubro de 2026',
 }

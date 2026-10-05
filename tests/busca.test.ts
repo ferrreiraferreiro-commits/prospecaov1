@@ -181,22 +181,3 @@ describe('busca na base do CNPJ', () => {
     expect(((await ok.json()) as { results: unknown[] }).results).toHaveLength(3)
   })
 })
-
-describe('ponte do motor: quem pode chamar', () => {
-  it('aceita só o site da XS e o app no próprio computador', async () => {
-    const { origemPermitida } = await import('../busca/ponte')
-    expect(origemPermitida('https://xs-prospeccao.vercel.app')).toBe(true)
-    expect(origemPermitida('http://localhost:5173')).toBe(true)
-    // Qualquer um pode criar um projeto na Vercel com nome parecido
-    expect(origemPermitida('https://xs-prospeccao-golpe.vercel.app')).toBe(false)
-    expect(origemPermitida('https://xs-prospeccao.vercel.app.golpe.com')).toBe(false)
-    expect(origemPermitida('http://xs-prospeccao.vercel.app')).toBe(false)
-    expect(origemPermitida(undefined)).toBe(false)
-  })
-  it('um mesmo endereço não enche a ponte de motores falsos', async () => {
-    const { abrirVaga } = await import('../busca/ponte')
-    const abertas = Array.from({ length: 25 }, (_, i) => abrirVaga(`teste-${i}`, '203.0.113.9'))
-    expect(abertas.filter(Boolean)).toHaveLength(20)
-    expect(abrirVaga('outro', '198.51.100.1')).not.toBeNull()
-  })
-})

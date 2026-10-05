@@ -5,12 +5,12 @@ Prospecção por ligação e WhatsApp, busca de empresas (base aberta de comérc
 ## Como funciona
 
 ```
-┌──────────────────────────────┐        ┌──────────────────────────────┐
-│ App web (Vercel ou localhost)│  HTTP  │ Motor WhatsApp XS (no seu computador) │
-│ React · leads · gestão       │ ─────► │ 127.0.0.1:3077               │
-│ dados no Supabase            │        │ Chrome automatizado (Maps)   │
-└──────────────────────────────┘        │ sessão do WhatsApp (Baileys) │
-                                        └──────────────────────────────┘
+┌──────────────────────────────┐ HTTPS  ┌──────────────────────────────────────┐
+│ App web (Vercel ou localhost)│ ─────► │ VPS da XS                            │
+│ React · leads · gestão       │        │ /lugares   base aberta de comércios  │
+│ dados no Supabase            │        │ /whatsapp  gateway → um WhatsApp por │
+└──────────────────────────────┘        │            conta (whatsapp-cloud/)   │
+                                        └──────────────────────────────────────┘
 ```
 
 - **App web**: tudo o que é tela e dado — Painel, Leads, Hoje, Modo Ligação, Funis, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes. Funciona no celular e no PC.
@@ -19,7 +19,7 @@ Prospecção por ligação e WhatsApp, busca de empresas (base aberta de comérc
   - **Google Maps** (Places API) com a chave de cada usuário (Ajustes → Busca do Google, tabela `busca_google`). Cada conta usa a própria cota grátis do Google (1.000 consultas/mês) e a XS para no teto (950 por padrão).
 - **`api/maps.ts`** (Vercel): confere o login e a conta liberada; repassa a busca grátis à VPS (`XS_BUSCA_URL` + `XS_BUSCA_TOKEN`), chama o Google com a chave do usuário e abre o site das empresas para achar o Instagram. No `npm run dev`, o `vite.config.ts` chama a mesma função.
 - A busca antiga pela base do CNPJ (`busca/servidor.ts`, `importar.ts`) não é mais usada pelo app.
-- **Motor WhatsApp XS** (`motor/`), opcional: mantém a sessão do WhatsApp para os disparos automáticos (Disparo, Funis, Agendadas). Só escuta em `127.0.0.1` e só aceita chamadas do próprio app. O código antigo da busca no Maps ainda está lá, mas o app não usa mais.
+- **WhatsApp da XS** (`motor/` + `whatsapp-cloud/`): roda na VPS, um WhatsApp por conta, para os disparos automáticos (Disparo, Funis, Agendadas). O site fala com o gateway por HTTPS, com o login da pessoa; nada para instalar no computador. Detalhes em [`whatsapp-cloud/LEIA-ME.md`](whatsapp-cloud/LEIA-ME.md).
 
 ## Rodar
 
@@ -30,14 +30,7 @@ npm test             # testes do app
 npm run build
 ```
 
-Motor WhatsApp XS para quem só usa (Windows): no app, **Ajustes → Motor WhatsApp XS → Baixar o Motor WhatsApp XS**. É um único `Motor WhatsApp XS.exe` (Node embutido), que usa o Chrome ou o Edge do computador e guarda os dados na pasta `Motor XS - dados` ao lado dele.
-
-Para desenvolver:
-
-- `npm run motor` (ou dois cliques em **`Iniciar Motor WhatsApp XS.bat`**) · testes: `npm run test:motor`.
-- Gerar um novo instalador: `npm run motor:exe` → `motor/build/Motor WhatsApp XS.exe` e `public/downloads/Motor-WhatsApp-XS.zip` (publique o site para atualizar o download).
-
-Deixe a janela do motor aberta enquanto usa o disparo. A sessão do WhatsApp, as campanhas e a última busca ficam em `motor/storage/` (fora do git).
+WhatsApp: `npm run test:whatsapp` (gateway + serviço). Instalar/atualizar na VPS: `sudo bash whatsapp-cloud/instalar.sh gabriel` (veja o LEIA-ME).
 
 ## Módulos
 
@@ -60,7 +53,7 @@ O app usa o projeto `central-prospeccao` (mesmos leads e logins). As migrações
 
 ## Deploy (Vercel)
 
-Projeto `xs-prospeccao`. O `.vercelignore` deixa o `motor/` fora do deploy. Na versão publicada (https), o Chrome pode pedir permissão para o site acessar o Motor WhatsApp XS no computador — clique em Permitir.
+Projeto `xs-prospeccao`. O `.vercelignore` deixa `motor/` e `whatsapp-cloud/` fora do deploy (eles rodam na VPS).
 
 ## Estrutura
 
@@ -69,7 +62,8 @@ src/lib        regras puras (parser, duplicidade, métricas, biz.ts da gestão, 
 src/data       Repository + LocalRepository + SupabaseRepository (inclui as tabelas da gestão)
 src/store      useApp (prospecção) e useBiz (gestão)
 src/pages      Painel, Leads, Hoje, Ligação, Maps, Funis, Disparo, WhatsApp, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes
-motor/src      server.ts (API local), maps.ts (busca), enrich.ts (links/telefone/CNPJ), whatsapp.ts, disparo.ts
+motor/src      WhatsApp de uma conta: server.ts, whatsapp.ts, disparo.ts, agenda.ts (roda na VPS)
+whatsapp-cloud gateway.ts (login + um WhatsApp por conta), instalar.sh (systemd, Caddy, polkit)
 ```
 
 Regras que continuam valendo: dados importados não são inventados nem alterados; duplicidade só por telefone, lugar no Maps ou nome + endereço; o histórico do lead nunca é sobrescrito.

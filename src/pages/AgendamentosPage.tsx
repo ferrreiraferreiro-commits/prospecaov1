@@ -1,16 +1,16 @@
 import clsx from 'clsx'
-import { AlarmClock, CalendarClock, Check, CheckCheck, Coffee, Pencil, RotateCcw, Search, Send, Trash2, X } from 'lucide-react'
+import { AlarmClock, CalendarClock, Check, CheckCheck, Pencil, RotateCcw, Search, Send, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, confirmAction } from '../components/kit'
-import { MOTOR_DOWNLOAD, MotorOffline } from '../components/MotorOffline'
+import { WhatsAppIndisponivel } from '../components/WhatsAppIndisponivel'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Segmented } from '../components/ui'
 import { localParts, quickTimes, relativeTo, syncAgenda, toIso, type Agendamento } from '../lib/agenda'
 import { formatPhone } from '../lib/contact'
 import { leadPhone } from '../lib/disparo'
 import { fillMessage, getMessages, MESSAGE_VARIABLES, pickVariation } from '../lib/messages'
-import { motorFetch, useMotor } from '../lib/motor'
+import { waFetch, useWaServico } from '../lib/waServico'
 import { normalizeKey } from '../lib/statuses'
 import type { Lead } from '../lib/types'
 import { useApp } from '../store/useApp'
@@ -54,9 +54,8 @@ function dayLabel(iso: string): string {
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 export function AgendamentosPage() {
-  const online = useMotor((s) => s.online)
-  const health = useMotor((s) => s.health)
-  const nuvem = useMotor((s) => s.nuvem)
+  const online = useWaServico((s) => s.online)
+  const health = useWaServico((s) => s.health)
   const leads = useApp((s) => s.leads)
   const settings = useApp((s) => s.settings)
   const toast = useApp((s) => s.toast)
@@ -70,9 +69,9 @@ export function AgendamentosPage() {
 
   const refresh = useCallback(async () => {
     try {
-      setList(await motorFetch<Agendamento[]>('/agenda', { timeoutMs: 6000 }))
+      setList(await waFetch<Agendamento[]>('/agenda', { timeoutMs: 6000 }))
     } catch {
-      /* motor desligado */
+      /* WhatsApp indisponível */
     }
   }, [])
 
@@ -130,8 +129,8 @@ export function AgendamentosPage() {
     setSaving(true)
     try {
       const body = { leadId: draft.leadId, nome: draft.nome || draft.telefone, telefone: draft.telefone, texto: draft.texto, quando }
-      if (draft.id) await motorFetch(`/agenda/${draft.id}/editar`, { method: 'POST', json: body })
-      else await motorFetch('/agenda', { method: 'POST', json: body })
+      if (draft.id) await waFetch(`/agenda/${draft.id}/editar`, { method: 'POST', json: body })
+      else await waFetch('/agenda', { method: 'POST', json: body })
       toast(`${draft.id ? 'Agendamento atualizado' : 'Mensagem agendada'} para ${dayLabel(quando).toLowerCase()} às ${hhmm(quando)}.`)
       setDraft(emptyDraft())
       setAba('proximos')
@@ -145,7 +144,7 @@ export function AgendamentosPage() {
 
   async function act(path: string, method = 'POST', body?: unknown) {
     try {
-      await motorFetch(path, { method, json: body })
+      await waFetch(path, { method, json: body })
       await refresh()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha.', 'error')
@@ -177,23 +176,9 @@ export function AgendamentosPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Mensagens agendadas" subtitle={
-          nuvem
-            ? 'Deixe mensagens de WhatsApp marcadas para um dia e hora. A XS envia sozinha, mesmo com o computador desligado.'
-            : 'Deixe mensagens de WhatsApp marcadas para um dia e hora. O Motor WhatsApp XS envia sozinho, mesmo com você longe do computador.'
-        }
-      />
+      <PageHeader title="Mensagens agendadas" subtitle="Deixe mensagens de WhatsApp marcadas para um dia e hora. A XS envia sozinha, mesmo com o computador desligado." />
 
-      {online === false && <MotorOffline feature="O agendamento" />}
-      {online && health && !health.agenda && (
-        <div className="panel flex flex-wrap items-center gap-3 border-amber-400/25 px-4 py-3 text-xs">
-          <span className="size-2 rounded-full bg-amber-400" />
-          <span className="flex-1 text-fg-2">Seu Motor WhatsApp XS (versão {health.versao}) é anterior aos agendamentos. Baixe a versão nova, feche o motor aberto e abra o novo.</span>
-          <a href={MOTOR_DOWNLOAD} download className="font-medium text-blue-300 hover:text-blue-200">
-            Baixar o Motor WhatsApp XS →
-          </a>
-        </div>
-      )}
+      {online === false && <WhatsAppIndisponivel />}
       {online && !waOk && (
         <div className="panel flex flex-wrap items-center gap-3 border-amber-400/25 px-4 py-3 text-xs">
           <span className="size-2 rounded-full bg-amber-400" />
@@ -315,22 +300,9 @@ export function AgendamentosPage() {
               {draft.id ? 'Salvar alterações' : 'Agendar mensagem'}
             </Button>
 
-            {nuvem ? (
-              <p className="rounded-lg border border-line-soft bg-ink p-3 text-2xs text-fg-3">
-                As mensagens saem pela nuvem da XS no horário marcado (horário de Brasília), mesmo com o seu computador desligado. Basta o WhatsApp estar conectado.
-              </p>
-            ) : (
-              <div className="rounded-lg border border-line-soft bg-ink p-3 text-2xs text-fg-3">
-                <p className="mb-1 flex items-center gap-1.5 font-semibold text-fg-2">
-                  <Coffee className="size-3.5" /> Para funcionar com você fora de casa
-                </p>
-                <ul className="list-disc space-y-0.5 pl-4">
-                  <li>Deixe o computador ligado com o Motor WhatsApp XS aberto e o WhatsApp conectado.</li>
-                  <li>Enquanto houver agendamento, o Motor impede o Windows de suspender sozinho{health?.acordado ? ' (ativo agora)' : ''}. Não feche a tampa do notebook.</li>
-                  <li>Se o PC estiver desligado no horário, a mensagem sai assim que o Motor abrir de novo.</li>
-                </ul>
-              </div>
-            )}
+            <p className="rounded-lg border border-line-soft bg-ink p-3 text-2xs text-fg-3">
+              As mensagens saem pela nuvem da XS no horário marcado (horário de Brasília), mesmo com o seu computador desligado. Basta o WhatsApp estar conectado.
+            </p>
           </div>
         </Card>
 

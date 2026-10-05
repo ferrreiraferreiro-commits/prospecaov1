@@ -30,9 +30,9 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useComunidade } from '../lib/comunidade'
 import { useDisparoSync } from '../lib/disparo'
-import { useMotor, useMotorPolling } from '../lib/motor'
+import { useWaServico, useWaPolling } from '../lib/waServico'
 import { formatDateTime } from '../lib/dates'
-import { accessOf, planInfo, useAccount, useHasMotor } from '../store/useAccount'
+import { accessOf, planInfo, useAccount, useHasWhatsApp } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -50,8 +50,8 @@ interface NavItem {
   label: string
   icon: LucideIcon
   end?: boolean
-  /** Só aparece para contas com o Motor WhatsApp XS */
-  motor?: boolean
+  /** Só aparece para contas com o WhatsApp da XS (recurso "motor") */
+  whatsapp?: boolean
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
@@ -77,11 +77,11 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'WhatsApp',
     items: [
-      { to: '/disparo', label: 'Disparo', icon: Send, motor: true },
-      { to: '/funis', label: 'Funis', icon: Workflow, motor: true },
-      { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, motor: true },
+      { to: '/disparo', label: 'Disparo', icon: Send, whatsapp: true },
+      { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
+      { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },
       { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
-      { to: '/whatsapp', label: 'Conexão', icon: Smartphone, motor: true },
+      { to: '/whatsapp', label: 'Conexão', icon: Smartphone, whatsapp: true },
     ],
   },
 ]
@@ -93,15 +93,15 @@ const MOBILE: NavItem[] = [
   { to: '/maps', label: 'Buscar', icon: MapPinned },
 ]
 
-/** Menu da conta: sem o Motor, somem os itens que dependem dele (e grupos vazios). */
+/** Menu da conta: sem o WhatsApp da XS, somem os itens que dependem dele (e grupos vazios). */
 function useGroups() {
-  const motor = useHasMotor()
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => motor || !i.motor) })).filter((g) => g.items.length)
+  const temWhatsApp = useHasWhatsApp()
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => temWhatsApp || !i.whatsapp) })).filter((g) => g.items.length)
 }
 
-/** Conversa com o Motor WhatsApp XS no computador: status e disparos do WhatsApp. */
-function MotorSync() {
-  useMotorPolling()
+/** Status do WhatsApp da conta e resultados dos disparos para o histórico dos leads. */
+function WhatsAppSync() {
+  useWaPolling()
   useDisparoSync()
   return null
 }
@@ -121,7 +121,7 @@ export function Layout() {
   const full = pathname.startsWith('/ligacao')
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [sheet, setSheet] = useState(false)
-  const motor = useHasMotor()
+  const temWhatsApp = useHasWhatsApp()
   const groups = useGroups()
   useReminders()
   usePrivacyMode()
@@ -176,7 +176,7 @@ export function Layout() {
         <div className="space-y-1 border-t border-line-soft p-2.5">
           <ComunidadeLink collapsed={collapsed} />
           <TrialPill collapsed={collapsed} />
-          {motor && <MotorPill collapsed={collapsed} />}
+          {temWhatsApp && <WhatsAppPill collapsed={collapsed} />}
           <button
             onClick={toggle}
             title={collapsed ? 'Expandir menu' : 'Recolher menu'}
@@ -235,7 +235,7 @@ export function Layout() {
       </nav>
 
       {sheet && <MobileSheet groups={groups} onClose={() => setSheet(false)} />}
-      {motor && <MotorSync />}
+      {temWhatsApp && <WhatsAppSync />}
 
       <ImportModal />
       <LeadDrawer />
@@ -271,23 +271,20 @@ function SideLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   )
 }
 
-/** Indica se o Motor WhatsApp XS (disparos do WhatsApp) está rodando neste computador. */
-function MotorPill({ collapsed }: { collapsed: boolean }) {
-  const online = useMotor((s) => s.online)
-  const wa = useMotor((s) => s.health?.whatsapp.status)
-  const nuvem = useMotor((s) => s.nuvem)
-  const label = nuvem
-    ? online
-      ? wa === 'connected'
-        ? 'WhatsApp on'
-        : 'WhatsApp desconectado'
-      : online === false
-        ? 'WhatsApp indisponível'
-        : 'Verificando WhatsApp…'
-    : online ? (wa === 'connected' ? 'Motor · WhatsApp on' : 'Motor online') : online === false ? 'Motor desligado' : 'Verificando motor…'
+/** Situação do WhatsApp da conta (verde só com o WhatsApp conectado). */
+function WhatsAppPill({ collapsed }: { collapsed: boolean }) {
+  const online = useWaServico((s) => s.online)
+  const wa = useWaServico((s) => s.health?.whatsapp.status)
+  const label = online
+    ? wa === 'connected'
+      ? 'WhatsApp on'
+      : 'WhatsApp desconectado'
+    : online === false
+      ? 'WhatsApp indisponível'
+      : 'Verificando WhatsApp…'
   return (
     <NavLink
-      to={nuvem ? '/whatsapp' : '/configuracoes#motor'}
+      to="/whatsapp"
       title={label}
       className={clsx(
         'flex h-9 items-center gap-2.5 rounded-lg text-xs text-fg-3 transition-colors hover:bg-tint/[0.04] hover:text-fg-2',
@@ -295,13 +292,8 @@ function MotorPill({ collapsed }: { collapsed: boolean }) {
       )}
     >
       <span className="relative flex size-4 items-center justify-center">
-        {nuvem ? (
-          // Nuvem: verde só com o WhatsApp conectado; amarelo desconectado ou verificando; vermelho com o serviço fora
-          <span className={clsx('size-2 rounded-full', online ? (wa === 'connected' ? 'bg-go' : 'bg-amber-400') : online === false ? 'bg-red-400' : 'bg-amber-400')} />
-        ) : (
-          <span className={clsx('size-2 rounded-full', online ? 'bg-go' : online === false ? 'bg-fg-4' : 'bg-amber-400')} />
-        )}
-        {online && (!nuvem || wa === 'connected') && <span className="absolute size-2 animate-ping rounded-full bg-go/60" />}
+        <span className={clsx('size-2 rounded-full', online ? (wa === 'connected' ? 'bg-go' : 'bg-amber-400') : online === false ? 'bg-red-400' : 'bg-amber-400')} />
+        {online && wa === 'connected' && <span className="absolute size-2 animate-ping rounded-full bg-go/60" />}
       </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </NavLink>
