@@ -309,8 +309,13 @@ function MotorPill({ collapsed }: { collapsed: boolean }) {
       )}
     >
       <span className="relative flex size-4 items-center justify-center">
-        <span className={clsx('size-2 rounded-full', online ? 'bg-go' : online === false ? 'bg-fg-4' : 'bg-amber-400')} />
-        {online && <span className="absolute size-2 animate-ping rounded-full bg-go/60" />}
+        {nuvem ? (
+          // Nuvem: verde só com o WhatsApp conectado; amarelo desconectado ou verificando; vermelho com o serviço fora
+          <span className={clsx('size-2 rounded-full', online ? (wa === 'connected' ? 'bg-go' : 'bg-amber-400') : online === false ? 'bg-red-400' : 'bg-amber-400')} />
+        ) : (
+          <span className={clsx('size-2 rounded-full', online ? 'bg-go' : online === false ? 'bg-fg-4' : 'bg-amber-400')} />
+        )}
+        {online && (!nuvem || wa === 'connected') && <span className="absolute size-2 animate-ping rounded-full bg-go/60" />}
       </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </NavLink>
