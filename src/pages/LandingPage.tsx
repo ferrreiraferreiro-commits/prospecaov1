@@ -68,8 +68,11 @@ export function LandingPage() {
         <Hero />
         {/* O azul do topo clareia até o cinza-claro; daqui para baixo, tokens do tema claro */}
         <div className="tema-claro">
-          <Highlights />
-          <Steps />
+          {/* O degradê do topo termina por trás do resumo e do "Como funciona" */}
+          <div className="land-fade-end">
+            <Highlights />
+            <Steps />
+          </div>
           <Product />
           <Audience />
           <Faq />
@@ -253,7 +256,7 @@ function Highlights() {
   ]
   return (
     // Sem divisórias: o degradê do topo passa por trás dos textos
-    <section aria-label="Em resumo" className="land-fade-end">
+    <section aria-label="Em resumo">
       <ul className={clsx(WRAP, 'grid grid-cols-2 gap-x-6 gap-y-4 pt-2 pb-8 lg:flex lg:justify-between lg:pt-1 lg:pb-10')}>
         {items.map((it) => (
           <li
@@ -277,7 +280,7 @@ function Steps() {
   ]
   return (
     <section id="como-funciona" aria-labelledby="como-t" className="scroll-mt-16">
-      <div className={clsx(WRAP, 'pt-14 pb-24 sm:pt-20 sm:pb-32')}>
+      <div className={clsx(WRAP, 'pt-10 pb-24 sm:pt-14 sm:pb-32')}>
         <div className="reveal">
           <Eyebrow>Como funciona</Eyebrow>
           <h2 id="como-t" className={clsx(H2, 'mt-4')}>

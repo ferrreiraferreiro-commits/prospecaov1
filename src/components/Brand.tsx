@@ -2,7 +2,7 @@ import clsx from 'clsx'
 
 /** Logo XS (prata). `size` é a altura em px; a largura acompanha a proporção. */
 export function LogoMark({ size = 32, className }: { size?: number; className?: string }) {
-  return <img src="/logo-xs.webp" alt="XS" height={size} style={{ height: size, width: 'auto' }} className={clsx('logo-xs shrink-0 select-none', className)} draggable={false} />
+  return <img src="/logo-xs.webp" alt="XS" height={size} style={{ height: size, width: 'auto' }} className={clsx('shrink-0 select-none', className)} draggable={false} />
 }
 
 

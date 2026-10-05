@@ -272,7 +272,7 @@
   background: transparent;
 }
 .land-bg {
-  padding-bottom: 130px;
+  padding-bottom: 100px;
   background: linear-gradient(
     180deg,
     #0d1324 0,
@@ -283,9 +283,9 @@
     #aebcdc 100%
   );
 }
-/* Faixa logo abaixo do topo (Em resumo): termina o degradê, do azul-claro ao cinza-claro */
+/* Resumo + "Como funciona": o degradê continua devagar do azul-claro até o cinza-claro */
 .land-fade-end {
-  background: linear-gradient(180deg, #aebcdc 0, #dfe5f1 55%, #f3f4f6 100%);
+  background: linear-gradient(180deg, #aebcdc 0, #c3cee6 90px, #d9e0ee 220px, #e9edf4 360px, #f3f4f6 520px);
 }
 /* Bloco com os tokens do tema claro dentro de uma página escura */
 .tema-claro {
@@ -298,11 +298,6 @@
 }
 .tema-claro .land-nav-bg {
   background-color: rgb(255 255 255 / 0.88);
-}
-
-/* Logo prateado fica escuro no fundo branco */
-.tema-claro .logo-xs {
-  filter: brightness(0.2);
 }
 
 .land-glow,
