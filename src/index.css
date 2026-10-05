@@ -272,17 +272,20 @@
   background: transparent;
 }
 .land-bg {
-  padding-bottom: 280px;
+  padding-bottom: 130px;
   background: linear-gradient(
     180deg,
     #0d1324 0,
-    #0a0e18 calc(100% - 420px),
-    #141c33 calc(100% - 330px),
-    #3a4a73 calc(100% - 230px),
-    #9fb0d6 calc(100% - 120px),
-    #dde3f0 calc(100% - 50px),
-    #f3f4f6 100%
+    #0a0e18 calc(100% - 290px),
+    #141c33 calc(100% - 220px),
+    #3a4a73 calc(100% - 140px),
+    #8495c2 calc(100% - 55px),
+    #aebcdc 100%
   );
+}
+/* Faixa logo abaixo do topo (Em resumo): termina o degradê, do azul-claro ao cinza-claro */
+.land-fade-end {
+  background: linear-gradient(180deg, #aebcdc 0, #dfe5f1 55%, #f3f4f6 100%);
 }
 /* Bloco com os tokens do tema claro dentro de uma página escura */
 .tema-claro {

@@ -252,12 +252,13 @@ function Highlights() {
     { icon: <Route />, text: 'Do lead ao projeto' },
   ]
   return (
-    <section aria-label="Em resumo" className="border-y border-line-soft">
-      <ul className={clsx(WRAP, 'grid grid-cols-2 gap-x-6 gap-y-5 py-7 lg:grid-cols-4 lg:gap-0 lg:py-0')}>
+    // Sem divisórias: o degradê do topo passa por trás dos textos
+    <section aria-label="Em resumo" className="land-fade-end">
+      <ul className={clsx(WRAP, 'grid grid-cols-2 gap-x-6 gap-y-4 pt-2 pb-8 lg:flex lg:justify-between lg:pt-1 lg:pb-10')}>
         {items.map((it) => (
           <li
             key={it.text}
-            className="flex items-center gap-3 text-[13px] text-fg-2 lg:border-l lg:border-line-soft lg:px-8 lg:py-7 lg:first:border-l-0 lg:first:pl-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-fg-3"
+            className="flex items-center gap-3 text-[13px] text-fg-2 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-fg-3"
           >
             {it.icon}
             {it.text}
@@ -276,7 +277,7 @@ function Steps() {
   ]
   return (
     <section id="como-funciona" aria-labelledby="como-t" className="scroll-mt-16">
-      <div className={clsx(WRAP, 'py-24 sm:py-32')}>
+      <div className={clsx(WRAP, 'pt-14 pb-24 sm:pt-20 sm:pb-32')}>
         <div className="reveal">
           <Eyebrow>Como funciona</Eyebrow>
           <h2 id="como-t" className={clsx(H2, 'mt-4')}>
