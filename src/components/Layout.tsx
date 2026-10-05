@@ -16,8 +16,6 @@ import {
   Menu,
   MessagesSquare,
   ScrollText,
-  Settings,
-  ShieldCheck,
   Send,
   Smartphone,
   Sparkles,
@@ -32,7 +30,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useDisparoSync } from '../lib/disparo'
 import { useMotor, useMotorPolling } from '../lib/motor'
 import { formatDateTime } from '../lib/dates'
-import { accessOf, planInfo, useAccount, useHasMotor, useIsAdmin } from '../store/useAccount'
+import { accessOf, planInfo, useAccount, useHasMotor } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -51,11 +49,19 @@ interface NavItem {
   end?: boolean
   /** Só aparece para contas com o Motor WhatsApp XS */
   motor?: boolean
-  /** Só aparece para o dono da XS */
-  admin?: boolean
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'Gestão',
+    items: [
+      { to: '/clientes', label: 'Clientes', icon: Users },
+      { to: '/projetos', label: 'Projetos', icon: FolderKanban },
+      { to: '/financeiro', label: 'Financeiro', icon: BadgeDollarSign },
+      { to: '/precificacao', label: 'Precificação', icon: Calculator },
+      { to: '/estatisticas', label: 'Números', icon: ChartColumn },
+    ],
+  },
   {
     title: 'Prospecção',
     items: [
@@ -76,23 +82,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/whatsapp', label: 'Conexão', icon: Smartphone, motor: true },
     ],
   },
-  {
-    title: 'Gestão',
-    items: [
-      { to: '/clientes', label: 'Clientes', icon: Users },
-      { to: '/projetos', label: 'Projetos', icon: FolderKanban },
-      { to: '/financeiro', label: 'Financeiro', icon: BadgeDollarSign },
-      { to: '/precificacao', label: 'Precificação', icon: Calculator },
-    ],
-  },
-  {
-    title: 'Sistema',
-    items: [
-      { to: '/estatisticas', label: 'Números', icon: ChartColumn },
-      { to: '/configuracoes', label: 'Ajustes', icon: Settings },
-      { to: '/contas', label: 'Contas', icon: ShieldCheck, admin: true },
-    ],
-  },
 ]
 
 const MOBILE: NavItem[] = [
@@ -102,11 +91,10 @@ const MOBILE: NavItem[] = [
   { to: '/maps', label: 'Buscar', icon: MapPinned },
 ]
 
-/** Menu da conta: sem o Motor, somem os itens que dependem dele (e grupos vazios); Contas só para o dono. */
+/** Menu da conta: sem o Motor, somem os itens que dependem dele (e grupos vazios). */
 function useGroups() {
   const motor = useHasMotor()
-  const admin = useIsAdmin()
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (motor || !i.motor) && (admin || !i.admin)) })).filter((g) => g.items.length)
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => motor || !i.motor) })).filter((g) => g.items.length)
 }
 
 /** Conversa com o Motor WhatsApp XS no computador: status e disparos do WhatsApp. */

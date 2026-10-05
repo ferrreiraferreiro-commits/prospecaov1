@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Bell, CalendarCheck, CalendarClock, Crown, LogOut, Monitor, Moon, ShieldCheck, Sun, UserRound } from 'lucide-react'
+import { Bell, CalendarCheck, CalendarClock, ChartColumn, Crown, LogOut, Monitor, Moon, Settings, ShieldCheck, Sun } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../data/supabaseClient'
@@ -212,11 +212,20 @@ function UserMenu({ compact }: { compact?: boolean }) {
             <button
               onClick={() => {
                 setOpen(false)
-                navigate('/configuracoes#perfil')
+                navigate('/estatisticas')
               }}
               className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-tint/[0.05] text-xs font-semibold text-fg transition-colors hover:bg-tint/[0.09]"
             >
-              <UserRound className="size-4" /> Meu perfil
+              <ChartColumn className="size-4" /> Números
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false)
+                navigate('/configuracoes')
+              }}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-tint/[0.05] text-xs font-semibold text-fg transition-colors hover:bg-tint/[0.09]"
+            >
+              <Settings className="size-4" /> Configurações
             </button>
             {admin && (
               <button
