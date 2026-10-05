@@ -59,14 +59,14 @@ export function LandingPage() {
   useRevealOnScroll(ref)
   useDarkTheme()
   return (
-    <div ref={ref} className="relative isolate min-h-dvh overflow-x-clip bg-white text-fg">
+    <div ref={ref} className="land-page relative isolate min-h-dvh overflow-x-clip text-fg">
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-raised focus:px-3 focus:py-2 focus:text-xs">
         Pular para o conteúdo
       </a>
       <Nav />
       <main id="conteudo">
         <Hero />
-        {/* Do topo azul para baixo, fundo branco (tokens do tema claro) */}
+        {/* O azul do topo clareia até o cinza-claro; daqui para baixo, tokens do tema claro */}
         <div className="tema-claro">
           <Highlights />
           <Steps />
@@ -114,7 +114,7 @@ function Nav() {
     <header
       className={clsx(
         'sticky top-0 z-40 border-b transition-[background-color,border-color] duration-300',
-        scrolled || open ? 'border-line-soft bg-[#0b0f1a]/95 backdrop-blur-md' : 'border-transparent bg-ink/0',
+        scrolled || open ? 'land-nav-bg border-line-soft backdrop-blur-md' : 'border-transparent bg-ink/0',
       )}
     >
       <div className={clsx(WRAP, 'relative flex h-16 items-center gap-3')}>

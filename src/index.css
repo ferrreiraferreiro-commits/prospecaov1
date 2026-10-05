@@ -263,15 +263,45 @@
   letter-spacing: -0.035em;
 }
 
-/* Landing: topo azul noite (.land-bg + .land-glow) e o resto no branco (.tema-claro) */
+/* Landing: topo azul noite (.land-bg + .land-glow) que clareia até o cinza-claro do resto (.tema-claro).
+   O padding de baixo é a faixa do degradê, sem texto, para as palavras ficarem sempre legíveis. */
+.land-page {
+  background: #f3f4f6;
+}
+.land-page .tema-claro {
+  background: transparent;
+}
 .land-bg {
-  background: linear-gradient(180deg, #0d1324 0, #0b1120 100%);
+  padding-bottom: 280px;
+  background: linear-gradient(
+    180deg,
+    #0d1324 0,
+    #0a0e18 calc(100% - 420px),
+    #141c33 calc(100% - 330px),
+    #3a4a73 calc(100% - 230px),
+    #9fb0d6 calc(100% - 120px),
+    #dde3f0 calc(100% - 50px),
+    #f3f4f6 100%
+  );
 }
 /* Bloco com os tokens do tema claro dentro de uma página escura */
 .tema-claro {
   color: var(--color-fg);
   background: #ffffff;
 }
+/* Menu fixo depois de rolar: azul no topo escuro, branco quando a página toda é clara */
+.land-nav-bg {
+  background-color: rgb(11 15 26 / 0.95);
+}
+.tema-claro .land-nav-bg {
+  background-color: rgb(255 255 255 / 0.88);
+}
+
+/* Logo prateado fica escuro no fundo branco */
+.tema-claro .logo-xs {
+  filter: brightness(0.2);
+}
+
 .land-glow,
 .land-glow-end,
 .land-grain {
