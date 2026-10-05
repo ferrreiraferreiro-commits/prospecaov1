@@ -221,7 +221,7 @@ export function PainelPage() {
 
         <Card title="Atalhos">
           <div className="grid grid-cols-2 gap-2">
-            <Shortcut to="/maps" icon={<MapPinned />} label="Buscar empresas" hint="Na hora, pela base do CNPJ" />
+            <Shortcut to="/maps" icon={<MapPinned />} label="Buscar empresas" hint="Na hora, com telefone" />
             {motor ? (
               <Shortcut to="/disparo" icon={<Send />} label="Novo disparo" hint={wa?.status === 'connected' ? `WhatsApp: ${wa.user?.name ?? 'conectado'}` : 'WhatsApp desconectado'} />
             ) : (

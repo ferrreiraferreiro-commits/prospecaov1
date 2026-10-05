@@ -246,7 +246,7 @@ function Hero() {
 
 function Highlights() {
   const items = [
-    { icon: <MapIcon />, text: 'Empresas reais, com CNPJ' },
+    { icon: <MapIcon />, text: 'Empresas reais, com telefone' },
     { icon: <LayoutList />, text: 'Tudo organizado num lugar' },
     { icon: <CalendarClock />, text: 'Retornos na hora certa' },
     { icon: <Route />, text: 'Do lead ao projeto' },
@@ -319,7 +319,7 @@ function Product() {
 
 function Audience() {
   const points = [
-    'Capta empresas locais por cidade, bairro e nicho, já com telefone e sócio.',
+    'Capta empresas locais por cidade, bairro e tipo de negócio, já com telefone, site e Instagram.',
     'Organiza leads, status e histórico de contato num lugar só.',
     'Lembra retornos e reuniões na hora certa.',
     'Transforma o lead em cliente e projeto sem sair da XS.',
@@ -364,7 +364,7 @@ function Faq() {
     },
     {
       q: 'De onde vêm os leads?',
-      a: 'Da busca da própria XS, que usa a base pública de empresas da Receita Federal: todas as empresas ativas do Brasil, com telefone, e-mail, endereço e sócio responsável. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
+      a: 'Da busca da própria XS: uma base aberta com milhões de comércios do Brasil, quase todos com telefone, ou o Google Maps com a sua própria chave grátis do Google. Escolha a cidade, o bairro e o tipo de negócio, e as empresas entram na sua lista. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
     },
     {
       q: 'Meus dados ficam guardados?',

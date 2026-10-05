@@ -142,27 +142,27 @@ function Tag({ children, tone }: { children: ReactNode; tone?: 'go' | 'muted' })
 // Busca de empresas
 // ---------------------------------------------------------------------------
 
-type Place = { nome: string; bairro: string; cel: boolean; site: boolean; base: boolean; insta: boolean; socio: boolean }
+type Place = { nome: string; bairro: string; cel: boolean; site: boolean; base: boolean; insta: boolean; face: boolean }
 
 const PLACES: Record<string, Place[]> = {
   Dentista: [
-    { nome: 'Clínica Sorriso Leve', bairro: 'Cambuí', cel: true, site: false, base: false, insta: true, socio: true },
-    { nome: 'Odonto Vida', bairro: 'Centro', cel: true, site: false, base: false, insta: true, socio: false },
-    { nome: 'Instituto Dental Norte', bairro: 'Taquaral', cel: true, site: true, base: false, insta: true, socio: true },
-    { nome: 'Sorriso Kids', bairro: 'Guanabara', cel: false, site: false, base: true, insta: false, socio: false },
-    { nome: 'Consultório Bem Estar', bairro: 'Castelo', cel: false, site: false, base: false, insta: false, socio: true },
+    { nome: 'Clínica Sorriso Leve', bairro: 'Cambuí', cel: true, site: false, base: false, insta: true, face: true },
+    { nome: 'Odonto Vida', bairro: 'Centro', cel: true, site: false, base: false, insta: true, face: false },
+    { nome: 'Instituto Dental Norte', bairro: 'Taquaral', cel: true, site: true, base: false, insta: true, face: true },
+    { nome: 'Sorriso Kids', bairro: 'Guanabara', cel: false, site: false, base: true, insta: false, face: false },
+    { nome: 'Consultório Bem Estar', bairro: 'Castelo', cel: false, site: false, base: false, insta: false, face: true },
   ],
   Barbearia: [
-    { nome: 'Barbearia Navalha', bairro: 'Centro', cel: true, site: false, base: true, insta: true, socio: false },
-    { nome: 'Dom Bigode', bairro: 'Cambuí', cel: true, site: true, base: false, insta: true, socio: true },
-    { nome: 'Corte Fino', bairro: 'Bosque', cel: false, site: false, base: false, insta: true, socio: true },
-    { nome: 'Barbearia do Zé', bairro: 'Taquaral', cel: true, site: false, base: false, insta: false, socio: false },
+    { nome: 'Barbearia Navalha', bairro: 'Centro', cel: true, site: false, base: true, insta: true, face: false },
+    { nome: 'Dom Bigode', bairro: 'Cambuí', cel: true, site: true, base: false, insta: true, face: true },
+    { nome: 'Corte Fino', bairro: 'Bosque', cel: false, site: false, base: false, insta: true, face: true },
+    { nome: 'Barbearia do Zé', bairro: 'Taquaral', cel: true, site: false, base: false, insta: false, face: false },
   ],
   'Pet shop': [
-    { nome: 'Pet Shop Amigo', bairro: 'Jardim Europa', cel: false, site: false, base: false, insta: true, socio: true },
-    { nome: 'Banho & Tosa Patinhas', bairro: 'Cambuí', cel: true, site: false, base: false, insta: true, socio: false },
-    { nome: 'Mundo Pet', bairro: 'Centro', cel: false, site: true, base: false, insta: true, socio: true },
-    { nome: 'Cão Feliz', bairro: 'Guanabara', cel: false, site: false, base: true, insta: false, socio: false },
+    { nome: 'Pet Shop Amigo', bairro: 'Jardim Europa', cel: false, site: false, base: false, insta: true, face: true },
+    { nome: 'Banho & Tosa Patinhas', bairro: 'Cambuí', cel: true, site: false, base: false, insta: true, face: false },
+    { nome: 'Mundo Pet', bairro: 'Centro', cel: false, site: true, base: false, insta: true, face: true },
+    { nome: 'Cão Feliz', bairro: 'Guanabara', cel: false, site: false, base: true, insta: false, face: false },
   ],
 }
 
@@ -235,7 +235,7 @@ function MapsMock() {
               <div className="h-full rounded-full bg-accent transition-[width] duration-150" style={{ width: `${(progress / 19) * 100}%` }} />
             </div>
             <p className="num mt-3 text-center text-2xs text-fg-3">
-              Buscando na base do CNPJ · Campinas - SP
+              Buscando empresas · Campinas - SP
             </p>
           </div>
         </div>
@@ -261,7 +261,7 @@ function MapsMock() {
                     <Have ok>Telefone</Have>
                     <Have ok={r.insta}>Instagram</Have>
                     <Have ok={r.site}>Site</Have>
-                    <Have ok={r.socio}>Sócio pelo CNPJ</Have>
+                    <Have ok={r.face}>Facebook</Have>
                   </div>
                 )}
               </li>
