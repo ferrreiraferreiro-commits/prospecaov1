@@ -3,7 +3,6 @@ import {
   AlarmClock,
   BadgeDollarSign,
   Calculator,
-  ChartColumn,
   CheckCircle2,
   ChevronsLeft,
   ChevronsRight,
@@ -63,7 +62,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/projetos', label: 'Projetos', icon: FolderKanban },
       { to: '/financeiro', label: 'Financeiro', icon: BadgeDollarSign },
       { to: '/precificacao', label: 'Precificação', icon: Calculator },
-      { to: '/estatisticas', label: 'Números', icon: ChartColumn },
     ],
   },
   {
