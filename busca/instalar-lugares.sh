@@ -16,7 +16,7 @@ cp "$AQUI/lugares.ts" "$AQUI/lugares-importar.ts" "$APP"/
 echo "== DuckDB (lê a base da Overture direto do S3 público)"
 cd "$APP"
 [ -f package.json ] || echo '{ "private": true }' > package.json
-npm install --omit=dev --no-audit --no-fund @duckdb/node-api@1.5 >/dev/null
+npm install --omit=dev --no-audit --no-fund @duckdb/node-api@1.5.6-r.1 >/dev/null
 cd - >/dev/null
 
 echo "== Serviços"
