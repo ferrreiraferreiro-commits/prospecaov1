@@ -12,6 +12,8 @@ import { supabase } from '../data/supabaseClient'
 
 export const COTA_GRATIS = 1000
 export const LIMITE_PADRAO = 950
+/** Teto usado na chave de demonstração (sem cartão): ela nunca cobra, quem limita é o Google, por dia. */
+export const SEM_TETO = 100000
 const LOCAL_KEY = 'xs-prospeccao:busca-google'
 
 export interface GoogleConfig {
@@ -26,6 +28,8 @@ export const mesAtual = (d = new Date()) => `${d.getFullYear()}-${String(d.getMo
 /** Consultas usadas neste mês (o contador zera sozinho quando o mês vira). */
 export const usadasNoMes = (c: GoogleConfig) => (c.mes === mesAtual() ? c.usadas : 0)
 export const restantes = (c: GoogleConfig) => Math.max(0, c.limite - usadasNoMes(c))
+/** Chave sem cartão: a XS não põe teto no mês. */
+export const semTeto = (c: Pick<GoogleConfig, 'limite'>) => c.limite >= SEM_TETO
 
 const VAZIO: GoogleConfig = {
   chave: null,

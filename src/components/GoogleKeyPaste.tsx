@@ -3,8 +3,9 @@ import clsx from 'clsx'
 import { ExternalLink, KeyRound } from 'lucide-react'
 import { useState } from 'react'
 import { useApp } from '../store/useApp'
-import { useGoogleKey } from '../store/useGoogleKey'
+import { LIMITE_PADRAO, SEM_TETO, useGoogleKey } from '../store/useGoogleKey'
 import { mapsApi } from '../store/useMapsSearch'
+import { confirmAction } from './kit'
 import { Button } from './ui'
 
 /**
@@ -43,7 +44,11 @@ export function GoogleKeyPaste({ label, className }: { label?: string; className
     setTesting(true)
     try {
       await mapsApi({ acao: 'testar', chave: k })
-      await save({ chave: k })
+      // A chave sem cartão nunca cobra: não precisa do teto de 950 por mês
+      const demo = confirmAction(
+        'Essa chave é a de demonstração, criada SEM cartão?\n\nOK = sim: a XS tira o teto do mês (essa chave nunca cobra; o Google só limita por dia).\nCancelar = não, a chave tem cartão: a XS para em 950 consultas por mês para você não pagar nada.',
+      )
+      await save({ chave: k, limite: demo ? SEM_TETO : LIMITE_PADRAO })
       setDraft('')
       toast('Chave conferida e salva. A busca do Google está liberada.', 'success')
     } catch (err) {

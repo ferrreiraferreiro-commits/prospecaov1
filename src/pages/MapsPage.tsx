@@ -12,7 +12,7 @@ import { CATEGORIAS, GRUPOS, POPULARES, categoriaDe } from '../lib/categorias'
 import { formatPhone } from '../lib/contact'
 import { formatElapsed, PHASE_LABEL, type Mode, type SearchSource } from '../lib/mapsSearch'
 import { normalizeKey } from '../lib/statuses'
-import { restantes, usadasNoMes, useGoogleKey } from '../store/useGoogleKey'
+import { restantes, semTeto, usadasNoMes, useGoogleKey } from '../store/useGoogleKey'
 import { nominatim, useMapsSearch, type SearchArea } from '../store/useMapsSearch'
 import { useApp } from '../store/useApp'
 
@@ -315,19 +315,26 @@ export function MapsPage() {
             </div>
             {google ? (
               hasKey ? (
-                <div className="space-y-1">
-                  <div className="flex items-baseline justify-between text-2xs">
-                    <span className="text-fg-3">Consultas grátis do mês</span>
-                    <span className="num text-fg-2">
-                      {usadas} / {gk.config.limite}
-                    </span>
-                  </div>
-                  <Progress value={usadas} max={gk.config.limite || 1} tone={sobra < 50 ? 'gold' : 'accent'} className="h-1" />
+                semTeto(gk.config) ? (
                   <p className="text-2xs text-fg-4">
-                    Esta busca usa até <span className="num text-fg-3">{custo}</span>. Cada consulta traz até 20 empresas. A XS para antes da cota grátis do Google, então você
-                    nunca paga.
+                    Chave sem cartão: nunca cobra. Esta busca usa até <span className="num text-fg-3">{custo}</span> consulta(s), cada uma com até 20 empresas. O Google limita por
+                    dia; se acabar, volta amanhã ({usadas} usadas neste mês).
                   </p>
-                </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="flex items-baseline justify-between text-2xs">
+                      <span className="text-fg-3">Consultas grátis do mês</span>
+                      <span className="num text-fg-2">
+                        {usadas} / {gk.config.limite}
+                      </span>
+                    </div>
+                    <Progress value={usadas} max={gk.config.limite || 1} tone={sobra < 50 ? 'gold' : 'accent'} className="h-1" />
+                    <p className="text-2xs text-fg-4">
+                      Esta busca usa até <span className="num text-fg-3">{custo}</span>. Cada consulta traz até 20 empresas. A XS para antes da cota grátis do Google, então você
+                      nunca paga.
+                    </p>
+                  </div>
+                )
               ) : (
                 <div className="space-y-2.5 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-3 text-xs">
                   <p className="flex items-start gap-2">

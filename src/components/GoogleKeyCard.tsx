@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { CheckCircle2, ExternalLink, Trash2 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useApp } from '../store/useApp'
-import { COTA_GRATIS, LIMITE_PADRAO, restantes, usadasNoMes, useGoogleKey } from '../store/useGoogleKey'
+import { COTA_GRATIS, LIMITE_PADRAO, restantes, SEM_TETO, semTeto, usadasNoMes, useGoogleKey } from '../store/useGoogleKey'
 import { DEMO_KEY_URL, GetDemoKeyButton, GoogleKeyPaste } from './GoogleKeyPaste'
 import { confirmAction } from './kit'
 import { Button, Progress } from './ui'
@@ -36,6 +36,16 @@ export function GoogleKeyCard() {
   // Sem chave, o passo a passo mais fácil (sem cartão) já vem aberto
   const aberto = guide === null ? (gk.loaded && !chave ? 'demo' : null) : guide
   const toggle = (g: 'demo' | 'cartao') => setGuide(aberto === g ? 'nenhum' : g)
+
+  const demo = semTeto(gk.config)
+  async function setDemo(on: boolean) {
+    try {
+      await gk.save({ limite: on ? SEM_TETO : LIMITE_PADRAO })
+      toast(on ? 'Chave sem cartão: a XS não põe mais teto no mês.' : `Teto de ${LIMITE_PADRAO} consultas por mês ligado.`)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Falha ao salvar.', 'error')
+    }
+  }
 
   async function saveLimite() {
     const n = Math.round(Number(limite))
@@ -100,26 +110,47 @@ export function GoogleKeyCard() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <p className="label">Uso neste mês</p>
-            <p className="num text-lg font-semibold">
-              {usadas} <span className="text-sm font-normal text-fg-4">/ {gk.config.limite} consultas</span>
-            </p>
-            <Progress value={usadas} max={gk.config.limite || 1} tone={restantes(gk.config) < 50 ? 'gold' : 'accent'} className="h-1.5" />
-            <p className="text-2xs text-fg-4">Cerca de {(restantes(gk.config) * 20).toLocaleString('pt-BR')} empresas ainda grátis. Zera no dia 1º.</p>
+            {demo ? (
+              <>
+                <p className="num text-lg font-semibold">
+                  {usadas} <span className="text-sm font-normal text-fg-4">consultas · sem teto</span>
+                </p>
+                <p className="text-2xs text-fg-4">Chave sem cartão: nunca cobra. O Google limita por dia; quando acaba, a busca do Google volta no dia seguinte.</p>
+              </>
+            ) : (
+              <>
+                <p className="num text-lg font-semibold">
+                  {usadas} <span className="text-sm font-normal text-fg-4">/ {gk.config.limite} consultas</span>
+                </p>
+                <Progress value={usadas} max={gk.config.limite || 1} tone={restantes(gk.config) < 50 ? 'gold' : 'accent'} className="h-1.5" />
+                <p className="text-2xs text-fg-4">Cerca de {(restantes(gk.config) * 20).toLocaleString('pt-BR')} empresas ainda grátis. Zera no dia 1º.</p>
+              </>
+            )}
           </div>
-          <div className="space-y-1.5">
-            <label htmlFor="g-limite" className="label">
-              Teto por mês
+          <div className="space-y-2">
+            <label className="flex items-start gap-2 text-xs text-fg-2">
+              <input type="checkbox" className="mt-0.5" checked={demo} onChange={(e) => void setDemo(e.target.checked)} />
+              <span>
+                Minha chave é a de demonstração (sem cartão)
+                <span className="block text-2xs text-fg-4">Ela nunca cobra, então a XS não põe teto no mês. Só marque se a chave não tem cartão.</span>
+              </span>
             </label>
-            <div className="flex gap-1.5">
-              <input id="g-limite" type="number" min={0} className="input num w-28" value={limite} onChange={(e) => setLimite(e.target.value)} />
-              <Button size="sm" onClick={() => void saveLimite()} disabled={String(gk.config.limite) === limite}>
-                Salvar
-              </Button>
-            </div>
-            <p className="text-2xs text-fg-4">
-              Com cartão, a cota grátis do Google é {COTA_GRATIS.toLocaleString('pt-BR')} por mês; deixando em {LIMITE_PADRAO}, você nunca paga nada. A chave sem cartão nunca
-              cobra: o Google só pausa até o dia seguinte quando passa do limite do dia.
-            </p>
+            {!demo && (
+              <div className="space-y-1.5">
+                <label htmlFor="g-limite" className="label">
+                  Teto por mês
+                </label>
+                <div className="flex gap-1.5">
+                  <input id="g-limite" type="number" min={0} className="input num w-28" value={limite} onChange={(e) => setLimite(e.target.value)} />
+                  <Button size="sm" onClick={() => void saveLimite()} disabled={String(gk.config.limite) === limite}>
+                    Salvar
+                  </Button>
+                </div>
+                <p className="text-2xs text-fg-4">
+                  Com cartão, a cota grátis do Google é {COTA_GRATIS.toLocaleString('pt-BR')} por mês; deixando em {LIMITE_PADRAO}, você nunca paga nada.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
