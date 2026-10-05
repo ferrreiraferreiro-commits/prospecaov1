@@ -58,6 +58,7 @@ export function PainelPage() {
   const motorOnline = useMotor((s) => s.online)
   const wa = useMotor((s) => s.health?.whatsapp)
   const motor = useHasMotor()
+  const nuvem = useMotor((s) => s.nuvem)
 
   const plan = useMemo(
     () => buildTodayPlan(leads, interactions, index, meetings, today, settings.max_tentativas),
@@ -231,7 +232,7 @@ export function PainelPage() {
             <Shortcut to="/precificacao" icon={<Sparkles />} label="Calcular orçamento" hint="Precificação" />
             <Shortcut to="/clientes" icon={<Users />} label="Clientes" hint={`${clientesAtivos.length} ativos`} />
             {motor ? (
-              <Shortcut to="/whatsapp" icon={<Smartphone />} label="Conectar WhatsApp" hint={motorOnline ? (wa?.status === 'connected' ? 'Conectado' : 'Ler QR Code') : 'Motor desligado'} />
+              <Shortcut to="/whatsapp" icon={<Smartphone />} label="Conectar WhatsApp" hint={motorOnline ? (wa?.status === 'connected' ? 'Conectado' : 'Ler QR Code') : nuvem ? 'Serviço indisponível' : 'Motor desligado'} />
             ) : (
               <Shortcut to="/financeiro" icon={<BadgeDollarSign />} label="Financeiro" hint={`Saldo ${formatMoney(fin.saldo)}`} />
             )}

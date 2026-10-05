@@ -28,6 +28,7 @@ import { useBiz } from '../store/useBiz'
 export function DisparoPage() {
   const online = useMotor((s) => s.online)
   const wa = useMotor((s) => s.health?.whatsapp)
+  const nuvem = useMotor((s) => s.nuvem)
   const toast = useApp((s) => s.toast)
   const [params] = useSearchParams()
   const [campaigns, setCampaigns] = useState<CampaignSummary[]>([])
@@ -119,7 +120,7 @@ export function DisparoPage() {
         <h2 className="text-[13px] font-semibold">Campanhas</h2>
         {campaigns.length === 0 ? (
           <div className="panel">
-            <Empty icon={<Megaphone />} title={online ? 'Nenhuma campanha ainda' : 'Ligue o Motor WhatsApp XS para ver as campanhas'}>
+            <Empty icon={<Megaphone />} title={online ? 'Nenhuma campanha ainda' : nuvem ? 'O serviço de WhatsApp está indisponível no momento' : 'Ligue o Motor WhatsApp XS para ver as campanhas'}>
               Monte um funil em Funis, escolha os leads e crie a campanha aqui.
             </Empty>
           </div>

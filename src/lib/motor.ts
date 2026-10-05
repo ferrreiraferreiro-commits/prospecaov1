@@ -2,6 +2,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useEffect } from 'react'
 import { create } from 'zustand'
+import { contaUsaNuvem, NuvemIndisponivel, pelaNuvem } from './whatsappCloud'
 
 /**
  * Motor WhatsApp XS: programa local (pasta motor/) que roda no computador do usuário e
@@ -10,6 +11,7 @@ import { create } from 'zustand'
  * Motor 1.4+ ligado à conta (tabela `motores`): o app fala com ele pela ponte da XS na internet
  * (busca/ponte.ts na VPS), sem chamar 127.0.0.1 — o Chrome e o Brave bloqueiam isso sem permissão.
  * Sem motor ligado (motor antigo ou app sem login): HTTP direto em 127.0.0.1, como antes.
+ * WHATSAPP_ENGINE=cloud (whatsappCloud.ts): contas liberadas usam o Motor na VPS, pelo gateway da XS.
  */
 
 /** Mesmo endereço de public/motor.json, que o motor lê para achar a ponte */
@@ -20,6 +22,8 @@ export const CHAVE_MOTOR_OK = /^[A-Za-z0-9_-]{32,64}$/
 let chave: string | null = null
 /** App com login: só fala com o motor pela ponte, nunca por 127.0.0.1 */
 let modoPonte = false
+/** Conta usando o Motor da nuvem (WHATSAPP_ENGINE=cloud e liberada no gateway) */
+let modoNuvem = false
 /** Enquanto lê a conta, as verificações esperam (para não dizer "nenhum motor" à toa) */
 let carregando: Promise<void> | null = null
 
@@ -27,6 +31,8 @@ let carregando: Promise<void> | null = null
 export function carregarMotorDaConta(client: SupabaseClient): Promise<void> {
   modoPonte = true
   carregando = (async () => {
+    modoNuvem = await contaUsaNuvem(client)
+    if (modoNuvem) return useMotor.setState({ nuvem: true, ligado: true, computador: null })
     const { data } = await client.from('motores').select('chave, computador').maybeSingle()
     const row = data as { chave: string; computador: string | null } | null
     chave = row?.chave ?? null
@@ -79,6 +85,16 @@ async function pelaPonte(c: string, path: string, method: string, json: unknown,
   return res
 }
 
+/** Pedido ao Motor da nuvem; serviço fora do ar vira MotorError "offline" (mensagem amigável). */
+async function viaNuvem(path: string, method: string, json: unknown, timeoutMs: number, signal?: AbortSignal | null): Promise<Response> {
+  try {
+    return await pelaNuvem(path, method, json, timeoutMs, signal)
+  } catch (err) {
+    if (err instanceof NuvemIndisponivel) throw new MotorError(err.message, true)
+    throw new MotorError(err instanceof Error ? err.message : 'Falha no WhatsApp.')
+  }
+}
+
 const URL_KEY = 'xs-prospeccao:motor-url'
 export const DEFAULT_MOTOR_URL = 'http://127.0.0.1:3077'
 
@@ -112,8 +128,15 @@ export async function motorFetch<T>(path: string, init: RequestInit & { json?: u
   const { json, timeoutMs = 15000, ...rest } = init
   if (carregando) await carregando.catch(() => {})
   let res: Response
-  if (modoPonte && !chave) throw new MotorError('Nenhum Motor WhatsApp XS ligado à sua conta. Baixe e abra o motor: ele se liga sozinho.', true)
-  if (chave) {
+  if (modoNuvem) {
+    try {
+      res = await viaNuvem(path, (rest.method ?? 'GET').toUpperCase(), json, timeoutMs, rest.signal)
+    } catch (err) {
+      if (err instanceof MotorError && err.offline) useMotor.getState().markOffline()
+      throw err
+    }
+  } else if (modoPonte && !chave) throw new MotorError('Nenhum Motor WhatsApp XS ligado à sua conta. Baixe e abra o motor: ele se liga sozinho.', true)
+  else if (chave) {
     try {
       res = await pelaPonte(chave, path, (rest.method ?? 'GET').toUpperCase(), json, timeoutMs, rest.signal)
     } catch (err) {
@@ -134,7 +157,7 @@ export async function motorFetch<T>(path: string, init: RequestInit & { json?: u
     }
   }
   const body = (await res.json().catch(() => ({}))) as T & { error?: string }
-  if (!res.ok) throw new MotorError(body.error || `Falha no Motor WhatsApp XS (${res.status}).`)
+  if (!res.ok) throw new MotorError(body.error || (modoNuvem ? 'Falha no WhatsApp. Tente de novo.' : `Falha no Motor WhatsApp XS (${res.status}).`))
   return body
 }
 
@@ -145,7 +168,8 @@ export interface MotorHealth {
   versao: string
   /** Só o motor antigo (até 1.2) informava: tinha a busca no Maps */
   navegador?: boolean
-  whatsapp: { status: WaStatus; user: { id: string; name: string } | null }
+  /** `sessaoSalva` só vem da nuvem: há sessão guardada (conectando → "Reconectando") */
+  whatsapp: { status: WaStatus; user: { id: string; name: string } | null; sessaoSalva?: boolean }
   /** `pendente`/`runId` só vêm do motor 1.2+: há resultados que ainda não foram para os leads */
   maps?: { active: boolean; phase: string; runId?: string | null; pendente?: boolean }
   disparo: { running: number }
@@ -154,6 +178,8 @@ export interface MotorHealth {
   computador?: string
   /** O motor está impedindo o Windows de suspender */
   acordado?: boolean
+  /** Motor da nuvem (gateway da XS) */
+  nuvem?: boolean
 }
 
 interface MotorState {
@@ -164,6 +190,8 @@ interface MotorState {
   ligado: boolean
   /** Nome do computador do motor ligado */
   computador: string | null
+  /** WhatsApp na nuvem da XS (sem Motor no computador) */
+  nuvem: boolean
   check(): Promise<void>
   markOffline(): void
 }
@@ -174,8 +202,18 @@ export const useMotor = create<MotorState>()((set) => ({
   checkedAt: 0,
   ligado: false,
   computador: null,
+  nuvem: false,
   async check() {
     if (carregando) await carregando.catch(() => {})
+    if (modoNuvem) {
+      try {
+        const res = await viaNuvem('/health', 'GET', undefined, 8000)
+        const health = (await res.json()) as MotorHealth
+        return set({ online: res.ok, health: res.ok ? health : null, checkedAt: Date.now() })
+      } catch {
+        return set({ online: false, health: null, checkedAt: Date.now() })
+      }
+    }
     // App com login e nenhum motor ligado: nem tenta 127.0.0.1 (o navegador pediria permissão)
     if (modoPonte && !chave) return set({ online: false, health: null, checkedAt: Date.now() })
     try {

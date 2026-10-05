@@ -29,6 +29,7 @@ import { isLegacyEmail } from '../lib/auth'
 import { formatDateKey, formatDateTime, formatRelative, toDateKey } from '../lib/dates'
 import { formatMoney } from '../lib/insights'
 import { salvarSuporteWhatsApp, useSuporteWhatsApp } from '../lib/suporte'
+import { linkComunidadeValido, salvarComunidade, useComunidade } from '../lib/comunidade'
 import { planInfo, type Profile } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
@@ -187,6 +188,7 @@ export function ContasPage() {
       </Card>
 
       <SuporteCard />
+      <ComunidadeCard />
 
       {contaAberta && (
         <ContaModal
@@ -615,6 +617,39 @@ function SuporteCard() {
           Salvar
         </Button>
       </div>
+    </Card>
+  )
+}
+
+function ComunidadeCard() {
+  const toast = useApp((s) => s.toast)
+  const atual = useComunidade()
+  const [link, setLink] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  useEffect(() => setLink(atual ?? ''), [atual])
+  const invalido = !!link.trim() && !linkComunidadeValido(link)
+
+  const salvar = async () => {
+    setSalvando(true)
+    try {
+      await salvarComunidade(link)
+      toast(link.trim() ? 'Link da comunidade salvo. Já aparece no menu de todo mundo.' : 'Link da comunidade removido do menu.')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não foi possível salvar.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Card title="Comunidade no WhatsApp" description="Cole o link de convite do grupo ou da comunidade (WhatsApp → grupo → Convidar via link). Aparece no menu de todas as contas como “Comunidade XS”. Deixe vazio para esconder.">
+      <div className="flex max-w-xl gap-2">
+        <input className="input" inputMode="url" placeholder="https://chat.whatsapp.com/…" value={link} onChange={(e) => setLink(e.target.value)} />
+        <Button variant="primary" loading={salvando} disabled={invalido || (link.trim() || null) === atual} onClick={() => void salvar()}>
+          Salvar
+        </Button>
+      </div>
+      {invalido && <p className="mt-1.5 text-2xs text-red-300">Use o link de convite do WhatsApp, que começa com https://chat.whatsapp.com/</p>}
     </Card>
   )
 }

@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronsLeft,
   ChevronsRight,
+  ExternalLink,
   FolderKanban,
   Headphones,
   Info,
@@ -24,11 +25,13 @@ import {
   TriangleAlert,
   Workflow,
   Users,
+  UsersRound,
   X,
   type LucideIcon,
 } from 'lucide-react'
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useComunidade } from '../lib/comunidade'
 import { useDisparoSync } from '../lib/disparo'
 import { useMotor, useMotorPolling } from '../lib/motor'
 import { formatDateTime } from '../lib/dates'
@@ -185,6 +188,7 @@ export function Layout() {
         </div>
 
         <div className="space-y-1 border-t border-line-soft p-2.5">
+          <ComunidadeLink collapsed={collapsed} />
           <TrialPill collapsed={collapsed} />
           {motor && <MotorPill collapsed={collapsed} />}
           <button
@@ -285,10 +289,19 @@ function SideLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 function MotorPill({ collapsed }: { collapsed: boolean }) {
   const online = useMotor((s) => s.online)
   const wa = useMotor((s) => s.health?.whatsapp.status)
-  const label = online ? (wa === 'connected' ? 'Motor · WhatsApp on' : 'Motor online') : online === false ? 'Motor desligado' : 'Verificando motor…'
+  const nuvem = useMotor((s) => s.nuvem)
+  const label = nuvem
+    ? online
+      ? wa === 'connected'
+        ? 'WhatsApp on'
+        : 'WhatsApp desconectado'
+      : online === false
+        ? 'WhatsApp indisponível'
+        : 'Verificando WhatsApp…'
+    : online ? (wa === 'connected' ? 'Motor · WhatsApp on' : 'Motor online') : online === false ? 'Motor desligado' : 'Verificando motor…'
   return (
     <NavLink
-      to="/configuracoes#motor"
+      to={nuvem ? '/whatsapp' : '/configuracoes#motor'}
       title={label}
       className={clsx(
         'flex h-9 items-center gap-2.5 rounded-lg text-xs text-fg-3 transition-colors hover:bg-tint/[0.04] hover:text-fg-2',
@@ -301,6 +314,36 @@ function MotorPill({ collapsed }: { collapsed: boolean }) {
       </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </NavLink>
+  )
+}
+
+/** Atalho para a comunidade da XS no WhatsApp (link definido pelo dono na tela Contas). */
+function ComunidadeLink({ collapsed, grande }: { collapsed?: boolean; grande?: boolean }) {
+  const link = useComunidade()
+  if (!link) return null
+  if (grande)
+    return (
+      <a href={link} target="_blank" rel="noreferrer" className="mb-3 flex items-center gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-3 py-2.5 text-xs font-medium text-fg">
+        <UsersRound className="size-[18px] text-emerald-300" strokeWidth={1.75} />
+        <span className="flex-1">Entrar na Comunidade XS</span>
+        <ExternalLink className="size-3.5 text-fg-3" />
+      </a>
+    )
+  return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noreferrer"
+      title="Comunidade XS no WhatsApp"
+      className={clsx(
+        'flex h-9 items-center gap-2.5 rounded-lg text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-500/[0.08] hover:text-emerald-200',
+        collapsed ? 'justify-center' : 'px-2.5',
+      )}
+    >
+      <UsersRound className="size-4 shrink-0" strokeWidth={1.75} />
+      {!collapsed && <span className="flex-1 truncate">Comunidade XS</span>}
+      {!collapsed && <ExternalLink className="size-3 text-fg-4" />}
+    </a>
   )
 }
 
@@ -332,6 +375,7 @@ function MobileSheet({ groups, onClose }: { groups: typeof GROUPS; onClose: () =
             <X className="size-4" />
           </button>
         </div>
+        <ComunidadeLink grande />
         {groups.map((group) => (
           <div key={group.title} className="mb-3">
             <p className="pb-1.5 text-[10px] font-semibold tracking-[0.08em] text-fg-4 uppercase">{group.title}</p>

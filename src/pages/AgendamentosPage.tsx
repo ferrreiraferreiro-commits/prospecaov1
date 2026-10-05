@@ -56,6 +56,7 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: 
 export function AgendamentosPage() {
   const online = useMotor((s) => s.online)
   const health = useMotor((s) => s.health)
+  const nuvem = useMotor((s) => s.nuvem)
   const leads = useApp((s) => s.leads)
   const settings = useApp((s) => s.settings)
   const toast = useApp((s) => s.toast)
@@ -176,7 +177,12 @@ export function AgendamentosPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Mensagens agendadas" subtitle="Deixe mensagens de WhatsApp marcadas para um dia e hora. O Motor WhatsApp XS envia sozinho, mesmo com você longe do computador." />
+      <PageHeader title="Mensagens agendadas" subtitle={
+          nuvem
+            ? 'Deixe mensagens de WhatsApp marcadas para um dia e hora. A XS envia sozinha, mesmo com o computador desligado.'
+            : 'Deixe mensagens de WhatsApp marcadas para um dia e hora. O Motor WhatsApp XS envia sozinho, mesmo com você longe do computador.'
+        }
+      />
 
       {online === false && <MotorOffline feature="O agendamento" />}
       {online && health && !health.agenda && (
@@ -309,16 +315,22 @@ export function AgendamentosPage() {
               {draft.id ? 'Salvar alterações' : 'Agendar mensagem'}
             </Button>
 
-            <div className="rounded-lg border border-line-soft bg-ink p-3 text-2xs text-fg-3">
-              <p className="mb-1 flex items-center gap-1.5 font-semibold text-fg-2">
-                <Coffee className="size-3.5" /> Para funcionar com você fora de casa
+            {nuvem ? (
+              <p className="rounded-lg border border-line-soft bg-ink p-3 text-2xs text-fg-3">
+                As mensagens saem pela nuvem da XS no horário marcado (horário de Brasília), mesmo com o seu computador desligado. Basta o WhatsApp estar conectado.
               </p>
-              <ul className="list-disc space-y-0.5 pl-4">
-                <li>Deixe o computador ligado com o Motor WhatsApp XS aberto e o WhatsApp conectado.</li>
-                <li>Enquanto houver agendamento, o Motor impede o Windows de suspender sozinho{health?.acordado ? ' (ativo agora)' : ''}. Não feche a tampa do notebook.</li>
-                <li>Se o PC estiver desligado no horário, a mensagem sai assim que o Motor abrir de novo.</li>
-              </ul>
-            </div>
+            ) : (
+              <div className="rounded-lg border border-line-soft bg-ink p-3 text-2xs text-fg-3">
+                <p className="mb-1 flex items-center gap-1.5 font-semibold text-fg-2">
+                  <Coffee className="size-3.5" /> Para funcionar com você fora de casa
+                </p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  <li>Deixe o computador ligado com o Motor WhatsApp XS aberto e o WhatsApp conectado.</li>
+                  <li>Enquanto houver agendamento, o Motor impede o Windows de suspender sozinho{health?.acordado ? ' (ativo agora)' : ''}. Não feche a tampa do notebook.</li>
+                  <li>Se o PC estiver desligado no horário, a mensagem sai assim que o Motor abrir de novo.</li>
+                </ul>
+              </div>
+            )}
           </div>
         </Card>
 

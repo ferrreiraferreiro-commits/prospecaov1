@@ -65,5 +65,7 @@ function apiDev(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), maplibreWorker(), apiDev()],
   server: { port: Number(process.env.PORT) || 5180 },
+  // WHATSAPP_ENGINE=local|cloud e WHATSAPP_ENGINE_URL vão para o app (src/lib/whatsappCloud.ts). Nada secreto com esses nomes.
+  envPrefix: ['VITE_', 'WHATSAPP_ENGINE'],
   test: { environment: 'node', include: ['tests/**/*.test.ts'] },
 })
