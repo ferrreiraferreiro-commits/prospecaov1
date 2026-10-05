@@ -26,8 +26,8 @@ export function ClientDrawer({ clientId, onClose }: { clientId: string | null; o
       <header className="flex items-start gap-3 border-b border-line-soft px-5 pt-4 pb-3">
         <Avatar src={null} name={client.nome || '?'} size={40} />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-base font-semibold">{client.nome || 'Novo cliente'}</h2>
-          <p className="truncate text-xs text-fg-3">
+          <h2 className="pv truncate text-base font-semibold">{client.nome || 'Novo cliente'}</h2>
+          <p className="pv truncate text-xs text-fg-3">
             {[client.empresa, client.segmento].filter(Boolean).join(' · ') || 'Cliente'}
             {client.arquivado && ' · arquivado'}
           </p>
@@ -82,7 +82,7 @@ function ClientForm({ client, onDeleted }: { client: Client; onDeleted: () => vo
     <div className="space-y-4">
       <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant="ghost" icon={<Phone className="size-3.5" />} disabled={!telHref(client.telefone)} onClick={() => window.open(telHref(client.telefone)!, '_self')}>
-          {client.telefone ? formatPhone(client.telefone) : 'Sem telefone'}
+          <span className={clsx(client.telefone && 'pv')}>{client.telefone ? formatPhone(client.telefone) : 'Sem telefone'}</span>
         </Button>
         {whatsappHref(client.telefone) && (
           <a href={whatsappHref(client.telefone)!} target="_blank" rel="noreferrer" className="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-go hover:bg-go/10">
@@ -103,19 +103,19 @@ function ClientForm({ client, onDeleted }: { client: Client; onDeleted: () => vo
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Nome do cliente *">
-          <input className="input" autoFocus={!client.nome} {...text('nome')} value={draft.nome} onChange={(e) => set('nome', e.target.value)} />
+          <input className="pv input" autoFocus={!client.nome} {...text('nome')} value={draft.nome} onChange={(e) => set('nome', e.target.value)} />
         </Field>
         <Field label="Empresa">
-          <input className="input" {...text('empresa')} />
+          <input className="pv input" {...text('empresa')} />
         </Field>
         <Field label="Telefone / WhatsApp">
-          <input className="input" inputMode="tel" {...text('telefone')} />
+          <input className="pv input" inputMode="tel" {...text('telefone')} />
         </Field>
         <Field label="E-mail">
-          <input className="input" type="email" {...text('email')} />
+          <input className="pv input" type="email" {...text('email')} />
         </Field>
         <Field label="CPF / CNPJ">
-          <input className="input" {...text('documento')} />
+          <input className="pv input" {...text('documento')} />
         </Field>
         <Field label="Segmento">
           <input className="input" {...text('segmento')} />
@@ -124,10 +124,10 @@ function ClientForm({ client, onDeleted }: { client: Client; onDeleted: () => vo
           <input className="input" placeholder="Prospecção, indicação…" {...text('origem')} />
         </Field>
         <Field label="Site">
-          <input className="input" {...text('website')} />
+          <input className="pv input" {...text('website')} />
         </Field>
         <Field label="Endereço" className="sm:col-span-2">
-          <input className="input" {...text('endereco')} />
+          <input className="pv input" {...text('endereco')} />
         </Field>
         <Field label="Tipo de cliente">
           <Segmented
@@ -205,11 +205,11 @@ function Payments({ client }: { client: Client }) {
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-lg border border-line-soft bg-ink px-3 py-2">
           <p className="text-2xs text-fg-3">Recebido</p>
-          <p className="num text-base font-semibold text-emerald-300">{formatMoney(pago)}</p>
+          <p className="pv num text-base font-semibold text-emerald-300">{formatMoney(pago)}</p>
         </div>
         <div className="rounded-lg border border-line-soft bg-ink px-3 py-2">
           <p className="text-2xs text-fg-3">A receber</p>
-          <p className="num text-base font-semibold text-amber-300">{formatMoney(pendente)}</p>
+          <p className="pv num text-base font-semibold text-amber-300">{formatMoney(pendente)}</p>
         </div>
       </div>
 
@@ -301,7 +301,7 @@ function Payments({ client }: { client: Client }) {
                   {late && ' · atrasado'}
                 </p>
               </div>
-              <span className={clsx('num text-xs font-semibold', p.status === 'pago' ? 'text-emerald-300' : 'text-fg')}>{formatMoney(p.valor)}</span>
+              <span className={clsx('pv num text-xs font-semibold', p.status === 'pago' ? 'text-emerald-300' : 'text-fg')}>{formatMoney(p.valor)}</span>
               <button onClick={() => setDraft(p)} className="text-2xs text-fg-3 hover:text-fg">
                 Editar
               </button>
@@ -345,9 +345,9 @@ function Projects({ client }: { client: Client }) {
             <li key={p.id}>
               <Link to={`/projetos?p=${p.id}`} className="flex items-center gap-3 rounded-lg border border-line-soft bg-raised px-3 py-2.5 hover:border-line-strong">
                 <span className={clsx('size-2 rounded-full', st.tone)} />
-                <span className="min-w-0 flex-1 truncate text-xs font-medium">{p.nome}</span>
+                <span className="pv min-w-0 flex-1 truncate text-xs font-medium">{p.nome}</span>
                 <span className="text-2xs text-fg-3">{st.label}</span>
-                <span className="num text-xs text-fg-2">{formatMoney(p.orcamento)}</span>
+                <span className="pv num text-xs text-fg-2">{formatMoney(p.orcamento)}</span>
               </Link>
             </li>
           )
@@ -416,7 +416,7 @@ function Notes({ client }: { client: Client }) {
                 <StickyNote className="mt-0.5 size-4 shrink-0 text-fg-4" />
               )}
               <div className="min-w-0 flex-1">
-                <p className={clsx('text-xs whitespace-pre-wrap', n.concluido ? 'text-fg-4 line-through' : 'text-fg')}>{n.texto}</p>
+                <p className={clsx('pv text-xs whitespace-pre-wrap', n.concluido ? 'text-fg-4 line-through' : 'text-fg')}>{n.texto}</p>
                 <p className="mt-0.5 text-2xs text-fg-4">
                   {new Date(n.created_at).toLocaleDateString('pt-BR')}
                   {n.vencimento && (

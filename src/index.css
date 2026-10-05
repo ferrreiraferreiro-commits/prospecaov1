@@ -37,7 +37,8 @@
    Tema claro: mesmos tokens com outros valores. Os tons claros de texto do
    Tailwind (200/300/400) viram os escuros (800/700/600) para ter contraste no branco.
    --------------------------------------------------------------------------- */
-:root[data-theme='light'] {
+:root[data-theme='light'],
+.tema-claro {
   color-scheme: light;
 
   --color-ink: #f3f4f6;
@@ -262,9 +263,14 @@
   letter-spacing: -0.035em;
 }
 
-/* Landing: fundo azul noite. .land-glow fica atrás do topo, .land-glow-end atrás do convite final */
+/* Landing: topo azul noite (.land-bg + .land-glow) e o resto no branco (.tema-claro) */
 .land-bg {
-  background: linear-gradient(180deg, #0d1324 0, #0a0e18 1000px, var(--color-ink) 2200px);
+  background: linear-gradient(180deg, #0d1324 0, #0b1120 100%);
+}
+/* Bloco com os tokens do tema claro dentro de uma página escura */
+.tema-claro {
+  color: var(--color-fg);
+  background: #ffffff;
 }
 .land-glow,
 .land-glow-end,
@@ -290,6 +296,13 @@
   inset: 0;
   opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Modo live (src/lib/privacy.ts): borra o que tem a classe .pv — nomes, telefones, e-mails, valores */
+:root[data-privado] .pv {
+  filter: blur(6px);
+  user-select: none;
+  transition: filter 160ms ease-out;
 }
 
 /* Textos legais (Privacidade e Termos) */

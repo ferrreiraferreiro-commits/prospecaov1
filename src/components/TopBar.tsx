@@ -1,10 +1,11 @@
 import clsx from 'clsx'
-import { Bell, CalendarCheck, CalendarClock, Crown, LogOut, Monitor, Moon, ShieldCheck, Sun, UserRound } from 'lucide-react'
+import { Bell, CalendarCheck, CalendarClock, Crown, Eye, EyeOff, LogOut, Monitor, Moon, ShieldCheck, Sun, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../data/supabaseClient'
 import { LOGIN_DOMAIN } from '../lib/auth'
 import { formatDateTime, formatDayLabel, periodoLabel } from '../lib/dates'
+import { PRIVACY_SHORTCUT, usePrivacy } from '../lib/privacy'
 import { buildTodayPlan } from '../lib/selectors'
 import { useTheme, type ThemePref } from '../lib/theme'
 import { useIndex, useMetrics, useToday } from '../store/derived'
@@ -31,9 +32,31 @@ function useLogin(): string | null {
 export function TopBar({ compact }: { compact?: boolean }) {
   return (
     <div className="flex items-center justify-end gap-2">
+      <PrivacyToggle />
       <NotificationBell />
       <UserMenu compact={compact} />
     </div>
+  )
+}
+
+/** Olhinho do modo live: borra nomes, telefones e valores para mostrar a tela numa live. */
+function PrivacyToggle() {
+  const on = usePrivacy((s) => s.on)
+  const toggle = usePrivacy((s) => s.toggle)
+  return (
+    <button
+      onClick={toggle}
+      className={clsx(
+        'inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-2.5 text-xs font-semibold transition-colors',
+        on ? 'border-gold/40 bg-gold/10 text-gold hover:bg-gold/15' : 'border-line bg-panel text-fg-2 hover:bg-hover hover:text-fg',
+      )}
+      aria-pressed={on}
+      aria-label={on ? 'Modo live ligado: mostrar os dados' : 'Modo live: esconder nomes, telefones e valores'}
+      title={`${on ? 'Mostrar os dados de novo' : 'Modo live: esconde nomes, telefones, e-mails e valores'} (${PRIVACY_SHORTCUT})`}
+    >
+      {on ? <EyeOff className="size-[18px]" strokeWidth={1.75} /> : <Eye className="size-[18px]" strokeWidth={1.75} />}
+      {on && <span className="hidden sm:inline">Modo live</span>}
+    </button>
   )
 }
 
@@ -119,8 +142,8 @@ function BellItem({ icon, title, detail, onClick }: { icon: ReactNode; title: st
       <button onClick={onClick} className="flex w-full items-start gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-tint/[0.05]">
         <span className="mt-0.5">{icon}</span>
         <span className="min-w-0">
-          <span className="block truncate text-xs font-medium text-fg">{title}</span>
-          <span className="block truncate text-2xs text-fg-3">{detail}</span>
+          <span className="pv block truncate text-xs font-medium text-fg">{title}</span>
+          <span className="pv block truncate text-2xs text-fg-3">{detail}</span>
         </span>
       </button>
     </li>
@@ -160,7 +183,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
         <Avatar src={settings.avatar} name={fullName} size={30} />
         {!compact && (
           <span className="hidden min-w-0 sm:block">
-            <span className="block max-w-[140px] truncate text-xs leading-4 font-semibold text-fg">{firstName}</span>
+            <span className="pv block max-w-[140px] truncate text-xs leading-4 font-semibold text-fg">{firstName}</span>
             <span className="num block text-2xs leading-4 text-fg-3">
               {metrics.hoje.ligacoes}/{meta} ligações hoje
             </span>
@@ -172,8 +195,8 @@ function UserMenu({ compact }: { compact?: boolean }) {
           <div className="flex items-center gap-3">
             <Avatar src={settings.avatar} name={fullName} size={40} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-fg">{fullName}</p>
-              <p className="truncate text-xs text-fg-3">{usuario ? `@${usuario}` : (login ?? 'Modo local (este navegador)')}</p>
+              <p className="pv truncate text-sm font-semibold text-fg">{fullName}</p>
+              <p className="pv truncate text-xs text-fg-3">{usuario ? `@${usuario}` : (login ?? 'Modo local (este navegador)')}</p>
             </div>
           </div>
 

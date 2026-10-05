@@ -47,15 +47,16 @@ const TONE: Record<Tone, string> = {
 }
 
 /** Indicador numérico (rótulo pequeno + valor grande). */
-export function Stat({ label, value, hint, tone = 'default', icon }: { label: ReactNode; value: ReactNode; hint?: ReactNode; tone?: Tone; icon?: ReactNode }) {
+/** `priv`: valor que some no modo live (dinheiro, nomes). */
+export function Stat({ label, value, hint, tone = 'default', icon, priv }: { label: ReactNode; value: ReactNode; hint?: ReactNode; tone?: Tone; icon?: ReactNode; priv?: boolean }) {
   return (
     <div className="panel px-4 py-3">
       <div className="flex items-center gap-1.5 text-2xs font-medium text-fg-3">
         {icon && <span className="[&_svg]:size-3.5">{icon}</span>}
         {label}
       </div>
-      <div className={clsx('num mt-1 text-xl leading-7 font-semibold tracking-[-0.02em]', TONE[tone])}>{value}</div>
-      {hint && <div className="mt-0.5 truncate text-2xs text-fg-4">{hint}</div>}
+      <div className={clsx('num mt-1 text-xl leading-7 font-semibold tracking-[-0.02em]', TONE[tone], priv && 'pv')}>{value}</div>
+      {hint && <div className={clsx('mt-0.5 truncate text-2xs text-fg-4', priv && 'pv')}>{hint}</div>}
     </div>
   )
 }

@@ -106,10 +106,10 @@ export function FinanceiroPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Stat label="Receitas recebidas" value={formatMoney(resumo.receitas)} icon={<ArrowUpRight />} tone="blue" />
-        <Stat label="Despesas pagas" value={formatMoney(resumo.despesas)} icon={<ArrowDownRight />} />
-        <Stat label="Saldo do mês" value={formatMoney(resumo.saldo)} icon={<Scale />} tone={resumo.saldo >= 0 ? 'go' : 'bad'} />
-        <Stat label="A receber" value={formatMoney(resumo.aReceber)} icon={<Wallet />} tone="gold" hint={resumo.aPagar ? `${formatMoney(resumo.aPagar)} a pagar` : 'Pagamentos pendentes até este mês'} />
+        <Stat priv label="Receitas recebidas" value={formatMoney(resumo.receitas)} icon={<ArrowUpRight />} tone="blue" />
+        <Stat priv label="Despesas pagas" value={formatMoney(resumo.despesas)} icon={<ArrowDownRight />} />
+        <Stat priv label="Saldo do mês" value={formatMoney(resumo.saldo)} icon={<Scale />} tone={resumo.saldo >= 0 ? 'go' : 'bad'} />
+        <Stat priv label="A receber" value={formatMoney(resumo.aReceber)} icon={<Wallet />} tone="gold" hint={resumo.aPagar ? `${formatMoney(resumo.aPagar)} a pagar` : 'Pagamentos pendentes até este mês'} />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr]">
@@ -125,7 +125,7 @@ export function FinanceiroPage() {
                 <li key={cat}>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="text-fg-2">{cat}</span>
-                    <span className="num font-medium text-fg">{formatMoney(valor)}</span>
+                    <span className="pv num font-medium text-fg">{formatMoney(valor)}</span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-tint/[0.05]">
                     <div className="h-full rounded-full bg-viz-out" style={{ width: `${(valor / categorias[0][1]) * 100}%` }} />
@@ -170,7 +170,7 @@ export function FinanceiroPage() {
                       {t.tipo === 'receita' ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-fg">{t.descricao}</p>
+                      <p className="pv truncate text-xs font-medium text-fg">{t.descricao}</p>
                       <p className="truncate text-2xs text-fg-3">
                         {t.categoria} · {formatDateKeyShort(t.data)}
                         {t.client_id && clientName.get(t.client_id) ? ` · ${clientName.get(t.client_id)}` : ''}
@@ -179,7 +179,9 @@ export function FinanceiroPage() {
                       </p>
                     </div>
                     <span className={clsx('num text-xs font-semibold', t.tipo === 'receita' ? 'text-fg' : 'text-fg-2')}>
-                      {t.tipo === 'receita' ? '+' : '−'} {formatMoney(t.valor)}
+                      <span className="pv">
+                        {t.tipo === 'receita' ? '+' : '−'} {formatMoney(t.valor)}
+                      </span>
                     </span>
                   </button>
                 </li>
@@ -205,13 +207,13 @@ export function FinanceiroPage() {
                       <Check className="size-3" strokeWidth={3} />
                     </button>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">{clientName.get(p.client_id) ?? 'Cliente'}</p>
+                      <p className="pv truncate text-xs font-medium">{clientName.get(p.client_id) ?? 'Cliente'}</p>
                       <p className={clsx('truncate text-2xs', late ? 'text-red-300' : 'text-fg-3')}>
                         {p.descricao}
                         {p.vencimento && ` · ${late ? 'venceu' : 'vence'} ${formatDateKeyShort(p.vencimento)}`}
                       </p>
                     </div>
-                    <span className="num text-xs font-semibold">{formatMoney(p.valor)}</span>
+                    <span className="pv num text-xs font-semibold">{formatMoney(p.valor)}</span>
                   </li>
                 )
               })}
@@ -255,7 +257,7 @@ function MonthlyChart({ transactions, selected, onSelect }: { transactions: Tran
       <div className="relative h-48 pl-14">
         {ticks.map((t) => (
           <div key={t} className="absolute right-0 left-14 border-t border-line-soft" style={{ bottom: `${t * 100}%` }}>
-            <span className="num absolute -top-2 -left-14 w-12 text-right text-[10px] text-fg-4">{formatMoney(max * t).replace(',00', '')}</span>
+            <span className="pv num absolute -top-2 -left-14 w-12 text-right text-[10px] text-fg-4">{formatMoney(max * t).replace(',00', '')}</span>
           </div>
         ))}
         <div className="relative flex h-full items-end gap-2">
@@ -277,13 +279,13 @@ function MonthlyChart({ transactions, selected, onSelect }: { transactions: Tran
                 <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 w-40 -translate-x-1/2 rounded-md border border-line bg-raised px-2.5 py-2 text-left text-2xs shadow-xl">
                   <span className="block font-semibold text-fg">{monthLabel(d.m, 'long')}</span>
                   <span className="mt-1 flex justify-between text-fg-2">
-                    Receitas <span className="num text-fg">{formatMoney(d.entrada)}</span>
+                    Receitas <span className="pv num text-fg">{formatMoney(d.entrada)}</span>
                   </span>
                   <span className="flex justify-between text-fg-2">
-                    Despesas <span className="num text-fg">{formatMoney(d.saida)}</span>
+                    Despesas <span className="pv num text-fg">{formatMoney(d.saida)}</span>
                   </span>
                   <span className="mt-1 flex justify-between border-t border-line-soft pt-1 text-fg-2">
-                    Saldo <span className="num font-medium text-fg">{formatMoney(d.entrada - d.saida)}</span>
+                    Saldo <span className="pv num font-medium text-fg">{formatMoney(d.entrada - d.saida)}</span>
                   </span>
                 </span>
               )}

@@ -205,7 +205,7 @@ export function CallModePage() {
         {/* Esquerda: empresa */}
         <aside className={clsx('space-y-5 border-line-soft px-4 py-5 sm:px-6 xl:border-r xl:px-5', tab !== 'lead' && 'max-xl:hidden')}>
           <div>
-            <h1 className="text-lg leading-6 font-semibold tracking-[-0.01em]">{lead.empresa}</h1>
+            <h1 className="pv text-lg leading-6 font-semibold tracking-[-0.01em]">{lead.empresa}</h1>
             <p className="mt-1 text-xs text-fg-3">
               {lead.nicho ?? 'Nicho não informado'}
               {lead.cidade && ` · ${[lead.cidade, lead.estado].filter(Boolean).join(' - ')}`}
@@ -218,7 +218,7 @@ export function CallModePage() {
           </div>
 
           <div className="space-y-2">
-            <p className="num text-[22px] leading-none font-semibold tracking-tight">
+            <p className="pv num text-[22px] leading-none font-semibold tracking-tight">
               {lead.telefone ? formatPhone(lead.telefone) : <Missing>Sem telefone</Missing>}
             </p>
             <Button
@@ -298,14 +298,14 @@ export function CallModePage() {
           </div>
 
           <dl className="space-y-1.5 text-xs">
-            <Info label="Endereço">{lead.endereco ?? <Missing />}</Info>
+            <Info label="Endereço" priv>{lead.endereco ?? <Missing />}</Info>
             <Info label="Pasta">{lead.pasta ?? <Missing />}</Info>
             <Info label="Ligações">{calls ? `${calls} · última ${formatRelative(lead.ultima_ligacao!)}` : <Missing>Nenhuma ainda</Missing>}</Info>
             <Info label="Próximo">
               <NextActionText action={nextAction(lead, index)} />
             </Info>
             {lead.falei_com && (
-              <Info label="Contato">
+              <Info label="Contato" priv>
                 {lead.falei_com}
                 {lead.cargo && <span className="text-fg-3"> · {lead.cargo}</span>}
               </Info>
@@ -324,7 +324,7 @@ export function CallModePage() {
                       {!h.status && h.tipo === 'ligacao' && <span className="text-2xs text-gold">sem resultado</span>}
                     </div>
                     {(h.falei_com || h.observacao) && (
-                      <p className="mt-0.5 line-clamp-2 text-fg-2">
+                      <p className="pv mt-0.5 line-clamp-2 text-fg-2">
                         {h.falei_com && <span className="text-fg">{h.falei_com}: </span>}
                         {h.observacao}
                       </p>
@@ -366,7 +366,7 @@ export function CallModePage() {
           />
           {nextId && (
             <button onClick={() => go(nextId)} className="mt-4 flex w-full items-center justify-center gap-1.5 text-2xs text-fg-4 hover:text-fg-2">
-              <SkipForward className="size-3" /> Pular sem registrar{nextLead && ` · próximo: ${nextLead.empresa}`}
+              <SkipForward className="size-3" /> Pular sem registrar{nextLead && <span className="pv"> · próximo: {nextLead.empresa}</span>}
             </button>
           )}
         </aside>
@@ -386,11 +386,11 @@ const INSIGHT_DOT: Record<InsightTone, string> = {
 const SMALL_ACTION =
   'flex h-8 items-center justify-center gap-1.5 rounded-md border border-line bg-ink px-2 text-2xs font-medium text-fg-2 transition-colors hover:border-line-strong hover:bg-hover hover:text-fg disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-3.5'
 
-function Info({ label, children }: { label: string; children: ReactNode }) {
+function Info({ label, children, priv }: { label: string; children: ReactNode; priv?: boolean }) {
   return (
     <div className="grid grid-cols-[72px_1fr] gap-2">
       <dt className="text-fg-3">{label}</dt>
-      <dd className="min-w-0 break-words text-fg">{children}</dd>
+      <dd className={clsx('min-w-0 break-words text-fg', priv && 'pv')}>{children}</dd>
     </div>
   )
 }
@@ -408,7 +408,7 @@ function ContactButton({ href, icon, label }: { href: string | null; icon: React
   return (
     <a href={href} target="_blank" rel="noreferrer" className={clsx(cls, 'border-line bg-ink text-fg-2 transition-colors hover:border-line-strong hover:bg-hover hover:text-fg')}>
       {icon}
-      <span className="truncate">{label}</span>
+      <span className={clsx('truncate', label !== 'Maps' && 'pv')}>{label}</span>
     </a>
   )
 }

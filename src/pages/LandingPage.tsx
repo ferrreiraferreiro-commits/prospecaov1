@@ -39,8 +39,8 @@ function useRevealOnScroll(root: React.RefObject<HTMLElement | null>) {
 }
 
 /**
- * A landing foi desenhada só no escuro. Se o tema salvo for o claro, troca para o escuro
- * enquanto ela está aberta (antes de desenhar) e devolve o tema ao sair.
+ * O topo da landing é azul (tokens do escuro) e o resto usa .tema-claro. Se o tema salvo for o
+ * claro, troca para o escuro enquanto ela está aberta (antes de desenhar) e devolve o tema ao sair.
  */
 function useDarkTheme() {
   useLayoutEffect(() => {
@@ -59,23 +59,26 @@ export function LandingPage() {
   useRevealOnScroll(ref)
   useDarkTheme()
   return (
-    <div ref={ref} className="land-bg relative isolate min-h-dvh overflow-x-clip text-fg">
-      <div className="land-glow" aria-hidden />
-      <div className="land-grain" aria-hidden />
+    <div ref={ref} className="relative isolate min-h-dvh overflow-x-clip bg-white text-fg">
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-raised focus:px-3 focus:py-2 focus:text-xs">
         Pular para o conteúdo
       </a>
       <Nav />
       <main id="conteudo">
         <Hero />
-        <Highlights />
-        <Steps />
-        <Product />
-        <Audience />
-        <Faq />
-        <FinalCta />
+        {/* Do topo azul para baixo, fundo branco (tokens do tema claro) */}
+        <div className="tema-claro">
+          <Highlights />
+          <Steps />
+          <Product />
+          <Audience />
+          <Faq />
+          <FinalCta />
+        </div>
       </main>
-      <SiteFooter />
+      <div className="tema-claro">
+        <SiteFooter />
+      </div>
     </div>
   )
 }
@@ -200,7 +203,10 @@ const H2 = 'font-display text-balance text-[30px] leading-[1.1] sm:text-[40px] s
 
 function Hero() {
   return (
-    <section aria-labelledby="hero-t">
+    // -mt-16 + pt-16: o azul do topo continua atrás do menu
+    <section aria-labelledby="hero-t" className="land-bg relative isolate -mt-16 pt-16">
+      <div className="land-glow" aria-hidden />
+      <div className="land-grain" aria-hidden />
       <div className={clsx(WRAP, 'grid items-center gap-14 pt-12 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,548px)] lg:gap-12 lg:pt-28 lg:pb-32')}>
         <div className="max-w-[600px]">
           <p className="land-in text-[13px] text-fg-2/80" style={delay(0)}>

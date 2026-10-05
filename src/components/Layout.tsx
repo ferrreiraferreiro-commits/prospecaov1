@@ -43,6 +43,7 @@ import { EscolherPlano } from './Planos'
 import { TopBar } from './TopBar'
 import { Spinner } from './ui'
 import { useReminders } from './useReminders'
+import { usePrivacyMode } from '../lib/privacy'
 
 interface NavItem {
   to: string
@@ -134,6 +135,7 @@ export function Layout() {
   const motor = useHasMotor()
   const groups = useGroups()
   useReminders()
+  usePrivacyMode()
 
   useEffect(() => setSheet(false), [pathname])
 

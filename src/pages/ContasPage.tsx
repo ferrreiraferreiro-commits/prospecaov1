@@ -138,7 +138,7 @@ export function ContasPage() {
       />
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-        <Stat label="Recebido no mês" value={formatMoney(mesAtual)} tone="go" icon={<BadgeDollarSign />} hint={`${formatMoney(totalGeral)} no total`} />
+        <Stat priv label="Recebido no mês" value={formatMoney(mesAtual)} tone="go" icon={<BadgeDollarSign />} hint={`${formatMoney(totalGeral)} no total`} />
         <Stat label="Pagantes" value={resumo.pagantes} tone="blue" hint={resumo.vencendo ? `${resumo.vencendo} vence(m) em até 3 dias` : 'nenhum vencendo'} />
         <Stat label="Em teste" value={resumo.teste} />
         <Stat label="Vitalício" value={resumo.vitalicio} tone="gold" icon={<Crown />} />
@@ -243,10 +243,10 @@ function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; p
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-xs md:grid-cols-[minmax(0,1.6fr)_120px_minmax(0,1.3fr)_100px_110px_auto]">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate font-medium text-fg">
-          {nomeDe(conta)}
+          <span className="pv truncate">{nomeDe(conta)}</span>
           {conta.admin && <ShieldCheck className="size-3.5 shrink-0 text-blue-300" aria-label="Dono" />}
         </p>
-        <p className="truncate text-2xs text-fg-3">
+        <p className="pv truncate text-2xs text-fg-3">
           {[conta.usuario && `@${conta.usuario}`, legacy ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')}
           {conta.cidade ? ` · ${conta.cidade}` : ''}
         </p>
@@ -257,7 +257,7 @@ function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; p
       <div className="col-span-2 md:col-span-1">
         <FimLabel conta={conta} now={now} />
       </div>
-      <div className={clsx('num md:text-right', pago ? 'text-fg' : 'text-fg-4')}>
+      <div className={clsx('pv num md:text-right', pago ? 'text-fg' : 'text-fg-4')}>
         <span className="text-2xs text-fg-4 md:hidden">Já pagou </span>
         {formatMoney(pago)}
       </div>
@@ -292,7 +292,7 @@ function ContaModal({
 }) {
   const [aba, setAba] = useState<Aba>('plano')
   return (
-    <Modal open onClose={onClose} title={nomeDe(conta)} subtitle={[conta.usuario && `@${conta.usuario}`, isLegacyEmail(conta.email) ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')} width="max-w-xl">
+    <Modal open onClose={onClose} title={<span className="pv">{nomeDe(conta)}</span>} subtitle={<span className="pv">{[conta.usuario && `@${conta.usuario}`, isLegacyEmail(conta.email) ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')}</span>} width="max-w-xl">
       <div className="border-b border-line-soft px-5 py-2.5">
         <Segmented
           value={aba}

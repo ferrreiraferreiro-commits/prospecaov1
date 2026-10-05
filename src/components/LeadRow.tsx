@@ -92,7 +92,7 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
               aria-label={`Selecionar ${lead.empresa}`}
             />
           )}
-          <span className="truncate text-[13px] font-semibold text-fg" title={lead.empresa}>
+          <span className="pv truncate text-[13px] font-semibold text-fg" title={lead.empresa}>
             {lead.empresa}
           </span>
           <HotTag lead={lead} />
@@ -112,7 +112,7 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
       {/* Mobile: linha de detalhes */}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs lg:contents">
         <Rating lead={lead} className="text-xs" />
-        <span className="num text-xs text-fg-2">{lead.telefone ? formatPhone(lead.telefone) : <span className="text-fg-4">Sem telefone</span>}</span>
+        <span className="pv num text-xs text-fg-2">{lead.telefone ? formatPhone(lead.telefone) : <span className="text-fg-4">Sem telefone</span>}</span>
         <SiteTag lead={lead} className="text-xs" />
       </div>
 

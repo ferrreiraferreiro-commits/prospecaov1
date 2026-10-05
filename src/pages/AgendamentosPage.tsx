@@ -216,8 +216,8 @@ export function AgendamentosPage() {
               {draft.telefone ? (
                 <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] px-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-fg">{draft.nome || 'Número avulso'}</p>
-                    <p className="num text-2xs text-fg-3">{formatPhone(draft.telefone)}</p>
+                    <p className="pv truncate text-xs font-medium text-fg">{draft.nome || 'Número avulso'}</p>
+                    <p className="pv num text-2xs text-fg-3">{formatPhone(draft.telefone)}</p>
                   </div>
                   <button onClick={() => setDraft((d) => ({ ...d, leadId: null, nome: '', telefone: '' }))} className="rounded p-1 text-fg-3 hover:bg-hover hover:text-fg" aria-label="Trocar destinatário">
                     <X className="size-3.5" />
@@ -233,10 +233,10 @@ export function AgendamentosPage() {
                         <li key={l.id}>
                           <button onClick={() => chooseLead(l)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left hover:bg-tint/[0.05]">
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-xs font-medium">{l.empresa}</span>
-                              <span className="block truncate text-2xs text-fg-3">{[l.falei_com, l.cidade].filter(Boolean).join(' · ') || l.nicho}</span>
+                              <span className="pv block truncate text-xs font-medium">{l.empresa}</span>
+                              <span className="pv block truncate text-2xs text-fg-3">{[l.falei_com, l.cidade].filter(Boolean).join(' · ') || l.nicho}</span>
                             </span>
-                            <span className="num text-2xs text-fg-3">{formatPhone(leadPhone(l))}</span>
+                            <span className="pv num text-2xs text-fg-3">{formatPhone(leadPhone(l))}</span>
                           </button>
                         </li>
                       ))}
@@ -258,7 +258,7 @@ export function AgendamentosPage() {
                 </div>
               )}
               {draft.telefone && !draft.leadId && (
-                <input className="input mt-1.5" value={draft.nome} onChange={(e) => setDraft({ ...draft, nome: e.target.value })} placeholder="Nome (opcional, só para você reconhecer)" />
+                <input className="pv input mt-1.5" value={draft.nome} onChange={(e) => setDraft({ ...draft, nome: e.target.value })} placeholder="Nome (opcional, só para você reconhecer)" />
               )}
             </div>
 
@@ -274,7 +274,7 @@ export function AgendamentosPage() {
                   ))}
                 </select>
               </div>
-              <textarea className="input" rows={6} value={draft.texto} onChange={(e) => setDraft({ ...draft, texto: e.target.value })} placeholder="Ex.: {saudacao}, Mariana! Conforme combinamos, segue o exemplo do site…" />
+              <textarea className="pv input" rows={6} value={draft.texto} onChange={(e) => setDraft({ ...draft, texto: e.target.value })} placeholder="Ex.: {saudacao}, Mariana! Conforme combinamos, segue o exemplo do site…" />
               <p className="mt-1 text-2xs text-fg-4">
                 {MESSAGE_VARIABLES[0]} vira "Bom dia/Boa tarde/Boa noite" na hora do envio.
               </p>
@@ -391,11 +391,11 @@ function AgendaRow({ a, onEdit, onCancel, onDelete, onRetry }: { a: Agendamento;
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2">
-          <p className="truncate text-xs font-semibold text-fg">{a.nome}</p>
-          <p className="num text-2xs text-fg-3">{formatPhone(a.telefone)}</p>
+          <p className="pv truncate text-xs font-semibold text-fg">{a.nome}</p>
+          <p className="pv num text-2xs text-fg-3">{formatPhone(a.telefone)}</p>
           <StatusTag a={a} late={late} />
         </div>
-        <p className="mt-1 line-clamp-3 text-xs whitespace-pre-wrap text-fg-2">{a.texto}</p>
+        <p className="pv mt-1 line-clamp-3 text-xs whitespace-pre-wrap text-fg-2">{a.texto}</p>
         {a.erro && <p className={clsx('mt-1 text-2xs', a.status === 'falhou' ? 'text-red-300' : 'text-fg-4')}>{a.erro}</p>}
         {a.respostas.map((r, i) => (
           <p key={i} className="mt-1 rounded bg-emerald-500/10 px-2 py-1 text-2xs text-emerald-200">
