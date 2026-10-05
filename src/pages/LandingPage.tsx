@@ -114,7 +114,7 @@ function Nav() {
     <header
       className={clsx(
         'sticky top-0 z-40 border-b transition-[background-color,border-color] duration-300',
-        scrolled || open ? 'border-line-soft bg-[#0b0f1a]/80 backdrop-blur-md' : 'border-transparent bg-ink/0',
+        scrolled || open ? 'border-line-soft bg-[#0b0f1a]/95 backdrop-blur-md' : 'border-transparent bg-ink/0',
       )}
     >
       <div className={clsx(WRAP, 'relative flex h-16 items-center gap-3')}>
