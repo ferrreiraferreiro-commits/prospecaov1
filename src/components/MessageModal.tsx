@@ -63,7 +63,7 @@ function MessageFlow({ lead, initialTemplate, onClose }: { lead: Lead; initialTe
       width="max-w-xl"
       title="Mensagem de WhatsApp"
       subtitle={
-        <span className="text-fg-2">
+        <span className="pv text-fg-2">
           {lead.empresa}
           {target && <span className="num text-fg-3"> · {formatPhone(target.number)}</span>}
         </span>

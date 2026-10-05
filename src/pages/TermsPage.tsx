@@ -9,7 +9,7 @@ const sections: LegalSection[] = [
       <>
         <p>
           A XS Prospecção é uma ferramenta online para prospectar e acompanhar clientes, feita principalmente para quem vende sites e serviços digitais
-          para empresas. Ele reúne busca de empresas (base pública do CNPJ), lista de leads, Modo Ligação com roteiro e objeções, retornos, reuniões, mensagens
+          para empresas. Ele reúne busca de empresas (base aberta de comércios e Google Maps), lista de leads, Modo Ligação com roteiro e objeções, retornos, reuniões, mensagens
           de WhatsApp, clientes, projetos, financeiro, precificação e métricas.
         </p>
         <p>
@@ -97,8 +97,8 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          A XS depende de serviços de terceiros, como Supabase (banco de dados e login), Vercel (hospedagem), Oracle Cloud (servidor da busca de
-          empresas), Receita Federal (base pública do CNPJ), BrasilAPI (consulta de CNPJ) e OpenStreetMap (mapas). A lista completa está na <a href="/privacidade#terceiros">Política de Privacidade</a>.
+          A XS depende de serviços de terceiros, como Supabase (banco de dados e login), Vercel (hospedagem), um servidor próprio de busca, Overture
+          Maps (base aberta de comércios), Google (Places API, com a sua chave), BrasilAPI (consulta de CNPJ) e OpenStreetMap (mapas). A lista completa está na <a href="/privacidade#terceiros">Política de Privacidade</a>.
         </p>
         <p>
           Não temos controle sobre esses serviços. Mudanças, limites ou falhas neles podem afetar algumas funções da XS, e o uso deles também segue os
@@ -133,7 +133,7 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          A XS não é afiliada, patrocinada nem aprovada pelo Google, pelo WhatsApp ou pela Meta, nem pela Receita Federal. Os nomes são usados apenas para indicar com quais
+          A XS não é afiliada, patrocinada nem aprovada pelo Google, pelo WhatsApp, pela Meta ou pela Overture Maps Foundation. Os nomes são usados apenas para indicar com quais
           serviços a XS funciona.
         </p>
         <p>
@@ -143,8 +143,9 @@ const sections: LegalSection[] = [
           conteúdo das mensagens são de sua responsabilidade.
         </p>
         <p>
-          <strong>Base pública do CNPJ</strong>: a busca usa os dados abertos que a Receita Federal publica todo mês. Telefones e e-mails
-          podem estar desatualizados ou ser do escritório de contabilidade da empresa, e a XS não garante que estejam corretos. Use essas
+          <strong>Busca de empresas</strong>: a base aberta vem de dados públicos de comércios (Overture Maps) e é atualizada todo mês; o Google
+          Maps é consultado com a sua própria chave, dentro da cota que você definir. Telefones, sites e endereços podem estar desatualizados, e a
+          XS não garante que estejam corretos. Os custos de uso da sua chave do Google, se você passar da cota grátis dele, são seus. Use essas
           informações de forma compatível com a LGPD, para contato entre empresas, e respeite quem pedir para não ser contatado.
         </p>
       </>

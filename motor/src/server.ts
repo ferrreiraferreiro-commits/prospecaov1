@@ -141,7 +141,8 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log('  └────────────────────────────────────────────┘')
   console.log(`  Dados locais: ${storageDir}`)
   resumeStoredSession()
-  iniciarPonte(PORT, VERSION)
+  // Modo nuvem (whatsapp-cloud/, na VPS): o site fala com o motor pelo gateway, sem a ponte
+  if (process.env.XS_MODO !== 'nuvem') iniciarPonte(PORT, VERSION)
 })
 
 server.on('error', (err: NodeJS.ErrnoException) => {

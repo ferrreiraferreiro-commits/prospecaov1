@@ -10,6 +10,7 @@
       "env": { "VITE_SUPABASE_URL": "", "VITE_SUPABASE_ANON_KEY": "" },
       "port": 5181,
       "autoPort": true
-    }
+    },
+    { "name": "app-whatsapp-cloud", "runtimeExecutable": "npx", "runtimeArgs": ["vite"], "env": { "WHATSAPP_ENGINE": "cloud" }, "port": 5183, "autoPort": true }
   ]
 }

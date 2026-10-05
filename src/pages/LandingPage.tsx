@@ -39,8 +39,8 @@ function useRevealOnScroll(root: React.RefObject<HTMLElement | null>) {
 }
 
 /**
- * A landing foi desenhada só no escuro. Se o tema salvo for o claro, troca para o escuro
- * enquanto ela está aberta (antes de desenhar) e devolve o tema ao sair.
+ * O topo da landing é azul (tokens do escuro) e o resto usa .tema-claro. Se o tema salvo for o
+ * claro, troca para o escuro enquanto ela está aberta (antes de desenhar) e devolve o tema ao sair.
  */
 function useDarkTheme() {
   useLayoutEffect(() => {
@@ -59,23 +59,26 @@ export function LandingPage() {
   useRevealOnScroll(ref)
   useDarkTheme()
   return (
-    <div ref={ref} className="land-bg relative isolate min-h-dvh overflow-x-clip text-fg">
-      <div className="land-glow" aria-hidden />
-      <div className="land-grain" aria-hidden />
+    <div ref={ref} className="relative isolate min-h-dvh overflow-x-clip bg-white text-fg">
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-raised focus:px-3 focus:py-2 focus:text-xs">
         Pular para o conteúdo
       </a>
       <Nav />
       <main id="conteudo">
         <Hero />
-        <Highlights />
-        <Steps />
-        <Product />
-        <Audience />
-        <Faq />
-        <FinalCta />
+        {/* Do topo azul para baixo, fundo branco (tokens do tema claro) */}
+        <div className="tema-claro">
+          <Highlights />
+          <Steps />
+          <Product />
+          <Audience />
+          <Faq />
+          <FinalCta />
+        </div>
       </main>
-      <SiteFooter />
+      <div className="tema-claro">
+        <SiteFooter />
+      </div>
     </div>
   )
 }
@@ -111,7 +114,7 @@ function Nav() {
     <header
       className={clsx(
         'sticky top-0 z-40 border-b transition-[background-color,border-color] duration-300',
-        scrolled || open ? 'border-line-soft bg-[#0b0f1a]/80 backdrop-blur-md' : 'border-transparent bg-ink/0',
+        scrolled || open ? 'border-line-soft bg-[#0b0f1a]/95 backdrop-blur-md' : 'border-transparent bg-ink/0',
       )}
     >
       <div className={clsx(WRAP, 'relative flex h-16 items-center gap-3')}>
@@ -200,7 +203,10 @@ const H2 = 'font-display text-balance text-[30px] leading-[1.1] sm:text-[40px] s
 
 function Hero() {
   return (
-    <section aria-labelledby="hero-t">
+    // -mt-16 + pt-16: o azul do topo continua atrás do menu
+    <section aria-labelledby="hero-t" className="land-bg relative isolate -mt-16 pt-16">
+      <div className="land-glow" aria-hidden />
+      <div className="land-grain" aria-hidden />
       <div className={clsx(WRAP, 'grid items-center gap-14 pt-12 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,548px)] lg:gap-12 lg:pt-28 lg:pb-32')}>
         <div className="max-w-[600px]">
           <p className="land-in text-[13px] text-fg-2/80" style={delay(0)}>
@@ -240,7 +246,7 @@ function Hero() {
 
 function Highlights() {
   const items = [
-    { icon: <MapIcon />, text: 'Empresas reais, com CNPJ' },
+    { icon: <MapIcon />, text: 'Empresas reais, com telefone' },
     { icon: <LayoutList />, text: 'Tudo organizado num lugar' },
     { icon: <CalendarClock />, text: 'Retornos na hora certa' },
     { icon: <Route />, text: 'Do lead ao projeto' },
@@ -313,7 +319,7 @@ function Product() {
 
 function Audience() {
   const points = [
-    'Capta empresas locais por cidade, bairro e nicho, já com telefone e sócio.',
+    'Capta empresas locais por cidade, bairro e tipo de negócio, já com telefone, site e Instagram.',
     'Organiza leads, status e histórico de contato num lugar só.',
     'Lembra retornos e reuniões na hora certa.',
     'Transforma o lead em cliente e projeto sem sair da XS.',
@@ -358,7 +364,7 @@ function Faq() {
     },
     {
       q: 'De onde vêm os leads?',
-      a: 'Da busca da própria XS, que usa a base pública de empresas da Receita Federal: todas as empresas ativas do Brasil, com telefone, e-mail, endereço e sócio responsável. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
+      a: 'Da busca da própria XS: uma base aberta com milhões de comércios do Brasil, quase todos com telefone, ou o Google Maps com a sua própria chave grátis do Google. Escolha a cidade, o bairro e o tipo de negócio, e as empresas entram na sua lista. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
     },
     {
       q: 'Meus dados ficam guardados?',

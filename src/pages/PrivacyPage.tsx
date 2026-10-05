@@ -87,13 +87,14 @@ const sections: LegalSection[] = [
             <strong>Por você</strong>: no cadastro, no perfil e em tudo o que você digita, cola ou importa por planilha.
           </>,
           <>
-            <strong>Pela busca de empresas</strong>: o servidor de busca da XS consulta a base pública do CNPJ que a Receita Federal publica
-            todo mês (dados abertos): nome, endereço, telefone, e-mail, atividade e quadro de sócios das empresas ativas. O CPF que aparece no
-            nome de alguns microempreendedores é removido e nunca chega ao app. Para conferir o site e achar o Instagram, o servidor abre a
-            página pública do site da empresa, quando ela tem um.
+            <strong>Pela busca de empresas</strong>: a busca grátis usa a base aberta de lugares da Overture Maps Foundation (dados públicos de
+            comércios reunidos de fontes como Meta, Microsoft e Foursquare), guardada no servidor de busca da XS: nome, categoria, endereço,
+            telefone, site e redes sociais dos comércios. Se você colocar a sua chave do Google, a busca também consulta o Google Maps (Places
+            API) em seu nome, com a sua cota. Para achar o Instagram, o servidor abre a página pública do site da empresa, quando ela tem um.
           </>,
           <>
-            <strong>Pela consulta pública de CNPJ</strong>: quando há um CNPJ, os dados cadastrais públicos da empresa são consultados na BrasilAPI.
+            <strong>Pela consulta pública de CNPJ</strong>: quando há um CNPJ (digitado por você ou achado no site da empresa), os dados cadastrais
+            públicos da empresa são consultados na BrasilAPI.
           </>,
           <>
             <strong>Pelo WhatsApp</strong>: se você usar o disparo automático e conectar o seu WhatsApp ao Motor WhatsApp XS (programa opcional), a confirmação de entrega, de leitura e as respostas às mensagens
@@ -183,8 +184,15 @@ const sections: LegalSection[] = [
               <strong>Vercel</strong>: hospedagem do site.
             </>,
             <>
-              <strong>Oracle Cloud</strong>: servidor da busca de empresas. Ele recebe a cidade, os nichos e os filtros da busca e, para pular quem
-              você já tem, os telefones e CNPJs da sua lista, que são usados só durante a busca e não ficam guardados.
+              <strong>Servidor de busca da XS (VPS)</strong>: guarda a base aberta de comércios. Ele recebe a cidade, os tipos de negócio e os filtros
+              da busca e, para pular quem você já tem, os telefones da sua lista, que são usados só durante a busca e não ficam guardados.
+            </>,
+            <>
+              <strong>Google (Places API)</strong>: só se você colocar a sua chave do Google. A busca envia ao Google o tipo de negócio e a cidade,
+              usando a sua chave, que fica guardada na sua conta da XS e só é usada nas suas buscas.
+            </>,
+            <>
+              <strong>Overture Maps Foundation</strong>: origem da base aberta de comércios (dados abertos, licença CDLA Permissive 2.0).
             </>,
             <>
               <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pelo Motor WhatsApp XS saem da sua própria conta de WhatsApp, conectada por QR Code.
@@ -363,7 +371,7 @@ export function PrivacyPage() {
             Esta página explica, em linguagem simples, quais dados a XS Prospecção usa, por que usa, onde eles ficam e o que você pode fazer com eles.
           </p>
           <p className="border-l border-line-strong pl-4 text-fg-3">
-            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; a busca de empresas usa a base pública do CNPJ; não vendemos
+            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; a busca de empresas usa uma base aberta de comércios ou o Google, com a sua chave; não vendemos
             dados e não usamos rastreamento de publicidade.
           </p>
         </>

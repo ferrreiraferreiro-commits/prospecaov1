@@ -110,8 +110,8 @@ export function WhatsAppPage() {
                 <CheckCircle2 className="size-7" />
               </span>
               <div>
-                <p className="text-base font-semibold">{wa.user.name}</p>
-                <p className="num text-xs text-fg-3">{formatPhone(wa.user.id)}</p>
+                <p className="pv text-base font-semibold">{wa.user.name}</p>
+                <p className="pv num text-xs text-fg-3">{formatPhone(wa.user.id)}</p>
               </div>
               <p className="max-w-sm text-xs text-fg-3">Pronto para disparar. Se trocar de número, desconecte aqui e leia o QR Code com o outro aparelho.</p>
               <Button variant="danger" icon={<LogOut className="size-3.5" />} loading={busy} onClick={() => void disconnect()}>

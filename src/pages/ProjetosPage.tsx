@@ -66,7 +66,7 @@ export function ProjetosPage() {
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <Stat label="Em andamento" value={ativos.length} icon={<FolderKanban />} />
-        <Stat label="Carteira ativa" value={formatMoney(carteira)} tone="blue" hint="Orçamento dos projetos abertos" />
+        <Stat priv label="Carteira ativa" value={formatMoney(carteira)} tone="blue" hint="Orçamento dos projetos abertos" />
         <Stat label="Prazo vencido" value={atrasados} tone={atrasados ? 'bad' : 'default'} icon={<CalendarDays />} />
         <Stat label="Concluídos" value={concluidos} tone="go" />
       </div>
@@ -95,7 +95,7 @@ export function ProjetosPage() {
                   <span className={clsx('size-2 rounded-full', col.tone)} />
                   <h2 className="text-xs font-semibold">{col.label}</h2>
                   <span className="num rounded bg-tint/[0.06] px-1.5 text-2xs leading-[18px] text-fg-2">{items.length}</span>
-                  {total > 0 && <span className="num ml-auto text-2xs text-fg-4">{formatMoney(total)}</span>}
+                  {total > 0 && <span className="pv num ml-auto text-2xs text-fg-4">{formatMoney(total)}</span>}
                 </header>
                 <div className="flex-1 space-y-1.5 px-2 pb-2">
                   {items.map((p) => {
@@ -114,10 +114,10 @@ export function ProjetosPage() {
                         )}
                       >
                         <div className="flex items-start gap-1.5">
-                          <p className="min-w-0 flex-1 text-xs leading-4 font-medium text-fg">{p.nome}</p>
+                          <p className="pv min-w-0 flex-1 text-xs leading-4 font-medium text-fg">{p.nome}</p>
                           <GripVertical className="size-3.5 shrink-0 text-fg-4 opacity-0 group-hover:opacity-100" />
                         </div>
-                        {p.client_id && <p className="mt-0.5 truncate text-2xs text-fg-3">{clientName.get(p.client_id) ?? 'Cliente removido'}</p>}
+                        {p.client_id && <p className="pv mt-0.5 truncate text-2xs text-fg-3">{clientName.get(p.client_id) ?? 'Cliente removido'}</p>}
                         {p.tarefas.length > 0 && (
                           <div className="mt-2 flex items-center gap-2">
                             <Progress value={prog} max={100} tone={prog === 100 ? 'go' : 'accent'} className="flex-1" />
@@ -129,7 +129,7 @@ export function ProjetosPage() {
                         <div className="mt-2 flex items-center gap-2 text-2xs">
                           <span className={PROJECT_PRIORITY[p.prioridade].cls}>{PROJECT_PRIORITY[p.prioridade].label}</span>
                           {p.prazo && <span className={clsx('num', late ? 'text-red-300' : 'text-fg-3')}>· {formatDateKeyShort(p.prazo)}</span>}
-                          {p.orcamento > 0 && <span className="num ml-auto text-fg-2">{formatMoney(p.orcamento)}</span>}
+                          {p.orcamento > 0 && <span className="pv num ml-auto text-fg-2">{formatMoney(p.orcamento)}</span>}
                         </div>
                       </article>
                     )

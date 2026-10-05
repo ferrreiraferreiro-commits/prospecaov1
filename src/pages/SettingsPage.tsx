@@ -1,6 +1,6 @@
 import { Bell, Camera, Database, Download, LogOut, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Avatar, resizeAvatar } from '../components/Avatar'
 import { MOTOR_DOWNLOAD, MotorSteps } from '../components/MotorOffline'
 import { PageHeader } from '../components/PageHeader'
@@ -12,6 +12,7 @@ import { changePassword, isLegacyEmail, USUARIO_REGRA, usuarioValido } from '../
 import { formatDateTime } from '../lib/dates'
 import { getAvisosOn, notificationPermission, setAvisosOn, showSystemNotification } from '../lib/notify'
 import { InstalarApp } from '../components/InstalarApp'
+import { GoogleKeyCard } from '../components/GoogleKeyCard'
 import { DEFAULT_SETTINGS, type Snapshot } from '../lib/types'
 import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
@@ -38,6 +39,7 @@ function Card({ id, title, description, children, actions }: { id?: string; titl
 
 export function SettingsPage() {
   const motor = useHasMotor()
+  const nuvem = useMotor((s) => s.nuvem)
   const settings = useApp((s) => s.settings)
   const imports = useApp((s) => s.imports)
   const leads = useApp((s) => s.leads)
@@ -172,6 +174,8 @@ export function SettingsPage() {
       </Card>
 
       {supabase && <AcessoCard />}
+
+      <GoogleKeyCard />
 
       <Card
         title="WhatsApp"
@@ -343,9 +347,28 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      {motor && <MotorCard />}
+      {motor && (nuvem ? <WhatsAppNuvemCard /> : <MotorCard />)}
 
     </div>
+  )
+}
+
+/** Modo nuvem: o WhatsApp roda na XS, não há motor para baixar. */
+function WhatsAppNuvemCard() {
+  const online = useMotor((s) => s.online)
+  const wa = useMotor((s) => s.health?.whatsapp)
+  return (
+    <Card id="motor" title="WhatsApp" description="O WhatsApp dos disparos, funis e mensagens agendadas roda na nuvem da XS. Não precisa instalar nada.">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="flex items-center gap-2 text-fg-2">
+          <span className={clsx('size-2 rounded-full', online ? (wa?.status === 'connected' ? 'bg-go' : 'bg-amber-400') : 'bg-red-400')} />
+          {online ? (wa?.status === 'connected' ? 'Conectado' : 'Desconectado') : online === false ? 'Serviço indisponível no momento' : 'Verificando…'}
+        </span>
+        <Link to="/whatsapp" className="inline-flex h-8 items-center rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-[#3b7bf6]">
+          Abrir Conexão
+        </Link>
+      </div>
+    </Card>
   )
 }
 

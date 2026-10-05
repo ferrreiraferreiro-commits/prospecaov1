@@ -29,6 +29,7 @@ import { isLegacyEmail } from '../lib/auth'
 import { formatDateKey, formatDateTime, formatRelative, toDateKey } from '../lib/dates'
 import { formatMoney } from '../lib/insights'
 import { salvarSuporteWhatsApp, useSuporteWhatsApp } from '../lib/suporte'
+import { linkComunidadeValido, salvarComunidade, useComunidade } from '../lib/comunidade'
 import { planInfo, type Profile } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
@@ -138,7 +139,7 @@ export function ContasPage() {
       />
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-        <Stat label="Recebido no mês" value={formatMoney(mesAtual)} tone="go" icon={<BadgeDollarSign />} hint={`${formatMoney(totalGeral)} no total`} />
+        <Stat priv label="Recebido no mês" value={formatMoney(mesAtual)} tone="go" icon={<BadgeDollarSign />} hint={`${formatMoney(totalGeral)} no total`} />
         <Stat label="Pagantes" value={resumo.pagantes} tone="blue" hint={resumo.vencendo ? `${resumo.vencendo} vence(m) em até 3 dias` : 'nenhum vencendo'} />
         <Stat label="Em teste" value={resumo.teste} />
         <Stat label="Vitalício" value={resumo.vitalicio} tone="gold" icon={<Crown />} />
@@ -187,6 +188,7 @@ export function ContasPage() {
       </Card>
 
       <SuporteCard />
+      <ComunidadeCard />
 
       {contaAberta && (
         <ContaModal
@@ -243,10 +245,10 @@ function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; p
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-xs md:grid-cols-[minmax(0,1.6fr)_120px_minmax(0,1.3fr)_100px_110px_auto]">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate font-medium text-fg">
-          {nomeDe(conta)}
+          <span className="pv truncate">{nomeDe(conta)}</span>
           {conta.admin && <ShieldCheck className="size-3.5 shrink-0 text-blue-300" aria-label="Dono" />}
         </p>
-        <p className="truncate text-2xs text-fg-3">
+        <p className="pv truncate text-2xs text-fg-3">
           {[conta.usuario && `@${conta.usuario}`, legacy ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')}
           {conta.cidade ? ` · ${conta.cidade}` : ''}
         </p>
@@ -257,7 +259,7 @@ function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; p
       <div className="col-span-2 md:col-span-1">
         <FimLabel conta={conta} now={now} />
       </div>
-      <div className={clsx('num md:text-right', pago ? 'text-fg' : 'text-fg-4')}>
+      <div className={clsx('pv num md:text-right', pago ? 'text-fg' : 'text-fg-4')}>
         <span className="text-2xs text-fg-4 md:hidden">Já pagou </span>
         {formatMoney(pago)}
       </div>
@@ -292,7 +294,7 @@ function ContaModal({
 }) {
   const [aba, setAba] = useState<Aba>('plano')
   return (
-    <Modal open onClose={onClose} title={nomeDe(conta)} subtitle={[conta.usuario && `@${conta.usuario}`, isLegacyEmail(conta.email) ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')} width="max-w-xl">
+    <Modal open onClose={onClose} title={<span className="pv">{nomeDe(conta)}</span>} subtitle={<span className="pv">{[conta.usuario && `@${conta.usuario}`, isLegacyEmail(conta.email) ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')}</span>} width="max-w-xl">
       <div className="border-b border-line-soft px-5 py-2.5">
         <Segmented
           value={aba}
@@ -615,6 +617,39 @@ function SuporteCard() {
           Salvar
         </Button>
       </div>
+    </Card>
+  )
+}
+
+function ComunidadeCard() {
+  const toast = useApp((s) => s.toast)
+  const atual = useComunidade()
+  const [link, setLink] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  useEffect(() => setLink(atual ?? ''), [atual])
+  const invalido = !!link.trim() && !linkComunidadeValido(link)
+
+  const salvar = async () => {
+    setSalvando(true)
+    try {
+      await salvarComunidade(link)
+      toast(link.trim() ? 'Link da comunidade salvo. Já aparece no menu de todo mundo.' : 'Link da comunidade removido do menu.')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não foi possível salvar.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Card title="Comunidade no WhatsApp" description="Cole o link de convite do grupo ou da comunidade (WhatsApp → grupo → Convidar via link). Aparece no menu de todas as contas como “Comunidade XS”. Deixe vazio para esconder.">
+      <div className="flex max-w-xl gap-2">
+        <input className="input" inputMode="url" placeholder="https://chat.whatsapp.com/…" value={link} onChange={(e) => setLink(e.target.value)} />
+        <Button variant="primary" loading={salvando} disabled={invalido || (link.trim() || null) === atual} onClick={() => void salvar()}>
+          Salvar
+        </Button>
+      </div>
+      {invalido && <p className="mt-1.5 text-2xs text-red-300">Use o link de convite do WhatsApp, que começa com https://chat.whatsapp.com/</p>}
     </Card>
   )
 }

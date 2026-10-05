@@ -12,8 +12,9 @@ import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, Sta
 import { useLiguei } from './OutcomeModal'
 import { Button } from './ui'
 
+// Cabe num notebook de 1366 px com o menu aberto; acima disso as colunas flexíveis crescem
 export const ROW_GRID =
-  'lg:grid lg:grid-cols-[minmax(200px,2.4fr)_76px_118px_74px_164px_92px_minmax(120px,1.3fr)_250px] lg:items-center lg:gap-x-4'
+  'xl:grid xl:grid-cols-[minmax(140px,2.4fr)_64px_112px_64px_150px_80px_minmax(96px,1.3fr)_206px] 2xl:grid-cols-[minmax(200px,2.4fr)_76px_118px_74px_164px_92px_minmax(120px,1.3fr)_250px] xl:items-center xl:gap-x-3 2xl:gap-x-4'
 
 export function LeadListHeader({ allChecked, someChecked, onToggleAll }: { allChecked?: boolean; someChecked?: boolean; onToggleAll?: () => void }) {
   return (
@@ -92,7 +93,7 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
               aria-label={`Selecionar ${lead.empresa}`}
             />
           )}
-          <span className="truncate text-[13px] font-semibold text-fg" title={lead.empresa}>
+          <span className="pv truncate text-[13px] font-semibold text-fg" title={lead.empresa}>
             {lead.empresa}
           </span>
           <HotTag lead={lead} />
@@ -110,14 +111,14 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
       </div>
 
       {/* Mobile: linha de detalhes */}
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs lg:contents">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs xl:contents">
         <Rating lead={lead} className="text-xs" />
-        <span className="num text-xs text-fg-2">{lead.telefone ? formatPhone(lead.telefone) : <span className="text-fg-4">Sem telefone</span>}</span>
+        <span className="pv num text-xs text-fg-2">{lead.telefone ? formatPhone(lead.telefone) : <span className="text-fg-4">Sem telefone</span>}</span>
         <SiteTag lead={lead} className="text-xs" />
       </div>
 
-      <div className="mt-2 flex items-center gap-3 lg:contents" onClick={(e) => e.stopPropagation()}>
-        <div className="flex min-w-0 flex-wrap items-center gap-1 lg:flex-col lg:items-start">
+      <div className="mt-2 flex items-center gap-3 xl:contents" onClick={(e) => e.stopPropagation()}>
+        <div className="flex min-w-0 flex-wrap items-center gap-1 xl:flex-col xl:items-start">
           <StatusMenu lead={lead} />
           <Status2Menu lead={lead} />
         </div>
@@ -138,12 +139,12 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
         </div>
       </div>
 
-      <div className="mt-1 min-w-0 truncate text-xs lg:mt-0">
+      <div className="mt-1 min-w-0 truncate text-xs xl:mt-0">
         <NextActionText action={next} />
       </div>
 
       {/* Ações */}
-      <div className="mt-2 flex items-center justify-between gap-1 lg:mt-0 lg:justify-end" onClick={(e) => e.stopPropagation()}>
+      <div className="mt-2 flex items-center justify-between gap-1 xl:mt-0 xl:justify-end" onClick={(e) => e.stopPropagation()}>
         <QuickActions lead={lead} />
         <div className="flex items-center gap-1">
           <button
@@ -154,8 +155,16 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
           >
             <Headphones className="size-[15px]" />
           </button>
-          <Button size="sm" variant="secondary" className="border-go/25 text-go hover:border-go/40 hover:bg-go/10" icon={<PhoneOutgoing className="size-3.5" />} onClick={() => liguei(lead.id)}>
-            Liguei
+          <Button
+            size="sm"
+            variant="secondary"
+            className="border-go/25 text-go hover:border-go/40 hover:bg-go/10 xl:max-2xl:px-2"
+            icon={<PhoneOutgoing className="size-3.5" />}
+            onClick={() => liguei(lead.id)}
+            aria-label="Liguei"
+            title="Liguei: registrar a ligação"
+          >
+            <span className="xl:max-2xl:sr-only">Liguei</span>
           </Button>
         </div>
       </div>

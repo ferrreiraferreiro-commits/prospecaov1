@@ -81,9 +81,9 @@ export function ClientesPage() {
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <Stat label="Clientes ativos" value={ativos.length} icon={<Users />} hint={`${clients.length - ativos.length} arquivado(s)`} />
-        <Stat label="Receita recorrente" value={formatMoney(recorrente)} tone="blue" icon={<Repeat />} hint="Soma dos clientes fixos / mês" />
-        <Stat label="A receber" value={formatMoney(aReceber)} tone="gold" icon={<Wallet />} hint="Pagamentos pendentes" />
-        <Stat label="Recebido no mês" value={formatMoney(recebidoMes)} tone="go" icon={<CircleDollarSign />} />
+        <Stat priv label="Receita recorrente" value={formatMoney(recorrente)} tone="blue" icon={<Repeat />} hint="Soma dos clientes fixos / mês" />
+        <Stat priv label="A receber" value={formatMoney(aReceber)} tone="gold" icon={<Wallet />} hint="Pagamentos pendentes" />
+        <Stat priv label="Recebido no mês" value={formatMoney(recebidoMes)} tone="go" icon={<CircleDollarSign />} />
       </div>
 
       <section className="panel">
@@ -118,8 +118,8 @@ export function ClientesPage() {
                   <button onClick={() => setOpenId(c.id)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-tint/[0.025]">
                     <Avatar src={null} name={c.nome} size={32} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium text-fg">{c.nome}</p>
-                      <p className="truncate text-2xs text-fg-3">{[c.empresa !== c.nome ? c.empresa : null, c.segmento, c.telefone ? formatPhone(c.telefone) : null].filter(Boolean).join(' · ') || '—'}</p>
+                      <p className="pv truncate text-[13px] font-medium text-fg">{c.nome}</p>
+                      <p className="pv truncate text-2xs text-fg-3">{[c.empresa !== c.nome ? c.empresa : null, c.segmento, c.telefone ? formatPhone(c.telefone) : null].filter(Boolean).join(' · ') || '—'}</p>
                     </div>
                     <div className="hidden items-center gap-1.5 md:flex">
                       {c.tags.slice(0, 2).map((t) => (
@@ -131,7 +131,7 @@ export function ClientesPage() {
                     </div>
                     <Pill className={c.tipo === 'fixo' ? PILL.blue : PILL.neutral}>{c.tipo === 'fixo' ? 'Fixo' : 'Avulso'}</Pill>
                     <div className="w-28 text-right">
-                      {c.tipo === 'fixo' && c.valor_mensal ? <p className="num text-xs font-medium text-fg">{formatMoney(c.valor_mensal)}/mês</p> : null}
+                      {c.tipo === 'fixo' && c.valor_mensal ? <p className="pv num text-xs font-medium text-fg">{formatMoney(c.valor_mensal)}/mês</p> : null}
                       {info.pendente > 0 ? (
                         <p className={clsx('num text-2xs', info.atrasado ? 'text-red-300' : 'text-amber-300')}>
                           {formatMoney(info.pendente)} {info.atrasado ? 'atrasado' : 'a receber'}

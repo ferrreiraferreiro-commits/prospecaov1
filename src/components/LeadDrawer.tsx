@@ -48,11 +48,12 @@ function Section({ title, children, right }: { title: string; children: ReactNod
   )
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+/** `priv`: dado do lead que some no modo live (nome, telefone, endereço…). */
+function Row({ label, children, priv }: { label: string; children: ReactNode; priv?: boolean }) {
   return (
     <div className="grid grid-cols-[110px_1fr] gap-3 py-1 text-xs">
       <dt className="text-fg-3">{label}</dt>
-      <dd className="min-w-0 break-words text-fg">{children}</dd>
+      <dd className={clsx('min-w-0 break-words text-fg', priv && 'pv')}>{children}</dd>
     </div>
   )
 }
@@ -81,9 +82,9 @@ function InlineField({ value, placeholder, onSave, multiline }: { value: string 
   const commit = () => {
     if ((draft.trim() || null) !== (value ?? null)) onSave(draft)
   }
-  const cls = 'input h-7 border-transparent bg-transparent px-1.5 hover:border-line focus:bg-ink'
+  const cls = 'pv input h-7 border-transparent bg-transparent px-1.5 hover:border-line focus:bg-ink'
   return multiline ? (
-    <textarea className="input min-h-20 resize-y" value={draft} placeholder={placeholder} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
+    <textarea className="pv input min-h-20 resize-y" value={draft} placeholder={placeholder} onChange={(e) => setDraft(e.target.value)} onBlur={commit} />
   ) : (
     <input className={cls} value={draft} placeholder={placeholder} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
   )
@@ -125,7 +126,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
       <header className="border-b border-line-soft px-5 pt-4 pb-3.5">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="text-base leading-6 font-semibold tracking-[-0.01em]">{lead.empresa}</h2>
+            <h2 className="pv text-base leading-6 font-semibold tracking-[-0.01em]">{lead.empresa}</h2>
             <p className="mt-0.5 text-xs text-fg-3">
               {lead.nicho ?? 'Nicho não informado'}
               {lead.cidade && ` · ${[lead.cidade, lead.estado].filter(Boolean).join(' - ')}`}
@@ -207,7 +208,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
                 if (!other) return null
                 return (
                   <li key={d.otherId} className="flex items-center gap-2 text-xs">
-                    <button onClick={() => openLead(other.id)} className="truncate font-medium text-fg hover:underline">
+                    <button onClick={() => openLead(other.id)} className="pv truncate font-medium text-fg hover:underline">
                       {other.empresa}
                     </button>
                     <span className="shrink-0 text-fg-3">{d.reasons.map((r) => DUP_REASON_LABEL[r]).join(', ')}</span>
@@ -246,13 +247,15 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
 
         <Section title="Informações">
           <dl>
-            <Row label="Empresa">{lead.empresa}</Row>
+            <Row label="Empresa" priv>
+              {lead.empresa}
+            </Row>
             <Row label="Nicho">{lead.nicho ?? <Missing />}</Row>
-            <Row label="Telefone">
+            <Row label="Telefone" priv>
               <LinkOr href={telHref(lead.telefone)} label={formatPhone(lead.telefone)} />
               {lead.telefone && <CopyButton onClick={() => copyPhone(lead.telefone, 'Telefone')} label="Copiar telefone" />}
             </Row>
-            <Row label="WhatsApp">
+            <Row label="WhatsApp" priv>
               {lead.whatsapp ? (
                 <>
                   <button onClick={() => openWhatsApp(lead)} className="text-blue-300 hover:text-blue-200 hover:underline">
@@ -264,13 +267,15 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
                 <Missing />
               )}
             </Row>
-            <Row label="Instagram">
+            <Row label="Instagram" priv>
               <LinkOr href={instagramHref(lead.instagram)} label={instagramHandle(lead.instagram)} />
             </Row>
-            <Row label="Website">
+            <Row label="Website" priv>
               {lead.website ? <LinkOr href={websiteHref(lead.website)} label={websiteLabel(lead.website)} /> : <span className="text-gold/90">Sem site</span>}
             </Row>
-            <Row label="Endereço">{lead.endereco ?? <Missing />}</Row>
+            <Row label="Endereço" priv>
+              {lead.endereco ?? <Missing />}
+            </Row>
             <Row label="Cidade">{lead.cidade ? [lead.cidade, lead.estado].filter(Boolean).join(' - ') : <Missing />}</Row>
             <Row label="Avaliação Google">
               {lead.avaliacao !== null ? <Rating lead={lead} /> : <Missing />}
@@ -281,7 +286,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             <Row label="Pasta">{lead.pasta ?? <Missing />}</Row>
             {lead.etapa && <Row label="Etapa (arquivo)">{lead.etapa}</Row>}
             {extras.map(([k, v]) => (
-              <Row key={k} label={k}>
+              <Row key={k} label={k} priv>
                 {v}
               </Row>
             ))}
@@ -349,7 +354,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
                 <CalendarClock className="size-3.5 shrink-0 text-sky-300" />
                 <div className="min-w-0 flex-1">
                   <span className="text-fg">Retorno {whenLabel(f.data, f.horario, f.periodo)}</span>
-                  {f.observacao && <p className="truncate text-fg-3">{f.observacao}</p>}
+                  {f.observacao && <p className="pv truncate text-fg-3">{f.observacao}</p>}
                 </div>
                 <Button size="xs" variant="subtle" icon={<Check className="size-3" />} onClick={() => completeFollowup(f.id)}>
                   Concluir
@@ -366,9 +371,9 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
                   <span className="text-fg">
                     Reunião {formatDateKey(m.data)}
                     {m.horario && ` · ${m.horario}`}
-                    {m.contato && <span className="text-fg-3"> com {m.contato}</span>}
+                    {m.contato && <span className="pv text-fg-3"> com {m.contato}</span>}
                   </span>
-                  {m.observacao && <p className="truncate text-fg-3">{m.observacao}</p>}
+                  {m.observacao && <p className="pv truncate text-fg-3">{m.observacao}</p>}
                   {(m.data <= todayKey() || m.resultado) && (
                     <div className="mt-1.5">
                       <MeetingResult meeting={m} />
@@ -384,7 +389,9 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
         </Section>
 
         <Section title="CNPJ e sócios">
-          <CnpjSection lead={lead} />
+          <div className="pv">
+            <CnpjSection lead={lead} />
+          </div>
         </Section>
 
         <Section title="Observações">
@@ -392,7 +399,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           {lead.observacoes && (
             <p className="mt-2 text-2xs whitespace-pre-line text-fg-3">
               <span className="text-fg-4">Do arquivo: </span>
-              {lead.observacoes}
+              <span className="pv">{lead.observacoes}</span>
             </p>
           )}
         </Section>

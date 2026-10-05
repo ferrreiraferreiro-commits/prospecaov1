@@ -10,7 +10,7 @@ import { Button, Spinner, WhatsAppIcon } from './components/ui'
 import { LocalRepository } from './data/localRepository'
 import { SupabaseRepository } from './data/supabaseRepository'
 import { supabase } from './data/supabaseClient'
-import { carregarMotorDaConta, guardarChavePendente } from './lib/motor'
+import { carregarMotorDaConta, guardarChavePendente, useMotor } from './lib/motor'
 import { suporteUrl, useSuporteWhatsApp } from './lib/suporte'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
@@ -69,6 +69,7 @@ const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => (
 const ContasPage = lazyPage(() => import('./pages/ContasPage').then((m) => ({ default: m.ContasPage })))
 const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
 const WhatsAppPage = lazyPage(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
+const WhatsAppCloudPage = lazyPage(() => import('./pages/WhatsAppCloudPage').then((m) => ({ default: m.WhatsAppCloudPage })))
 const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })))
 const TermsPage = lazyPage(() => import('./pages/TermsPage').then((m) => ({ default: m.TermsPage })))
 const ConectarMotorPage = lazyPage(() => import('./pages/ConectarMotorPage').then((m) => ({ default: m.ConectarMotorPage })))
@@ -87,6 +88,11 @@ function LegalRoutes() {
       </Suspense>
     </BrowserRouter>
   )
+}
+
+/** Conexão: Motor no computador (padrão) ou WhatsApp na nuvem da XS (WHATSAPP_ENGINE=cloud) */
+function ConexaoPage() {
+  return useMotor((s) => s.nuvem) ? <WhatsAppCloudPage /> : <WhatsAppPage />
 }
 
 function Routed() {
@@ -108,7 +114,7 @@ function Routed() {
           <Route path="funis" element={m(<FunisPage />)} />
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />
-          <Route path="whatsapp" element={m(<WhatsAppPage />)} />
+          <Route path="whatsapp" element={m(<ConexaoPage />)} />
           <Route path="motor/conectar" element={m(<ConectarMotorPage />)} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />

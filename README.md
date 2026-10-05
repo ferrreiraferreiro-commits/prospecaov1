@@ -1,6 +1,6 @@
 # XS Prospecção
 
-Prospecção por ligação e WhatsApp, busca de empresas (base pública do CNPJ) e gestão do negócio (clientes, projetos, financeiro e precificação) num lugar só.
+Prospecção por ligação e WhatsApp, busca de empresas (base aberta de comércios ou Google Maps) e gestão do negócio (clientes, projetos, financeiro e precificação) num lugar só.
 
 ## Como funciona
 
@@ -14,8 +14,11 @@ Prospecção por ligação e WhatsApp, busca de empresas (base pública do CNPJ)
 ```
 
 - **App web**: tudo o que é tela e dado — Painel, Leads, Hoje, Modo Ligação, Funis, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes. Funciona no celular e no PC.
-- **Busca de empresas** (`busca/`, numa VPS grátis da Oracle): base aberta do CNPJ da Receita Federal num SQLite (só empresas ativas), importada toda semana se houver mês novo. Busca por cidade, bairro e nicho em milissegundos. Instalação: `sudo bash busca/instalar.sh <ip-com-tracos>.sslip.io` na VM.
-- **`api/maps.ts`** (Vercel): confere o login e a conta liberada e repassa a busca ao servidor (`XS_BUSCA_URL` + `XS_BUSCA_TOKEN`); também confere se o site do domínio do e-mail está no ar e acha o Instagram. No `npm run dev`, o `vite.config.ts` chama a mesma função.
+- **Busca de empresas**, duas fontes:
+  - **Base aberta** (grátis, sem limite): comércios do Brasil da [Overture Maps](https://overturemaps.org) (dados de Meta, Microsoft, Foursquare…) num SQLite na VPS. `busca/lugares-importar.ts` monta a base (toda semana confere se há versão nova), `busca/lugares.ts` responde em milissegundos em `/lugares/*`. Instalação, numa VPS que já tem o `instalar.sh`: `sudo bash busca/instalar-lugares.sh`.
+  - **Google Maps** (Places API) com a chave de cada usuário (Ajustes → Busca do Google, tabela `busca_google`). Cada conta usa a própria cota grátis do Google (1.000 consultas/mês) e a XS para no teto (950 por padrão).
+- **`api/maps.ts`** (Vercel): confere o login e a conta liberada; repassa a busca grátis à VPS (`XS_BUSCA_URL` + `XS_BUSCA_TOKEN`), chama o Google com a chave do usuário e abre o site das empresas para achar o Instagram. No `npm run dev`, o `vite.config.ts` chama a mesma função.
+- A busca antiga pela base do CNPJ (`busca/servidor.ts`, `importar.ts`) não é mais usada pelo app.
 - **Motor WhatsApp XS** (`motor/`), opcional: mantém a sessão do WhatsApp para os disparos automáticos (Disparo, Funis, Agendadas). Só escuta em `127.0.0.1` e só aceita chamadas do próprio app. O código antigo da busca no Maps ainda está lá, mas o app não usa mais.
 
 ## Rodar
@@ -42,7 +45,7 @@ Deixe a janela do motor aberta enquanto usa o disparo. A sessão do WhatsApp, as
 |---|---|
 | **Painel** | Meta do dia, retornos e reuniões, funil de prospecção, recebido no mês, projetos em andamento. |
 | **Leads / Hoje / Ligação** | A Central de Prospecção: importação de TXT, registro de ligações, retornos, reuniões, roteiro e objeções. |
-| **Buscar no Maps** | Varre a região em 19 ou 41 setores, abre cada ficha e confere telefone, site, Instagram, endereço e CNPJ (o sócio só é sugerido quando nome, telefone e cidade conferem). Pula quem já está nos leads e importa com um clique. |
+| **Buscar empresas** | 101 tipos de negócio em 11 grupos, por cidade e bairro, na base aberta (grátis) ou no Google (com a chave do usuário). Filtros de telefone, celular e site; pula quem já está nos leads; os resultados entram direto na lista. |
 | **Funis** | Sequências de WhatsApp: mensagens com variações em rodízio e esperas entre elas. Variáveis `{saudacao}`, `{responsavel}`, `{empresa}`, `{cidade}`, `{nicho}`, `{nome}`, `{servico}`. |
 | **Disparo** | Campanhas com intervalo aleatório entre leads (1–60 min), um lead por vez, trava de duplicidade por telefone, confirmação de entrega/leitura e respostas recebidas. Pausa sozinho se o WhatsApp desconectar de forma suspeita. O resultado vai para o histórico de cada lead. |
 | **Conexão** | QR Code do WhatsApp, status e mensagem de teste. |

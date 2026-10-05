@@ -1,6 +1,7 @@
-import { Download, PlugZap, RefreshCw } from 'lucide-react'
+import { CloudOff, Download, PlugZap, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMotor } from '../lib/motor'
+import { MSG_INDISPONIVEL } from '../lib/whatsappCloud'
 import { Button } from './ui'
 
 export const MOTOR_DOWNLOAD = '/downloads/Motor-WhatsApp-XS.zip'
@@ -30,6 +31,8 @@ export function MotorOffline({ feature }: { feature: string }) {
   const check = useMotor((s) => s.check)
   const ligado = useMotor((s) => s.ligado)
   const computador = useMotor((s) => s.computador)
+  const nuvem = useMotor((s) => s.nuvem)
+  if (nuvem) return <ServicoIndisponivel />
   return (
     <section className="panel flex flex-col gap-3 border-amber-400/25 bg-amber-400/[0.04] px-4 py-3.5 sm:flex-row sm:items-start">
       <PlugZap className="size-5 shrink-0 text-amber-300" />
@@ -65,6 +68,20 @@ export function MotorOffline({ feature }: { feature: string }) {
           Já abri, verificar
         </Button>
       </div>
+    </section>
+  )
+}
+
+/** Modo nuvem: o WhatsApp roda na XS; se o serviço cair, só um aviso (nada para instalar). */
+function ServicoIndisponivel() {
+  const check = useMotor((s) => s.check)
+  return (
+    <section className="panel flex flex-col gap-3 border-amber-400/25 bg-amber-400/[0.04] px-4 py-3.5 sm:flex-row sm:items-center">
+      <CloudOff className="size-5 shrink-0 text-amber-300" />
+      <p className="min-w-0 flex-1 text-xs text-fg-2">{MSG_INDISPONIVEL}</p>
+      <Button size="sm" icon={<RefreshCw className="size-3.5" />} onClick={() => void check()}>
+        Tentar de novo
+      </Button>
     </section>
   )
 }

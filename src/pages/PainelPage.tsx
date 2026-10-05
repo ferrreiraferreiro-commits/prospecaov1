@@ -58,6 +58,7 @@ export function PainelPage() {
   const motorOnline = useMotor((s) => s.online)
   const wa = useMotor((s) => s.health?.whatsapp)
   const motor = useHasMotor()
+  const nuvem = useMotor((s) => s.nuvem)
 
   const plan = useMemo(
     () => buildTodayPlan(leads, interactions, index, meetings, today, settings.max_tentativas),
@@ -122,10 +123,10 @@ export function PainelPage() {
       </section>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Stat label="Recebido no mês" value={formatMoney(fin.receitas)} tone="go" icon={<BadgeDollarSign />} hint={`Saldo ${formatMoney(fin.saldo)}`} />
-        <Stat label="A receber" value={formatMoney(fin.aReceber)} tone="gold" hint={`${payments.filter((p) => p.status === 'pendente').length} pagamento(s) pendente(s)`} />
-        <Stat label="Clientes ativos" value={clientesAtivos.length} icon={<Users />} hint={recorrente ? `${formatMoney(recorrente)}/mês recorrente` : `${fechadasMes.length} fechado(s) este mês`} />
-        <Stat label="Projetos em andamento" value={ativos.length} icon={<FolderKanban />} tone="blue" hint={formatMoney(ativos.reduce((s, p) => s + p.orcamento, 0)) + ' em carteira'} />
+        <Stat priv label="Recebido no mês" value={formatMoney(fin.receitas)} tone="go" icon={<BadgeDollarSign />} hint={`Saldo ${formatMoney(fin.saldo)}`} />
+        <Stat priv label="A receber" value={formatMoney(fin.aReceber)} tone="gold" hint={`${payments.filter((p) => p.status === 'pendente').length} pagamento(s) pendente(s)`} />
+        <Stat label="Clientes ativos" value={clientesAtivos.length} icon={<Users />} priv={!!recorrente} hint={recorrente ? `${formatMoney(recorrente)}/mês recorrente` : `${fechadasMes.length} fechado(s) este mês`} />
+        <Stat label="Projetos em andamento" value={ativos.length} icon={<FolderKanban />} tone="blue" priv hint={formatMoney(ativos.reduce((s, p) => s + p.orcamento, 0)) + ' em carteira'} />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1.25fr_1fr]">
@@ -203,7 +204,7 @@ export function PainelPage() {
                     <Link to={`/projetos?p=${p.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-tint/[0.025]">
                       <span className={clsx('size-2 shrink-0 rounded-full', st.tone)} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-medium">{p.nome}</span>
+                        <span className="pv block truncate text-xs font-medium">{p.nome}</span>
                         <span className="block text-2xs text-fg-3">
                           {st.label}
                           {p.prazo && ` · prazo ${formatDayLabel(p.prazo).toLowerCase()}`}
@@ -221,7 +222,7 @@ export function PainelPage() {
 
         <Card title="Atalhos">
           <div className="grid grid-cols-2 gap-2">
-            <Shortcut to="/maps" icon={<MapPinned />} label="Buscar empresas" hint="Na hora, pela base do CNPJ" />
+            <Shortcut to="/maps" icon={<MapPinned />} label="Buscar empresas" hint="Na hora, com telefone" />
             {motor ? (
               <Shortcut to="/disparo" icon={<Send />} label="Novo disparo" hint={wa?.status === 'connected' ? `WhatsApp: ${wa.user?.name ?? 'conectado'}` : 'WhatsApp desconectado'} />
             ) : (
@@ -231,7 +232,7 @@ export function PainelPage() {
             <Shortcut to="/precificacao" icon={<Sparkles />} label="Calcular orçamento" hint="Precificação" />
             <Shortcut to="/clientes" icon={<Users />} label="Clientes" hint={`${clientesAtivos.length} ativos`} />
             {motor ? (
-              <Shortcut to="/whatsapp" icon={<Smartphone />} label="Conectar WhatsApp" hint={motorOnline ? (wa?.status === 'connected' ? 'Conectado' : 'Ler QR Code') : 'Motor desligado'} />
+              <Shortcut to="/whatsapp" icon={<Smartphone />} label="Conectar WhatsApp" hint={motorOnline ? (wa?.status === 'connected' ? 'Conectado' : 'Ler QR Code') : nuvem ? 'Serviço indisponível' : 'Motor desligado'} />
             ) : (
               <Shortcut to="/financeiro" icon={<BadgeDollarSign />} label="Financeiro" hint={`Saldo ${formatMoney(fin.saldo)}`} />
             )}
@@ -258,8 +259,8 @@ function AgendaItem({ icon, title, detail, onClick }: { icon: ReactNode; title: 
       <button onClick={onClick} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-tint/[0.025]">
         {icon}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-medium">{title}</span>
-          <span className="block truncate text-2xs text-fg-3">{detail}</span>
+          <span className="pv block truncate text-xs font-medium">{title}</span>
+          <span className="pv block truncate text-2xs text-fg-3">{detail}</span>
         </span>
         <ArrowRight className="size-3.5 text-fg-4" />
       </button>

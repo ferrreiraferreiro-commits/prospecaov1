@@ -69,7 +69,7 @@ export function Timeline({ lead, items, importRecord }: { lead: Lead; items: Int
                   {it.cargo && <span className="text-fg-3"> · {it.cargo}</span>}
                 </p>
               )}
-              {it.observacao && <p className="mt-1 text-xs whitespace-pre-line text-fg-2">{it.observacao}</p>}
+              {it.observacao && <p className="pv mt-1 text-xs whitespace-pre-line text-fg-2">{it.observacao}</p>}
             </div>
           </li>
         )
