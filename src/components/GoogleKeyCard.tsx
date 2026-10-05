@@ -1,16 +1,15 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import clsx from 'clsx'
-import { CheckCircle2, ExternalLink, KeyRound, Trash2 } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Trash2 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useApp } from '../store/useApp'
 import { COTA_GRATIS, LIMITE_PADRAO, restantes, usadasNoMes, useGoogleKey } from '../store/useGoogleKey'
-import { mapsApi } from '../store/useMapsSearch'
+import { DEMO_KEY_URL, GetDemoKeyButton, GoogleKeyPaste } from './GoogleKeyPaste'
 import { confirmAction } from './kit'
 import { Button, Progress } from './ui'
 
 const LINKS = {
-  // Chave de demonstração: sem cartão, abre direto a tela que gera a chave
-  demo: 'https://console.cloud.google.com/google/maps-hosted/demo-api-key?hl=pt-br',
+  demo: DEMO_KEY_URL,
   demoInfo: 'https://mapsplatform.google.com/maps-demo-key/',
   console: 'https://console.cloud.google.com/projectcreate',
   billing: 'https://console.cloud.google.com/billing',
@@ -23,9 +22,7 @@ const LINKS = {
 export function GoogleKeyCard() {
   const toast = useApp((s) => s.toast)
   const gk = useGoogleKey()
-  const [draft, setDraft] = useState('')
   const [limite, setLimite] = useState(String(LIMITE_PADRAO))
-  const [testing, setTesting] = useState(false)
   // null = ainda não mexeu (abre o mais fácil se não tem chave); 'nenhum' = fechou tudo
   const [guide, setGuide] = useState<'demo' | 'cartao' | 'nenhum' | null>(null)
 
@@ -39,22 +36,6 @@ export function GoogleKeyCard() {
   // Sem chave, o passo a passo mais fácil (sem cartão) já vem aberto
   const aberto = guide === null ? (gk.loaded && !chave ? 'demo' : null) : guide
   const toggle = (g: 'demo' | 'cartao') => setGuide(aberto === g ? 'nenhum' : g)
-
-  async function testAndSave() {
-    const k = draft.trim()
-    if (!k) return toast('Cole a chave do Google no campo.', 'error')
-    setTesting(true)
-    try {
-      await mapsApi({ acao: 'testar', chave: k })
-      await gk.save({ chave: k })
-      setDraft('')
-      toast('Chave conferida e salva. A busca do Google está liberada.', 'success')
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Não consegui conferir a chave.', 'error')
-    } finally {
-      setTesting(false)
-    }
-  }
 
   async function saveLimite() {
     const n = Math.round(Number(limite))
@@ -99,29 +80,22 @@ export function GoogleKeyCard() {
               Tirar
             </Button>
           </div>
-        ) : null}
-
-        <div>
-          <label htmlFor="g-chave" className="label">
-            {chave ? 'Trocar a chave' : 'Sua chave do Google (Places API)'}
-          </label>
-          <div className="flex gap-1.5">
-            <input
-              id="g-chave"
-              className="pv input font-mono"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void testAndSave()}
-              placeholder="AIza…"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <Button variant="primary" loading={testing} icon={<KeyRound className="size-3.5" />} onClick={() => void testAndSave()}>
-              Testar e salvar
-            </Button>
+        ) : (
+          <div className="space-y-3 rounded-lg border border-blue-500/30 bg-blue-500/[0.05] p-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-xs font-semibold text-fg">1.</span>
+              <GetDemoKeyButton />
+              <span className="text-2xs text-fg-3">Entre com o seu Gmail e clique em "Copiar chave". Sem cartão.</span>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="pt-2 text-xs font-semibold text-fg">2.</span>
+              <GoogleKeyPaste className="min-w-0 flex-1" />
+            </div>
           </div>
-          <p className="mt-1 text-2xs text-fg-4">O teste usa uma consulta que o Google não cobra. A chave fica guardada só na sua conta.</p>
-        </div>
+        )}
+
+        {chave && <GoogleKeyPaste label="Trocar a chave" />}
+        <p className="-mt-2 text-2xs text-fg-4">Ao salvar, a XS confere a chave com uma consulta que o Google não cobra. A chave fica guardada só na sua conta.</p>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -163,7 +137,7 @@ export function GoogleKeyCard() {
               .
             </Step>
             <Step n={4}>
-              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Testar e salvar</b>. Pronto: a busca do Google já aparece em Buscar empresas.
+              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Salvar</b>. Pronto: a busca do Google já aparece em Buscar empresas.
             </Step>
             <li className="rounded-md bg-tint/[0.04] px-2.5 py-2 text-2xs leading-4 text-fg-3">
               Essa chave é grátis de verdade: não tem cartão, então nunca cobra. O Google dá um limite de consultas por dia (ele não diz quanto); quando acaba, a busca do Google
@@ -201,7 +175,7 @@ export function GoogleKeyCard() {
               <b className="font-medium text-fg">30 por dia</b>. Assim nem um erro passa da cota grátis.
             </Step>
             <Step n={7}>
-              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Testar e salvar</b>. Se der erro, a mensagem diz qual passo falta.
+              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Salvar</b>. Se der erro, a mensagem diz qual passo falta.
             </Step>
           </Guide>
         </div>

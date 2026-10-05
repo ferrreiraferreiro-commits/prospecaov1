@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/kit'
 import { getMapStyle, MapView, saveMapStyle, type MapPoint, type MapStyle } from '../components/MapView'
+import { GetDemoKeyButton, GoogleKeyPaste } from '../components/GoogleKeyPaste'
 import { PageHeader } from '../components/PageHeader'
 import { Button, InstagramIcon, Progress } from '../components/ui'
 import { CATEGORIAS, GRUPOS, POPULARES, categoriaDe } from '../lib/categorias'
@@ -328,16 +329,20 @@ export function MapsPage() {
                   </p>
                 </div>
               ) : (
-                <Link
-                  to="/configuracoes#google"
-                  className="flex items-start gap-2.5 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-2.5 text-xs transition-colors hover:bg-blue-500/10"
-                >
-                  <KeyRound className="mt-0.5 size-4 shrink-0 text-blue-300" />
-                  <span>
-                    <span className="block font-semibold text-fg">Coloque a sua chave do Google</span>
-                    <span className="block text-2xs text-fg-3">Grátis e sem cartão, em 2 minutos: passo a passo em Ajustes. Traz nota e avaliações do Google.</span>
-                  </span>
-                </Link>
+                <div className="space-y-2.5 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-3 text-xs">
+                  <p className="flex items-start gap-2">
+                    <KeyRound className="mt-0.5 size-4 shrink-0 text-blue-300" />
+                    <span>
+                      <span className="block font-semibold text-fg">Pegue a sua chave grátis do Google</span>
+                      <span className="block text-2xs text-fg-3">Sem cartão. Entre com o Gmail, clique em "Copiar chave" e cole aqui embaixo.</span>
+                    </span>
+                  </p>
+                  <GetDemoKeyButton className="w-full" />
+                  <GoogleKeyPaste />
+                  <Link to="/configuracoes#google" className="block text-2xs text-fg-3 underline underline-offset-2 hover:text-fg">
+                    Ver o passo a passo em Ajustes
+                  </Link>
+                </div>
               )
             ) : (
               <p className="text-2xs text-fg-4">
