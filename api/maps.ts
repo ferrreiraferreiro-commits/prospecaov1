@@ -286,7 +286,7 @@ export function googleError(
   if (reason === 'API_KEY_SERVICE_BLOCKED' || reason === 'API_KEY_HTTP_REFERRER_BLOCKED' || reason === 'API_KEY_IP_ADDRESS_BLOCKED')
     return new HttpError(400, 'A chave está restrita e bloqueou a XS. Em "Restrições do aplicativo", deixe "Nenhuma", e em "Restrições de API" deixe só a Places API (New).')
   if (status === 429 || data.error?.status === 'RESOURCE_EXHAUSTED')
-    return new HttpError(429, 'O Google atingiu o limite de consultas da sua chave (cota do dia ou do mês). Tente amanhã ou aumente a cota no Google Cloud.')
+    return new HttpError(429, 'O Google atingiu o limite de consultas da sua chave por hoje (a chave sem cartão tem um limite por dia). Amanhã ela volta sozinha; até lá, use a base aberta.')
   if (status === 403) return new HttpError(400, `O Google recusou a chave: ${msg || 'sem permissão'}.`)
   return new HttpError(502, `O Google não respondeu (${msg || `erro ${status}`}). Tente de novo.`)
 }

@@ -9,6 +9,9 @@ import { confirmAction } from './kit'
 import { Button, Progress } from './ui'
 
 const LINKS = {
+  // Chave de demonstração: sem cartão, abre direto a tela que gera a chave
+  demo: 'https://console.cloud.google.com/google/maps-hosted/demo-api-key?hl=pt-br',
+  demoInfo: 'https://mapsplatform.google.com/maps-demo-key/',
   console: 'https://console.cloud.google.com/projectcreate',
   billing: 'https://console.cloud.google.com/billing',
   api: 'https://console.cloud.google.com/apis/library/places.googleapis.com',
@@ -16,14 +19,15 @@ const LINKS = {
   cotas: 'https://console.cloud.google.com/apis/api/places.googleapis.com/quotas',
 }
 
-/** Ajustes → Busca do Google: a chave do usuário, o teto do mês e o passo a passo para criar a chave. */
+/** Ajustes → Busca do Google: a chave do usuário, o teto do mês e o passo a passo para criar a chave (sem ou com cartão). */
 export function GoogleKeyCard() {
   const toast = useApp((s) => s.toast)
   const gk = useGoogleKey()
   const [draft, setDraft] = useState('')
   const [limite, setLimite] = useState(String(LIMITE_PADRAO))
   const [testing, setTesting] = useState(false)
-  const [guide, setGuide] = useState(false)
+  // null = ainda não mexeu (abre o mais fácil se não tem chave); 'nenhum' = fechou tudo
+  const [guide, setGuide] = useState<'demo' | 'cartao' | 'nenhum' | null>(null)
 
   useEffect(() => {
     if (!gk.loaded) void gk.load()
@@ -32,8 +36,9 @@ export function GoogleKeyCard() {
 
   const chave = gk.config.chave
   const usadas = usadasNoMes(gk.config)
-  // Sem chave, o passo a passo já vem aberto
-  const showGuide = guide || (gk.loaded && !chave)
+  // Sem chave, o passo a passo mais fácil (sem cartão) já vem aberto
+  const aberto = guide === null ? (gk.loaded && !chave ? 'demo' : null) : guide
+  const toggle = (g: 'demo' | 'cartao') => setGuide(aberto === g ? 'nenhum' : g)
 
   async function testAndSave() {
     const k = draft.trim()
@@ -68,8 +73,8 @@ export function GoogleKeyCard() {
       <header className="border-b border-line-soft px-5 py-3.5">
         <h2 className="text-[13px] font-semibold">Busca do Google</h2>
         <p className="mt-0.5 text-xs text-fg-3">
-          A busca de empresas usa o Google Maps com a sua própria chave. O Google dá 1.000 consultas grátis por mês para cada conta (cada uma traz até 20 empresas) e a XS para
-          antes disso.
+          Além da base aberta, a busca pode usar o Google Maps (com nota e avaliações) pela sua própria chave do Google. Dá para criar uma sem cartão em 2 minutos, e a XS nunca
+          deixa você ser cobrado.
         </p>
       </header>
       <div className="space-y-4 px-5 py-4">
@@ -87,7 +92,7 @@ export function GoogleKeyCard() {
               variant="ghost"
               icon={<Trash2 className="size-3.5" />}
               onClick={async () => {
-                if (!confirmAction('Tirar a chave do Google desta conta? A busca passa a usar só o OpenStreetMap.')) return
+                if (!confirmAction('Tirar a chave do Google desta conta? A busca continua funcionando pela base aberta.')) return
                 await gk.save({ chave: null }).catch((err: Error) => toast(err.message, 'error'))
               }}
             >
@@ -138,48 +143,83 @@ export function GoogleKeyCard() {
               </Button>
             </div>
             <p className="text-2xs text-fg-4">
-              A cota grátis do Google é {COTA_GRATIS.toLocaleString('pt-BR')}. Deixando em {LIMITE_PADRAO}, você nunca paga nada.
+              Com cartão, a cota grátis do Google é {COTA_GRATIS.toLocaleString('pt-BR')} por mês; deixando em {LIMITE_PADRAO}, você nunca paga nada. A chave sem cartão nunca
+              cobra: o Google só pausa até o dia seguinte quando passa do limite do dia.
             </p>
           </div>
         </div>
 
-        <div className="rounded-lg border border-line-soft">
-          <button onClick={() => setGuide((g) => !g)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-semibold text-fg">
-            Como criar a chave (uns 5 minutos)
-            <span className="text-2xs font-normal text-fg-3">{showGuide ? 'esconder' : 'ver passo a passo'}</span>
-          </button>
-          {showGuide && (
-            <ol className="space-y-3 border-t border-line-soft px-3 py-3 text-xs text-fg-2">
-              <Step n={1} link={LINKS.console} linkLabel="Criar projeto">
-                Entre no Google Cloud com a sua conta Google e crie um projeto (por exemplo, "XS Busca").
-              </Step>
-              <Step n={2} link={LINKS.billing} linkLabel="Faturamento">
-                Vincule uma conta de faturamento ao projeto. O Google pede um cartão só para confirmar que você é uma pessoa: dentro das 1.000 consultas grátis do mês ele não cobra
-                nada.
-              </Step>
-              <Step n={3} link={LINKS.api} linkLabel="Ativar a API">
-                Abra a página da <b className="font-medium text-fg">Places API (New)</b> e clique em <b className="font-medium text-fg">Ativar</b>.
-              </Step>
-              <Step n={4} link={LINKS.credenciais} linkLabel="Credenciais">
-                Em <b className="font-medium text-fg">Credenciais</b>, clique em <b className="font-medium text-fg">Criar credenciais → Chave de API</b> e copie a chave (começa com
-                "AIza").
-              </Step>
-              <Step n={5}>
-                Recomendado: na chave, em <b className="font-medium text-fg">Restrições de API</b>, escolha só a <b className="font-medium text-fg">Places API (New)</b>. Em
-                "Restrições do aplicativo", deixe <b className="font-medium text-fg">Nenhuma</b>.
-              </Step>
-              <Step n={6} link={LINKS.cotas} linkLabel="Cotas">
-                Garantia extra (opcional): nas cotas da Places API, limite as consultas de <b className="font-medium text-fg">Text Search</b> a{' '}
-                <b className="font-medium text-fg">30 por dia</b>. Assim nem um erro passa da cota grátis.
-              </Step>
-              <Step n={7}>
-                Cole a chave no campo acima e clique em <b className="font-medium text-fg">Testar e salvar</b>. Se der erro, a mensagem diz qual passo falta.
-              </Step>
-            </ol>
-          )}
+        <div className="divide-y divide-line-soft rounded-lg border border-line-soft">
+          <Guide open={aberto === 'demo'} onToggle={() => toggle('demo')} title="Sem cartão: chave de demonstração (2 minutos)" badge="Mais fácil">
+            <Step n={1} link={LINKS.demo} linkLabel="Abrir a página da chave">
+              Abra a página da chave de demonstração do Google e entre com a sua conta Google (o mesmo login do Gmail).
+            </Step>
+            <Step n={2}>
+              Se o Google pedir, aceite os <b className="font-medium text-fg">Termos da chave de demonstração</b> e escolha o país <b className="font-medium text-fg">Brasil</b>.
+              Não precisa de cartão.
+            </Step>
+            <Step n={3}>
+              Aparece a tela <b className="font-medium text-fg">"Tudo certo!"</b> com a sua chave (começa com "AIza"). Clique em <b className="font-medium text-fg">Copiar chave</b>
+              .
+            </Step>
+            <Step n={4}>
+              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Testar e salvar</b>. Pronto: a busca do Google já aparece em Buscar empresas.
+            </Step>
+            <li className="rounded-md bg-tint/[0.04] px-2.5 py-2 text-2xs leading-4 text-fg-3">
+              Essa chave é grátis de verdade: não tem cartão, então nunca cobra. O Google dá um limite de consultas por dia (ele não diz quanto); quando acaba, a busca do Google
+              pausa até o dia seguinte e a base aberta continua funcionando. Se a chave sumir, ela pode ser vista de novo no{' '}
+              <a href={LINKS.credenciais} target="_blank" rel="noreferrer" className="text-blue-300 hover:text-blue-200">
+                Google Cloud
+              </a>
+              .{' '}
+              <a href={LINKS.demoInfo} target="_blank" rel="noreferrer" className="text-blue-300 hover:text-blue-200">
+                Saiba mais
+              </a>
+            </li>
+          </Guide>
+          <Guide open={aberto === 'cartao'} onToggle={() => toggle('cartao')} title="Com cartão: 1.000 consultas grátis por mês (uns 5 minutos)">
+            <Step n={1} link={LINKS.console} linkLabel="Criar projeto">
+              Entre no Google Cloud com a sua conta Google e crie um projeto (por exemplo, "XS Busca").
+            </Step>
+            <Step n={2} link={LINKS.billing} linkLabel="Faturamento">
+              Vincule uma conta de faturamento ao projeto. O Google pede um cartão (cartão virtual de banco digital costuma servir) só para confirmar que você é uma pessoa: dentro
+              das 1.000 consultas grátis do mês ele não cobra nada.
+            </Step>
+            <Step n={3} link={LINKS.api} linkLabel="Ativar a API">
+              Abra a página da <b className="font-medium text-fg">Places API (New)</b> e clique em <b className="font-medium text-fg">Ativar</b>.
+            </Step>
+            <Step n={4} link={LINKS.credenciais} linkLabel="Credenciais">
+              Em <b className="font-medium text-fg">Credenciais</b>, clique em <b className="font-medium text-fg">Criar credenciais → Chave de API</b> e copie a chave (começa com
+              "AIza").
+            </Step>
+            <Step n={5}>
+              Recomendado: na chave, em <b className="font-medium text-fg">Restrições de API</b>, escolha só a <b className="font-medium text-fg">Places API (New)</b>. Em
+              "Restrições do aplicativo", deixe <b className="font-medium text-fg">Nenhuma</b>.
+            </Step>
+            <Step n={6} link={LINKS.cotas} linkLabel="Cotas">
+              Garantia extra (opcional): nas cotas da Places API, limite as consultas de <b className="font-medium text-fg">Text Search</b> a{' '}
+              <b className="font-medium text-fg">30 por dia</b>. Assim nem um erro passa da cota grátis.
+            </Step>
+            <Step n={7}>
+              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Testar e salvar</b>. Se der erro, a mensagem diz qual passo falta.
+            </Step>
+          </Guide>
         </div>
       </div>
     </section>
+  )
+}
+
+function Guide({ open, onToggle, title, badge, children }: { open: boolean; onToggle: () => void; title: string; badge?: string; children: ReactNode }) {
+  return (
+    <div>
+      <button onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-fg">
+        <span className="flex-1">{title}</span>
+        {badge && <span className="rounded bg-emerald-500/10 px-1.5 text-2xs leading-5 font-medium text-emerald-300">{badge}</span>}
+        <span className="text-2xs font-normal text-fg-3">{open ? 'esconder' : 'ver passo a passo'}</span>
+      </button>
+      {open && <ol className="space-y-3 border-t border-line-soft px-3 py-3 text-xs text-fg-2">{children}</ol>}
+    </div>
   )
 }
 

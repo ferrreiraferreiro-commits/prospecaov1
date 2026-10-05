@@ -335,7 +335,7 @@ export function MapsPage() {
                   <KeyRound className="mt-0.5 size-4 shrink-0 text-blue-300" />
                   <span>
                     <span className="block font-semibold text-fg">Coloque a sua chave do Google</span>
-                    <span className="block text-2xs text-fg-3">Grátis, uns 5 minutos, passo a passo em Ajustes. São cerca de 20 mil empresas por mês só para você.</span>
+                    <span className="block text-2xs text-fg-3">Grátis e sem cartão, em 2 minutos: passo a passo em Ajustes. Traz nota e avaliações do Google.</span>
                   </span>
                 </Link>
               )
