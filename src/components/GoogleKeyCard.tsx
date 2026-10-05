@@ -126,11 +126,11 @@ export function GoogleKeyCard() {
         <div className="divide-y divide-line-soft rounded-lg border border-line-soft">
           <Guide open={aberto === 'demo'} onToggle={() => toggle('demo')} title="Sem cartão: chave de demonstração (2 minutos)" badge="Mais fácil">
             <Step n={1} link={LINKS.demo} linkLabel="Abrir a página da chave">
-              Abra a página da chave de demonstração do Google e entre com a sua conta Google (o mesmo login do Gmail).
+              Clique no botão azul lá em cima (ou aqui) e entre com a sua conta Google (o mesmo login do Gmail).
             </Step>
             <Step n={2}>
-              Se o Google pedir, aceite os <b className="font-medium text-fg">Termos da chave de demonstração</b> e escolha o país <b className="font-medium text-fg">Brasil</b>.
-              Não precisa de cartão.
+              Marque que aceita os <b className="font-medium text-fg">Termos de Serviço</b> (se pedir o país, escolha <b className="font-medium text-fg">Brasil</b>) e clique em{' '}
+              <b className="font-medium text-fg">Concordar e continuar</b>. Não precisa de cartão.
             </Step>
             <Step n={3}>
               Aparece a tela <b className="font-medium text-fg">"Tudo certo!"</b> com a sua chave (começa com "AIza"). Clique em <b className="font-medium text-fg">Copiar chave</b>

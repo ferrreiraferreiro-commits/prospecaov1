@@ -7,8 +7,11 @@ import { useGoogleKey } from '../store/useGoogleKey'
 import { mapsApi } from '../store/useMapsSearch'
 import { Button } from './ui'
 
-/** Página do Google que gera a chave de demonstração (sem cartão) na hora, depois do login. */
-export const DEMO_KEY_URL = 'https://console.cloud.google.com/google/maps-hosted/demo-api-key?hl=pt-br'
+/**
+ * Mesmo destino do botão "Receber uma chave de demonstração" da página oficial (developers.google.com/maps/demo-key):
+ * mostra os termos (quem nunca aceitou precisa deles) e em seguida gera a chave, sem cartão.
+ */
+export const DEMO_KEY_URL = 'https://console.cloud.google.com/google/maps-hosted/tos?ref=https%3A%2F%2Fdevelopers.google.com%2Fmaps%2F&hl=pt-br'
 
 /** Botão que abre o Google direto na tela da chave grátis (sem cartão). */
 export function GetDemoKeyButton({ className }: { className?: string }) {
