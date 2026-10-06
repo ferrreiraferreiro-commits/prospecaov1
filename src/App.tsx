@@ -234,7 +234,7 @@ function Blocked({ motivo, email }: { motivo: keyof typeof BLOQUEIO; email: stri
       </div>
       {naoChegou && (
         <p className="max-w-sm text-2xs text-fg-3">
-          O pagamento ainda não foi aprovado. Pix costuma levar até 1 minuto; cartão, alguns minutos. Use no checkout o mesmo e-mail da sua conta
+          O pagamento ainda não foi aprovado. O Pix costuma ser aprovado em até 1 minuto. Use no checkout o mesmo e-mail da sua conta
           {email && !email.endsWith('@prospeccao.local') && (
             <>
               {' '}(<span className="pv">{email}</span>)

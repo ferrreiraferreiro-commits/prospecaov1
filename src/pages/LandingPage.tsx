@@ -390,7 +390,7 @@ function Faq() {
       q: 'Quanto custa?',
       a: (
         <>
-          Um plano só, o Mensal, com tudo liberado. Paga por Pix ou cartão e o acesso libera sozinho assim que o pagamento é aprovado. O valor está logo acima, na{' '}
+          Um plano só, o Mensal, com tudo liberado. Paga por Pix e o acesso libera sozinho assim que o pagamento é aprovado. O valor está logo acima, na{' '}
           <a href="#preco" className="text-fg-2 underline decoration-line-strong underline-offset-4 hover:text-fg">
             seção Preço
           </a>
@@ -522,7 +522,7 @@ function Pricing() {
               <span className="text-sm text-fg-3">/mês</span>
             </p>
           )}
-          <p className="mt-2 text-xs text-fg-3">Sem fidelidade. Pix ou cartão.</p>
+          <p className="mt-2 text-xs text-fg-3">Sem fidelidade. Pagamento por Pix.</p>
           <ul className="mt-6 space-y-2.5 border-t border-line-soft pt-6">
             {inclui.map((t) => (
               <li key={t} className="flex items-start gap-2.5 text-[13px] leading-5 text-fg-2">

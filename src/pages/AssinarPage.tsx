@@ -52,7 +52,7 @@ export function AssinarPage({ logado }: { logado: boolean }) {
           <span className="text-sm text-fg-3">{carregado ? 'O valor aparece no checkout.' : ' '}</span>
         )}
       </p>
-      <p className="mt-2 text-xs text-fg-3">Cobrado uma vez por mês. Pix ou cartão.</p>
+      <p className="mt-2 text-xs text-fg-3">Cobrado uma vez por mês. Pagamento por Pix.</p>
 
       <ul className="mt-6 space-y-2.5 border-t border-line-soft pt-6">
         {INCLUI.map((t) => (
