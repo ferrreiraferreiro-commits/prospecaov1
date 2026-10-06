@@ -37,7 +37,7 @@ export function AssinarPage({ logado }: { logado: boolean }) {
   }, [])
 
   const plano = (
-    <div className="rounded-2xl border border-white/10 bg-[#0e1424]/80 p-6 text-left shadow-2xl shadow-black/30 backdrop-blur sm:p-8">
+    <div className={logado ? 'rounded-2xl border border-line bg-panel p-6 text-left sm:p-8' : 'rounded-2xl border border-white/10 bg-[#0e1424]/80 p-6 text-left shadow-2xl shadow-black/30 backdrop-blur sm:p-8'}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-fg">Plano Mensal</p>
         <span className="rounded-md bg-go/15 px-2 py-0.5 text-2xs font-semibold text-go">Tudo liberado</span>
@@ -54,7 +54,7 @@ export function AssinarPage({ logado }: { logado: boolean }) {
       </p>
       <p className="mt-2 text-xs text-fg-3">Cobrado uma vez por mês. Pix ou cartão.</p>
 
-      <ul className="mt-6 space-y-2.5 border-t border-white/10 pt-6">
+      <ul className="mt-6 space-y-2.5 border-t border-line-soft pt-6">
         {INCLUI.map((t) => (
           <li key={t} className="flex items-start gap-2.5 text-[13px] leading-5 text-fg-2">
             <Check className="mt-0.5 size-4 shrink-0 text-go" aria-hidden /> {t}
@@ -68,7 +68,7 @@ export function AssinarPage({ logado }: { logado: boolean }) {
             <Spinner />
           </div>
         ) : !checkout ? (
-          <p className="rounded-lg border border-white/10 px-4 py-3 text-center text-xs text-fg-3">As assinaturas abrem em breve.</p>
+          <p className="rounded-lg border border-line-soft px-4 py-3 text-center text-xs text-fg-3">As assinaturas abrem em breve.</p>
         ) : (
           <a
             href={linkCheckout(checkout, logado ? profile?.user_id : null)}
