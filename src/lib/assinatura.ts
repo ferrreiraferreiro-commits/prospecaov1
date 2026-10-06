@@ -119,3 +119,30 @@ export async function pagamentosSemConta(): Promise<PagamentoSemConta[]> {
   if (error) throw new Error(error.message)
   return ((data ?? []) as PagamentoSemConta[]).map((p) => ({ ...p, valor: p.valor == null ? null : Number(p.valor) }))
 }
+
+// ---------------------------------------------------------------------------
+// "Ou assine agora" na página inicial: primeiro cria a conta, depois abre /assinar
+// ---------------------------------------------------------------------------
+
+const DEPOIS_KEY = 'xs-prospeccao:assinar-depois'
+
+/** Lembra (neste navegador) que a pessoa quer assinar assim que entrar na conta. */
+export function marcarAssinarDepois(): void {
+  try {
+    localStorage.setItem(DEPOIS_KEY, String(Date.now()))
+  } catch {
+    /* sem armazenamento: ela cai no app e assina pelo menu do plano */
+  }
+}
+
+/** Ela pediu para assinar nas últimas 24 h? Lê e apaga (só redireciona uma vez). */
+export function consumirAssinarDepois(now = Date.now()): boolean {
+  try {
+    const v = localStorage.getItem(DEPOIS_KEY)
+    if (!v) return false
+    localStorage.removeItem(DEPOIS_KEY)
+    return now - Number(v) < 86_400_000
+  } catch {
+    return false
+  }
+}

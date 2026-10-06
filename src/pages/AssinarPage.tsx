@@ -1,11 +1,11 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
-import { ArrowLeft, ArrowUpRight, Check, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUpRight, Check, ShieldCheck } from 'lucide-react'
 import { useEffect, useLayoutEffect, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
 import { SiteFooter } from '../components/site/SiteFooter'
 import { Spinner } from '../components/ui'
-import { formatPreco, linkCheckout, useAssinatura } from '../lib/assinatura'
+import { formatPreco, linkCheckout, marcarAssinarDepois, useAssinatura } from '../lib/assinatura'
 import { useAccount } from '../store/useAccount'
 import '@fontsource-variable/manrope'
 
@@ -21,8 +21,7 @@ const INCLUI = [
 /**
  * Página de venda do plano Mensal (/assinar). É o link "Página de vendas" do produto na SigiloPay.
  * - Logado: botão direto para o checkout, com a conta junto (?xs=) → o plano cai na conta certa.
- * - Sem login: entra e assina, ou compra direto (o plano entra na conta com o mesmo e-mail,
- *   inclusive se ela for criada depois da compra).
+ * - Sem login: cria a conta (ou entra) primeiro; ao entrar, volta para cá com o checkout ligado à conta.
  */
 export function AssinarPage({ logado }: { logado: boolean }) {
   const { checkout, preco, carregado } = useAssinatura()
@@ -69,13 +68,15 @@ export function AssinarPage({ logado }: { logado: boolean }) {
           </div>
         ) : !checkout ? (
           <p className="rounded-lg border border-line-soft px-4 py-3 text-center text-xs text-fg-3">As assinaturas abrem em breve.</p>
-        ) : (
-          <a
-            href={linkCheckout(checkout, logado ? profile?.user_id : null)}
-            className="group flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-[15px] font-semibold text-white transition-colors hover:bg-[#3b7bf6]"
-          >
+        ) : logado ? (
+          <a href={linkCheckout(checkout, profile?.user_id)} className="group flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-[15px] font-semibold text-white transition-colors hover:bg-[#3b7bf6]">
             Assinar agora <ArrowUpRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
           </a>
+        ) : (
+          // Sem conta: cria a conta primeiro e, ao entrar, cai em /assinar com o checkout ligado a ela
+          <Link to="/criar-conta" onClick={marcarAssinarDepois} className="group flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-[15px] font-semibold text-white transition-colors hover:bg-[#3b7bf6]">
+            Criar conta e assinar <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
+          </Link>
         )}
         <p className="mt-3 flex items-center justify-center gap-1.5 text-2xs text-fg-3">
           <ShieldCheck className="size-3.5" aria-hidden /> Pagamento seguro
@@ -97,11 +98,11 @@ export function AssinarPage({ logado }: { logado: boolean }) {
     )
   }
 
-  return <AssinarPublico plano={plano} temCheckout={!!checkout} />
+  return <AssinarPublico plano={plano} />
 }
 
 /** Mesmo azul do topo da landing, para quem chega pelo link de vendas. */
-function AssinarPublico({ plano, temCheckout }: { plano: ReactNode; temCheckout: boolean }) {
+function AssinarPublico({ plano }: { plano: ReactNode }) {
   useLayoutEffect(() => {
     const root = document.documentElement
     const antes = root.dataset.theme
@@ -145,15 +146,6 @@ function AssinarPublico({ plano, temCheckout }: { plano: ReactNode; temCheckout:
                 </Link>
                 : o plano cai direto na sua conta.
               </p>
-              {temCheckout && (
-                <p>
-                  <span className="font-medium text-fg">Ainda não tem?</span> Assine aqui e depois{' '}
-                  <Link to="/criar-conta" className="text-blue-300 underline decoration-blue-300/40 underline-offset-4 hover:text-blue-200">
-                    crie sua conta
-                  </Link>{' '}
-                  com o <span className="text-fg">mesmo e-mail</span> da compra. O plano já vai estar lá.
-                </p>
-              )}
               <p>
                 Prefere ver antes?{' '}
                 <Link to="/criar-conta" className="text-blue-300 underline decoration-blue-300/40 underline-offset-4 hover:text-blue-200">

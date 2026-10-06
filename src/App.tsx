@@ -1,7 +1,7 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import type { Session } from '@supabase/supabase-js'
 import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { LogoMark } from './components/Brand'
 import { Layout } from './components/Layout'
 import { EscolherPlano } from './components/Planos'
@@ -10,6 +10,7 @@ import { Button, Spinner, WhatsAppIcon } from './components/ui'
 import { LocalRepository } from './data/localRepository'
 import { SupabaseRepository } from './data/supabaseRepository'
 import { supabase } from './data/supabaseClient'
+import { consumirAssinarDepois } from './lib/assinatura'
 import { iniciarWhatsApp } from './lib/waServico'
 import { suporteUrl, useSuporteWhatsApp } from './lib/suporte'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
@@ -90,6 +91,15 @@ function LegalRoutes() {
 }
 
 
+/** Veio do "Ou assine agora" da página inicial: depois de criar a conta e entrar, abre /assinar. */
+function IrParaAssinar() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (consumirAssinarDepois()) navigate('/assinar', { replace: true })
+  }, [navigate])
+  return null
+}
+
 function Routed() {
   const temWhatsApp = useHasWhatsApp()
   const admin = useIsAdmin()
@@ -97,6 +107,7 @@ function Routed() {
   const m = (el: ReactNode) => (temWhatsApp ? el : <Navigate to="/" replace />)
   return (
     <BrowserRouter>
+      <IrParaAssinar />
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<PainelPage />} />
