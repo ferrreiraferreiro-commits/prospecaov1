@@ -97,7 +97,13 @@ export async function painelWhatsApp(): Promise<PainelWhatsApp> {
     throw new WaError(MSG_INDISPONIVEL, true)
   }
   if (!res.ok) throw new WaError(MSG_INDISPONIVEL, true)
-  return (await res.json()) as PainelWhatsApp
+  const p = (await res.json()) as PainelWhatsApp
+  // O relógio da VPS não bate com o do computador. Este próprio pedido acabou de marcar o dono como
+  // visto, então o horário mais recente é o "agora" do servidor: passa tudo para o relógio daqui.
+  const agoraServidor = Math.max(...Object.values(p.vistos).map((v) => Date.parse(v)).filter(Number.isFinite))
+  const ajuste = Number.isFinite(agoraServidor) ? Date.now() - agoraServidor : 0
+  for (const [id, v] of Object.entries(p.vistos)) p.vistos[id] = new Date(Date.parse(v) + ajuste).toISOString()
+  return p
 }
 
 export type WaStatus = 'disconnected' | 'connecting' | 'qrcode' | 'connected'
