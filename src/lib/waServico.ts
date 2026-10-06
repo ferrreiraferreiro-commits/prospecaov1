@@ -37,9 +37,16 @@ async function token(): Promise<string> {
   return t
 }
 
+/**
+ * Login que o servidor já recusou (sessão encerrada em outro lugar). Não manda de novo: uma aba esquecida
+ * repetindo um login vencido faz o servidor bloquear a internet inteira da pessoa por alguns minutos.
+ */
+let tokenRecusado: string | null = null
+
 /** Pedido ao WhatsApp da conta. A resposta (inclusive os erros) é a do próprio serviço. */
 async function pedir(path: string, method: string, json: unknown, timeoutMs: number, signal?: AbortSignal | null): Promise<Response> {
   const auth = await token()
+  if (auth === tokenRecusado) throw new WaError('Entre na sua conta da XS de novo.')
   let res: Response
   try {
     res = await fetch(`${WA_URL}/motor${path}`, {
@@ -51,6 +58,7 @@ async function pedir(path: string, method: string, json: unknown, timeoutMs: num
   } catch {
     throw new WaError(MSG_INDISPONIVEL, true)
   }
+  if (res.status === 401) tokenRecusado = auth
   // 403 = sem vaga na nuvem para esta conta agora: para a pessoa, é o serviço indisponível
   if (res.status === 503 || res.status === 502 || res.status === 403) throw new WaError(MSG_INDISPONIVEL, true)
   return res
@@ -81,7 +89,7 @@ export interface PainelWhatsApp {
     final: string | null
     sessaoSalva: boolean
   }[]
-  /** user_id → último pedido ao WhatsApp da XS (o app pergunta a cada 6 s com a aba aberta) */
+  /** user_id → último pedido ao WhatsApp da XS (o app confere a cada 5 min com a aba aberta) */
   vistos: Record<string, string>
   ligados: number
   max: number
@@ -90,12 +98,14 @@ export interface PainelWhatsApp {
 /** Só para o dono (tela Contas): o WhatsApp de cada conta e quem está com a XS aberta. */
 export async function painelWhatsApp(): Promise<PainelWhatsApp> {
   const auth = await token()
+  if (auth === tokenRecusado) throw new WaError('Entre na sua conta da XS de novo.')
   let res: Response
   try {
     res = await fetch(`${WA_URL}/painel`, { headers: { Authorization: `Bearer ${auth}` }, signal: AbortSignal.timeout(15000) })
   } catch {
     throw new WaError(MSG_INDISPONIVEL, true)
   }
+  if (res.status === 401) tokenRecusado = auth
   if (!res.ok) throw new WaError(MSG_INDISPONIVEL, true)
   const p = (await res.json()) as PainelWhatsApp
   // O relógio da VPS não bate com o do computador. Este próprio pedido acabou de marcar o dono como
@@ -163,8 +173,8 @@ export const useWaServico = create<WaServicoState>()((set) => ({
   },
 }))
 
-/** Mantém o status do WhatsApp atualizado enquanto a aba está visível. */
-export function useWaPolling(intervalMs = 6000) {
+/** Confere o WhatsApp a cada 5 min enquanto a aba está visível (e na hora em que a pessoa volta para a aba). */
+export function useWaPolling(intervalMs = 5 * 60_000) {
   const check = useWaServico((s) => s.check)
   useEffect(() => {
     void check()

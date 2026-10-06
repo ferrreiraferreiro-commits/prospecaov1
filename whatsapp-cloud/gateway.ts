@@ -173,7 +173,7 @@ let controle: Controle = { ligar: (n) => systemctl('start', n), desligar: (n) =>
 const ligados = new Set<string>()
 /** Último pedido de cada sessão */
 const ultimoUso = new Map<string, number>()
-/** Último pedido de cada conta (id → quando). O app pergunta a cada 6 s com a aba aberta: é o "online". */
+/** Último pedido de cada conta (id → quando). O app confere a cada 5 min com a aba aberta: é o "online". */
 const vistoConta = new Map<string, number>()
 /** Conta que usou cada sessão por último (as fixas são configuradas pelo usuário de login, não pelo id) */
 const contaDaSessao = new Map<string, string>()

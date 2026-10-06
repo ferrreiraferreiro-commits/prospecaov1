@@ -263,7 +263,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
             )}
             {supabase && (
               <button
-                onClick={() => supabase!.auth.signOut()}
+                onClick={() => supabase!.auth.signOut({ scope: 'local' })}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-bad/10 text-xs font-semibold text-red-300 transition-colors hover:bg-bad/20"
               >
                 <LogOut className="size-4" /> Sair

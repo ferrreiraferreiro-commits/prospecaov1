@@ -65,10 +65,10 @@ function nomeDe(c: Conta): string {
 
 type LinhaWa = PainelWhatsApp['sessoes'][number]
 
-/** Online = o app falou com o WhatsApp da XS há menos disso (ele pergunta a cada 6 s com a aba aberta). */
-const ONLINE_MS = 45_000
+/** Online = o app falou com o WhatsApp da XS há menos disso (ele confere a cada 5 min com a aba aberta). */
+const ONLINE_MS = 6 * 60_000
 
-/** O WhatsApp de cada conta, lido do servidor a cada 15 s enquanto a aba está visível. */
+/** O WhatsApp de cada conta, lido do servidor a cada 1 min enquanto a aba está visível. */
 function usePainelWhatsApp() {
   const [painel, setPainel] = useState<PainelWhatsApp | null>(null)
   const [falhou, setFalhou] = useState(false)
@@ -84,7 +84,7 @@ function usePainelWhatsApp() {
         () => vivo && setFalhou(true),
       )
     void ler()
-    const id = setInterval(() => document.visibilityState === 'visible' && void ler(), 15_000)
+    const id = setInterval(() => document.visibilityState === 'visible' && void ler(), 60_000)
     return () => {
       vivo = false
       clearInterval(id)
@@ -228,7 +228,7 @@ export function ContasPage() {
           ) : (
             <>
               <span>
-                <b className="num font-semibold text-fg">{onlineAgora}</b> com a XS aberta agora
+                <b className="num font-semibold text-fg">{onlineAgora}</b> online (últimos 5 min)
               </span>
               <span>
                 <b className="num font-semibold text-fg">{painel.sessoes.filter((s) => s.estado === 'connected').length}</b> conectado(s)
@@ -378,7 +378,7 @@ function ContaRow({
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-xs md:grid-cols-[minmax(0,1.6fr)_110px_130px_minmax(0,1.3fr)_100px_110px_auto]">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate font-medium text-fg">
-          {online && <span className="size-2 shrink-0 rounded-full bg-go" title="Com a XS aberta agora" aria-label="Online agora" />}
+          {online && <span className="size-2 shrink-0 rounded-full bg-go" title="Usou a XS nos últimos 5 minutos" aria-label="Online agora" />}
           <span className="pv truncate">{nomeDe(conta)}</span>
           {conta.admin && <ShieldCheck className="size-3.5 shrink-0 text-blue-300" aria-label="Dono" />}
         </p>

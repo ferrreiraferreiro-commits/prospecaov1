@@ -138,7 +138,7 @@ export async function syncCampaigns(): Promise<number> {
   return total
 }
 
-/** Sincroniza em segundo plano enquanto o WhatsApp da XS responde (a cada 20 s). */
+/** Sincroniza em segundo plano enquanto o WhatsApp da XS responde (a cada 1 min). */
 export function useDisparoSync() {
   const online = useWaServico((s) => s.online)
   useEffect(() => {
@@ -157,7 +157,7 @@ export function useDisparoSync() {
       }
     }
     void tick()
-    const id = setInterval(() => void tick(), 20_000)
+    const id = setInterval(() => void tick(), 60_000)
     return () => clearInterval(id)
   }, [online])
 }

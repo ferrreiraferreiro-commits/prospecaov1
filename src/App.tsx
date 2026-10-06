@@ -227,7 +227,7 @@ function Blocked({ motivo, email }: { motivo: keyof typeof BLOQUEIO; email: stri
           </Button>
         )}
         {supabase && (
-          <Button variant="secondary" size="lg" onClick={() => void supabase!.auth.signOut()}>
+          <Button variant="secondary" size="lg" onClick={() => void supabase!.auth.signOut({ scope: 'local' })}>
             Sair
           </Button>
         )}
