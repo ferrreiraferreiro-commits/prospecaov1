@@ -14,7 +14,8 @@
  *   - automáticas (XS_CLOUD_TODOS=1): toda conta com plano em dia e o recurso "motor" ganha a sua na
  *     primeira vez, até XS_CLOUD_MAX Motores ligados. Quem passar do limite vê "indisponível" até abrir vaga.
  *     O gateway liga/desliga cada Motor pelo systemd (xs-whatsapp-motor@<sessao>, regra do polkit).
- *     Motor sem WhatsApp conectado e sem uso há 30 min é desligado (libera memória); com WhatsApp
+ *     Só "Conectar" (ou disparo, agenda, teste) liga o Motor; olhar o status não liga. "Desconectar"
+ *     desliga na hora. Motor sem WhatsApp salvo e sem uso há 5 min é desligado (libera a vaga); com WhatsApp
  *     conectado fica ligado e volta sozinho quando a VPS reinicia.
  *
  * GET  /saude                aberto: o gateway e os Motores estão de pé?
@@ -49,8 +50,8 @@ let MAX_AUTO = Math.max(0, Number(process.env.XS_CLOUD_MAX ?? 5) || 0)
 const PORTA_INICIAL = Number(process.env.XS_CLOUD_PORTA_INICIAL ?? 3100)
 const MAX_CORPO = 8 * 1024 * 1024
 const TEMPO_MOTOR_MS = 60_000
-/** Motor automático sem WhatsApp conectado e sem uso por esse tempo é desligado */
-const OCIOSO_MS = 30 * 60_000
+/** Motor automático sem WhatsApp salvo e sem uso por esse tempo é desligado (ex.: abriu o QR Code e saiu) */
+const OCIOSO_MS = 5 * 60_000
 
 export const MSG_INDISPONIVEL = 'O serviço de WhatsApp está temporariamente indisponível. Tente novamente em alguns instantes.'
 const MSG_GENERICA = 'Não foi possível concluir agora. Tente novamente em alguns instantes.'
@@ -421,11 +422,28 @@ export async function chamarMotor(s: Sessao, method: string, caminho: string, co
   return { status: res.status, body: await res.json().catch(() => null) }
 }
 
+/** O que o app vê de quem está sem WhatsApp na nuvem agora (Motor desligado e nada salvo): desconectado. */
+export const SEM_WHATSAPP: Record<string, unknown> = {
+  '/health': { ok: true, nuvem: true, whatsapp: { status: 'disconnected', user: null, sessaoSalva: false }, disparo: { running: 0 }, agenda: { pendentes: 0 } },
+  '/whatsapp/status': { status: 'disconnected', qrCodeUrl: null, user: null, lastError: null, sessaoSalva: false },
+}
+
+/** Desliga um Motor automático e libera a vaga. */
+async function desligarMotor(s: Sessao, motivo: string) {
+  log(`${s.nome}: ${motivo}, desligando o Motor`)
+  ligados.delete(s.nome)
+  await controle.desligar(s.nome).catch((err) => log(`não consegui desligar ${s.nome}: ${(err as Error).message}`))
+}
+
 async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: Sessao, caminho: string) {
   const method = (req.method ?? 'GET').toUpperCase()
   if (!METODOS.has(method) || !CAMINHO_OK.test(caminho)) return send(res, 404, { error: 'Não encontrado.' })
   const corpo = method === 'GET' ? undefined : await lerCorpo(req)
-  ultimoUso.set(s.nome, Date.now())
+  const leitura = method === 'GET' && Object.hasOwn(SEM_WHATSAPP, caminho)
+  // Só olhar o status não liga o Motor de ninguém: quem nunca conectou (ou desconectou) não ocupa vaga
+  if (leitura && !s.fixa && !ligados.has(s.nome) && !credsSalvas(s)) return send(res, 200, SEM_WHATSAPP[caminho])
+  // O status que o app confere sozinho (/health) não conta como uso; a tela de conexão aberta conta
+  if (caminho !== '/health') ultimoUso.set(s.nome, Date.now())
   if (caminho.startsWith('/whatsapp/')) vistoEm.set(s.nome, Date.now())
   try {
     await garantirMotor(s)
@@ -436,6 +454,8 @@ async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: 
   try {
     const r = await chamarMotor(s, method, caminho, corpo)
     send(res, r.status, ajustarResposta(caminho, r.body, s))
+    // Desconectou: desliga o Motor na hora e libera a vaga (conectar de novo liga outra vez)
+    if (!s.fixa && method === 'POST' && caminho === '/whatsapp/desconectar' && r.status < 300) await desligarMotor(s, 'desconectou o WhatsApp')
   } catch (err) {
     const tempo = (err as Error).name === 'TimeoutError'
     log(`motor ${s.nome} ${method} ${caminho}: ${tempo ? 'demorou demais' : 'fora do ar'} (${(err as Error).message})`)
@@ -517,15 +537,13 @@ const QR_SEM_VER_MS = 4 * 60_000
 /**
  * A cada 30 s, para cada sessão: se há sessão salva e o WhatsApp está desconectado (ex.: a internet da
  * VPS caiu na hora de abrir), manda reconectar. QR Code girando sem ninguém na tela é desligado.
- * Motor automático sem WhatsApp salvo e sem uso há 30 min é desligado (volta no próximo acesso).
+ * Motor automático sem WhatsApp salvo e sem uso há 5 min é desligado (volta quando a pessoa conectar).
  * "Desconectar" na tela apaga a sessão salva, então o vigia não reconecta o que a pessoa desligou.
  */
 export async function vigiar(s: Sessao, agora = Date.now()): Promise<'reconectar' | 'parar-qr' | 'desligar' | null> {
   const salva = credsSalvas(s)
   if (!s.fixa && !salva && agora - (ultimoUso.get(s.nome) ?? 0) > OCIOSO_MS) {
-    log(`vigia ${s.nome}: sem WhatsApp e sem uso, desligando o Motor`)
-    ligados.delete(s.nome)
-    await controle.desligar(s.nome).catch((err) => log(`não consegui desligar ${s.nome}: ${(err as Error).message}`))
+    await desligarMotor(s, 'vigia: sem WhatsApp salvo e sem uso')
     return 'desligar'
   }
   let wa: { status?: string }
@@ -596,6 +614,9 @@ export const server = http.createServer(async (req, res) => {
     if (s) contaDaSessao.set(s.nome, conta.id)
 
     if (url.pathname === '/acesso') return send(res, s ? 200 : 403, { permitido: !!s })
+    // Sem vaga agora: o status mostra "desconectado"; o "indisponível" só aparece se tentar conectar
+    const sem = url.pathname.startsWith('/motor/') ? url.pathname.slice('/motor'.length) : ''
+    if (!s && conta.podeUsar && req.method === 'GET' && Object.hasOwn(SEM_WHATSAPP, sem)) return send(res, 200, SEM_WHATSAPP[sem])
     if (!s) return send(res, 403, { error: 'Sua conta não usa o WhatsApp na nuvem.' })
     if (url.pathname.startsWith('/motor/')) return await repassar(req, res, s, url.pathname.slice('/motor'.length))
     return send(res, 404, { error: 'Não encontrado.' })

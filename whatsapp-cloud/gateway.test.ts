@@ -28,6 +28,7 @@ const ANA = 'aaaaaaaa-0000-4000-8000-000000000001'
 const BRUNO = 'bbbbbbbb-0000-4000-8000-000000000002'
 const CARLA = 'cccccccc-0000-4000-8000-000000000003'
 const VENCIDA = 'dddddddd-0000-4000-8000-000000000004'
+const DAVI = 'eeeeeeee-0000-4000-8000-000000000005'
 
 const contas: Record<string, Conta> = {
   'token-dono-aaaaaaaaaaaaaaaa': { id: DONO, usuario: 'gabriel', podeUsar: true, admin: true },
@@ -35,6 +36,7 @@ const contas: Record<string, Conta> = {
   'token-bruno-aaaaaaaaaaaaaaa': { id: BRUNO, usuario: 'bruno', podeUsar: true },
   'token-carla-aaaaaaaaaaaaaaa': { id: CARLA, usuario: 'carla', podeUsar: true },
   'token-vencida-aaaaaaaaaaaaa': { id: VENCIDA, usuario: 'vencida', podeUsar: false },
+  'token-davi-aaaaaaaaaaaaaaaa': { id: DAVI, usuario: 'davi', podeUsar: true },
 }
 
 /** Motores de mentira: cada um guarda o que recebeu, como o de verdade */
@@ -178,9 +180,12 @@ test('cada conta tem o seu Motor: os pedidos da Ana nunca vão para o do Bruno n
   assert.equal(ligadosPeloControle.length, 2)
 })
 
-test('limite de Motores: a terceira conta continua no Motor do computador (403)', async () => {
+test('limite de Motores: sem vaga, o status mostra desconectado e conectar dá indisponível (403)', async () => {
   assert.equal((await pedir('token-carla-aaaaaaaaaaaaaaa', '/acesso')).status, 403)
-  assert.equal((await pedir('token-carla-aaaaaaaaaaaaaaa', '/motor/health')).status, 403)
+  const h = await pedir('token-carla-aaaaaaaaaaaaaaa', '/motor/health')
+  assert.equal(h.status, 200)
+  assert.equal(((await h.json()) as any).whatsapp.status, 'disconnected')
+  assert.equal((await pedir('token-carla-aaaaaaaaaaaaaaa', '/motor/whatsapp/conectar', { method: 'POST', body: '{}' })).status, 403)
 })
 
 test('plano vencido: não ganha WhatsApp na nuvem', async () => {
@@ -287,4 +292,33 @@ test('painel: só o dono vê; mostra cada WhatsApp, o final do número e quem es
   assert.ok(p.vistos[ANA] && p.vistos[DONO])
   assert.equal(p.vistos[VENCIDA] !== undefined, true) // entrou, mesmo sem WhatsApp na nuvem
   for (const s of p.sessoes) assert.ok(!('motor' in s) && !('dados' in s), 'nada de porta ou pasta')
+})
+
+test('só conectar liga o Motor; olhar o status não liga; desconectar desliga na hora', async () => {
+  configurar({ max: 5 })
+  const ligadosAntes = ligadosPeloControle.length
+  const h = (await (await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/health')).json()) as Record<string, any>
+  assert.equal(h.whatsapp.status, 'disconnected')
+  const st = (await (await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/status')).json()) as Record<string, any>
+  assert.equal(st.status, 'disconnected')
+  assert.equal(ligadosPeloControle.length, ligadosAntes, 'status não liga o Motor')
+
+  assert.equal((await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/conectar', { method: 'POST', body: '{}' })).status, 200)
+  assert.equal(ligadosPeloControle.length, ligadosAntes + 1)
+  const reg = JSON.parse(fs.readFileSync(path.join(dados, 'sessoes.json'), 'utf8')) as Record<string, { nome: string; porta: number }>
+  const davi: Sessao = { nome: reg[DAVI].nome, motor: `http://127.0.0.1:${reg[DAVI].porta}`, dados: path.join(dados, reg[DAVI].nome), fixa: false }
+
+  // O /health que o app confere sozinho não segura o Motor ligado
+  await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/health')
+  assert.equal(await vigiar(davi, Date.now() + 6 * 60_000), 'desligar')
+  assert.equal(desligadosPeloControle.at(-1), davi.nome)
+
+  // Liga de novo, desconecta: desliga na hora
+  await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/conectar', { method: 'POST', body: '{}' })
+  const desligadosAntes = desligadosPeloControle.length
+  assert.equal((await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/desconectar', { method: 'POST', body: '{}' })).status, 200)
+  assert.equal(desligadosPeloControle.length, desligadosAntes + 1)
+  const depois = (await (await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/status')).json()) as Record<string, any>
+  assert.equal(depois.status, 'disconnected')
+  configurar({ max: 2 })
 })

@@ -234,7 +234,7 @@ export function ContasPage() {
                 <b className="num font-semibold text-fg">{painel.sessoes.filter((s) => s.estado === 'connected').length}</b> conectado(s)
               </span>
               <span>
-                <b className="num font-semibold text-fg">{painel.ligados + fixasWa}</b> de {painel.max + fixasWa} vagas ligadas
+                <b className="num font-semibold text-fg">{painel.ligados + fixasWa}</b> de {painel.max + fixasWa} vagas em uso
               </span>
             </>
           )}

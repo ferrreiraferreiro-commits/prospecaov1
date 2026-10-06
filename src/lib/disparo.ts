@@ -138,9 +138,15 @@ export async function syncCampaigns(): Promise<number> {
   return total
 }
 
-/** Sincroniza em segundo plano enquanto o WhatsApp da XS responde (a cada 1 min). */
+/**
+ * Sincroniza em segundo plano (a cada 1 min) só enquanto há WhatsApp conectado ou algo na fila: sem isso
+ * o próprio pedido ligaria o WhatsApp da conta na nuvem e ocuparia uma vaga à toa.
+ */
 export function useDisparoSync() {
-  const online = useWaServico((s) => s.online)
+  const online = useWaServico((s) => {
+    const h = s.online ? s.health : null
+    return !!h && (h.whatsapp.status === 'connected' || h.disparo.running > 0 || (h.agenda?.pendentes ?? 0) > 0)
+  })
   useEffect(() => {
     if (!online) return
     let busy = false
