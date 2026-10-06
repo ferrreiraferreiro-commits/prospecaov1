@@ -14,6 +14,7 @@ import {
   LayoutList,
   MapPinned,
   Menu,
+  PlayCircle,
   MessagesSquare,
   ScrollText,
   Send,
@@ -29,6 +30,7 @@ import {
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useComunidade } from '../lib/comunidade'
+import { CANAL_TUTORIAIS } from '../lib/tutoriais'
 import { useDisparoSync } from '../lib/disparo'
 import { useWaServico, useWaPolling } from '../lib/waServico'
 import { formatDateTime } from '../lib/dates'
@@ -175,6 +177,7 @@ export function Layout() {
 
         <div className="space-y-1 border-t border-line-soft p-2.5">
           <ComunidadeLink collapsed={collapsed} />
+          <TutoriaisLink collapsed={collapsed} />
           <TrialPill collapsed={collapsed} />
           {temWhatsApp && <WhatsAppPill collapsed={collapsed} />}
           <button
@@ -330,6 +333,34 @@ function ComunidadeLink({ collapsed, grande }: { collapsed?: boolean; grande?: b
   )
 }
 
+/** Canal do YouTube com os tutoriais da XS. */
+function TutoriaisLink({ collapsed, grande }: { collapsed?: boolean; grande?: boolean }) {
+  if (grande)
+    return (
+      <a href={CANAL_TUTORIAIS} target="_blank" rel="noreferrer" className="mb-3 flex items-center gap-3 rounded-lg border border-line bg-raised px-3 py-2.5 text-xs font-medium text-fg">
+        <PlayCircle className="size-[18px] text-red-400" strokeWidth={1.75} />
+        <span className="flex-1">Tutoriais no YouTube</span>
+        <ExternalLink className="size-3.5 text-fg-3" />
+      </a>
+    )
+  return (
+    <a
+      href={CANAL_TUTORIAIS}
+      target="_blank"
+      rel="noreferrer"
+      title="Tutoriais da XS no YouTube"
+      className={clsx(
+        'flex h-9 items-center gap-2.5 rounded-lg text-xs font-medium text-fg-2 transition-colors hover:bg-tint/[0.04] hover:text-fg',
+        collapsed ? 'justify-center' : 'px-2.5',
+      )}
+    >
+      <PlayCircle className="size-4 shrink-0 text-red-400" strokeWidth={1.75} />
+      {!collapsed && <span className="flex-1 truncate">Tutoriais</span>}
+      {!collapsed && <ExternalLink className="size-3 text-fg-4" />}
+    </a>
+  )
+}
+
 /** No teste grátis, mostra quantos dias faltam. */
 function TrialPill({ collapsed }: { collapsed: boolean }) {
   const profile = useAccount((s) => s.profile)
@@ -359,6 +390,7 @@ function MobileSheet({ groups, onClose }: { groups: typeof GROUPS; onClose: () =
           </button>
         </div>
         <ComunidadeLink grande />
+        <TutoriaisLink grande />
         {groups.map((group) => (
           <div key={group.title} className="mb-3">
             <p className="pb-1.5 text-[10px] font-semibold tracking-[0.08em] text-fg-4 uppercase">{group.title}</p>
