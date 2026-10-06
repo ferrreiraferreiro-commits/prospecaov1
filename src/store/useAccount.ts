@@ -31,6 +31,8 @@ interface AccountState {
   ready: boolean
   init(client: SupabaseClient | null, userId?: string): Promise<void>
   save(patch: EditableProfile): Promise<void>
+  /** Lê o perfil de novo sem tela de carregando (ex.: acabou de pagar o plano). */
+  recarregar(): Promise<void>
 }
 
 // Modo local (sem Supabase): uma conta completa guardada no navegador
@@ -72,6 +74,13 @@ export const useAccount = create<AccountState>()((set, get) => ({
     const { data } = await client.from('profiles').select('*').eq('user_id', userId).maybeSingle()
     // Sem perfil (não deveria acontecer): não bloqueia o uso
     set({ profile: (data as Profile | null) ?? null, ready: true })
+  },
+
+  async recarregar() {
+    const current = get().profile
+    if (!db || !current) return
+    const { data } = await db.from('profiles').select('*').eq('user_id', current.user_id).maybeSingle()
+    if (data) set({ profile: data as Profile })
   },
 
   async save(patch) {

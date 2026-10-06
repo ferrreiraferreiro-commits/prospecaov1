@@ -283,6 +283,9 @@ function PlanCard() {
   if (!plan) return null
   const vitalicio = profile?.plano === 'vitalicio'
   const perto = plan.dias !== null && plan.dias <= 3
+  // Plano pago: a SigiloPay cobra sozinha todo mês. O botão só aparece se faltar menos de 1 dia
+  // (a cobrança não passou), para ninguém assinar duas vezes.
+  const renovarAgora = profile?.plano === 'ativo' && !!plan.ate && Date.parse(plan.ate) - Date.now() < 86_400_000
   return (
     <div className="mt-3 rounded-lg border border-line-soft bg-ink px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
@@ -309,10 +312,13 @@ function PlanCard() {
       ) : (
         <p className="mt-1.5 text-xs text-fg-2">{vitalicio ? 'Não acaba, é para sempre' : 'Sem data para acabar'}</p>
       )}
-      {(profile?.plano === 'teste' || (profile?.plano === 'ativo' && plan.ate)) && (
+      {profile?.plano === 'ativo' && plan.ate && !renovarAgora && (
+        <p className="mt-2.5 border-t border-line-soft pt-2.5 text-2xs text-fg-3">Assinou pelo checkout? A cobrança renova sozinha todo mês.</p>
+      )}
+      {(profile?.plano === 'teste' || renovarAgora) && (
         <EscolherPlano
           size="sm"
-          titulo={<p className="mt-2.5 mb-1.5 border-t border-line-soft pt-2.5 text-2xs font-medium text-fg-3">{profile.plano === 'teste' ? 'Assinar pelo WhatsApp' : 'Renovar pelo WhatsApp'}</p>}
+          titulo={<p className="mt-2.5 mb-1.5 border-t border-line-soft pt-2.5 text-2xs font-medium text-fg-3">{profile?.plano === 'teste' ? 'Continuar depois do teste' : 'A cobrança do mês não chegou?'}</p>}
         />
       )}
     </div>

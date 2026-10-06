@@ -172,3 +172,15 @@ describe('login por usuário ou e-mail, senha e pagamentos', () => {
     expect(recebidoNoMes(pags, now)).toBeCloseTo(79.9)
   })
 })
+
+describe('assinatura pela SigiloPay', () => {
+  it('põe a conta no link do checkout sem perder os parâmetros da oferta', async () => {
+    const { linkCheckout, checkoutValido } = await import('../src/lib/assinatura')
+    const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+    expect(linkCheckout('https://pay.exemplo.com/checkout/abc?offer=ABC1', id)).toBe(`https://pay.exemplo.com/checkout/abc?offer=ABC1&xs=${id}`)
+    expect(linkCheckout('https://pay.exemplo.com/checkout/abc', null)).toBe('https://pay.exemplo.com/checkout/abc')
+    expect(linkCheckout('https://pay.exemplo.com/checkout/abc', 'local')).toBe('https://pay.exemplo.com/checkout/abc')
+    expect(checkoutValido('http://pay.exemplo.com')).toBe(false)
+    expect(checkoutValido('pay.exemplo.com')).toBe(false)
+  })
+})

@@ -415,7 +415,7 @@ function Toasts() {
 
 const AVISO_KEY = 'xs-prospeccao:aviso-plano'
 
-/** Faixa quando o teste ou o plano acaba em até 3 dias, com um botão por plano para assinar pelo WhatsApp. */
+/** Faixa quando o teste acaba em até 3 dias (ou o plano pago em menos de 1 dia), com o botão do plano Mensal. */
 function PlanoAviso() {
   const profile = useAccount((s) => s.profile)
   const plan = planInfo(profile)
@@ -427,10 +427,11 @@ function PlanoAviso() {
     }
   })
   if (!profile || !plan?.ate) return null
-  const falta = Date.parse(plan.ate) - Date.now()
-  if (falta <= 0 || falta > 3 * 86_400_000 || fechado === plan.ate) return null
-
   const teste = profile.plano === 'teste'
+  const falta = Date.parse(plan.ate) - Date.now()
+  // Plano pago renova sozinho na SigiloPay: só avisa se faltar menos de 1 dia (a cobrança não passou)
+  if (falta <= 0 || falta > (teste ? 3 : 1) * 86_400_000 || fechado === plan.ate) return null
+
   const horas = Math.ceil(falta / 3_600_000)
   const quando = horas < 24 ? `em ${horas} hora${horas === 1 ? '' : 's'}` : `em ${plan.dias} dias`
 
