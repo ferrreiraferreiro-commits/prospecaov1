@@ -6,6 +6,7 @@ import { LogoMark, Wordmark } from '../components/Brand'
 import { CallDemo } from '../components/site/CallDemo'
 import { ProductShowcase } from '../components/site/ProductShowcase'
 import { SiteFooter } from '../components/site/SiteFooter'
+import { formatPreco, linkCheckout, useAssinatura } from '../lib/assinatura'
 import '@fontsource-variable/manrope'
 
 /** Atraso da animação de entrada (classe land-in / reveal). */
@@ -75,6 +76,7 @@ export function LandingPage() {
           </div>
           <Product />
           <Audience />
+          <Pricing />
           <Faq />
           <FinalCta />
         </div>
@@ -90,7 +92,7 @@ const NAV_LINKS = [
   { href: '#como-funciona', label: 'Como funciona' },
   { href: '#recursos', label: 'Recursos' },
   { href: '#perguntas', label: 'Perguntas' },
-  { href: '/assinar', label: 'Preço' },
+  { href: '#preco', label: 'Preço' },
 ]
 
 function Nav() {
@@ -388,9 +390,9 @@ function Faq() {
       q: 'Quanto custa?',
       a: (
         <>
-          Um plano só, o Mensal, com tudo liberado. Paga por Pix ou cartão e o acesso libera sozinho assim que o pagamento é aprovado. O valor está na{' '}
-          <a href="/assinar" className="text-fg-2 underline decoration-line-strong underline-offset-4 hover:text-fg">
-            página de assinatura
+          Um plano só, o Mensal, com tudo liberado. Paga por Pix ou cartão e o acesso libera sozinho assim que o pagamento é aprovado. O valor está logo acima, na{' '}
+          <a href="#preco" className="text-fg-2 underline decoration-line-strong underline-offset-4 hover:text-fg">
+            seção Preço
           </a>
           .
         </>
@@ -480,6 +482,60 @@ function FinalCta() {
         <div className="reveal mt-9 flex w-full flex-col items-center gap-4 sm:w-auto" style={delay(180)}>
           <PrimaryCta className="w-full sm:w-auto" />
           <p className="text-xs text-fg-2/70">Sem cartão de crédito.</p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/** Preço na própria página: o teste grátis continua sendo o caminho principal. */
+function Pricing() {
+  const { checkout, preco } = useAssinatura()
+  const inclui = [
+    'Busca de empresas por cidade, bairro e nicho',
+    'Leads, status, histórico e retornos',
+    'Modo ligação com roteiro na tela',
+    'WhatsApp: mensagens, funis e disparo',
+    'Clientes, projetos e financeiro',
+  ]
+  return (
+    <section id="preco" aria-labelledby="preco-t" className="scroll-mt-16 border-t border-line-soft">
+      <div className={clsx(WRAP, 'grid gap-14 py-24 sm:py-32 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:items-center lg:gap-20')}>
+        <div className="reveal">
+          <Eyebrow>Preço</Eyebrow>
+          <h2 id="preco-t" className={clsx(H2, 'mt-4')}>
+            Um plano só.
+            <br className="hidden sm:block" /> Tudo liberado.
+          </h2>
+          <p className="mt-5 max-w-[440px] text-base leading-7 text-fg-2">
+            Teste 1 dia de graça, sem cartão. Gostou, assina o Mensal e o acesso continua na hora em que o pagamento é aprovado.
+          </p>
+        </div>
+        <div className="reveal rounded-2xl border border-line bg-panel p-6 sm:p-8" style={delay(100)}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-fg">Plano Mensal</p>
+            <span className="rounded-md bg-go/15 px-2 py-0.5 text-2xs font-semibold text-go">Tudo liberado</span>
+          </div>
+          {preco && (
+            <p className="mt-5 flex items-baseline gap-1.5">
+              <span className="font-display num text-[44px] leading-none text-fg">{formatPreco(preco)}</span>
+              <span className="text-sm text-fg-3">/mês</span>
+            </p>
+          )}
+          <p className="mt-2 text-xs text-fg-3">Sem fidelidade. Pix ou cartão.</p>
+          <ul className="mt-6 space-y-2.5 border-t border-line-soft pt-6">
+            {inclui.map((t) => (
+              <li key={t} className="flex items-start gap-2.5 text-[13px] leading-5 text-fg-2">
+                <Check className="mt-0.5 size-4 shrink-0 text-go" aria-hidden /> {t}
+              </li>
+            ))}
+          </ul>
+          <PrimaryCta className="mt-7 w-full" />
+          {checkout && (
+            <a href={linkCheckout(checkout)} className="mt-3 block text-center text-[13px] text-fg-2 underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg">
+              Ou assine agora
+            </a>
+          )}
         </div>
       </div>
     </section>
