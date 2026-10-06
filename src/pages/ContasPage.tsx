@@ -30,6 +30,16 @@ import { formatDateKey, formatDateTime, formatRelative, toDateKey } from '../lib
 import { formatMoney } from '../lib/insights'
 import { salvarSuporteWhatsApp, useSuporteWhatsApp } from '../lib/suporte'
 import { linkComunidadeValido, salvarComunidade, useComunidade } from '../lib/comunidade'
+import {
+  checkoutValido,
+  pagamentosSemConta,
+  salvarAssinatura,
+  salvarTokenSigilo,
+  statusSigilo,
+  useAssinatura,
+  type PagamentoSemConta,
+  type SigiloStatus,
+} from '../lib/assinatura'
 import { planInfo, type Profile } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
@@ -187,6 +197,7 @@ export function ContasPage() {
         )}
       </Card>
 
+      <SigiloPayCard />
       <SuporteCard />
       <ComunidadeCard />
 
@@ -590,6 +601,168 @@ function AcessoAba({ conta, onMudou }: { conta: Conta; onMudou: () => void }) {
   )
 }
 
+/** Endereço público da XS (no localhost, o do site no ar: é ele que vai no painel da SigiloPay). */
+function enderecoXs(): string {
+  const o = window.location.origin
+  return /localhost|127\.0\.0\.1/.test(o) ? 'https://xs-prospeccao.vercel.app' : o
+}
+
+function Copiavel({ label, valor }: { label: string; valor: string }) {
+  const toast = useApp((s) => s.toast)
+  const [copiado, setCopiado] = useState(false)
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(valor)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 1500)
+    } catch {
+      toast('Não deu para copiar. Selecione o texto e copie.', 'error')
+    }
+  }
+  return (
+    <div>
+      <p className="label">{label}</p>
+      <div className="flex max-w-xl items-center gap-2">
+        <code className="input flex items-center truncate text-xs select-all">{valor}</code>
+        <Button size="sm" icon={copiado ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} onClick={() => void copiar()}>
+          {copiado ? 'Copiado' : 'Copiar'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** Venda do plano Mensal pela SigiloPay: checkout, preço, token do webhook e pagamentos sem conta. */
+function SigiloPayCard() {
+  const toast = useApp((s) => s.toast)
+  const atual = useAssinatura()
+  const [checkout, setCheckout] = useState('')
+  const [preco, setPreco] = useState<number | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  const [token, setToken] = useState('')
+  const [salvandoToken, setSalvandoToken] = useState(false)
+  const [status, setStatus] = useState<SigiloStatus | null>(null)
+  const [semConta, setSemConta] = useState<PagamentoSemConta[]>([])
+
+  useEffect(() => setCheckout(atual.checkout ?? ''), [atual.checkout])
+  useEffect(() => setPreco(atual.preco), [atual.preco])
+
+  const recarregar = useCallback(async () => {
+    try {
+      const [s, p] = await Promise.all([statusSigilo(), pagamentosSemConta()])
+      setStatus(s)
+      setSemConta(p)
+    } catch {
+      /* migração ainda não aplicada: o cartão continua usável */
+    }
+  }, [])
+  useEffect(() => {
+    void recarregar()
+  }, [recarregar])
+
+  const linkInvalido = !!checkout.trim() && !checkoutValido(checkout)
+  const mudou = (checkout.trim() || null) !== atual.checkout || preco !== atual.preco
+
+  const salvar = async () => {
+    setSalvando(true)
+    try {
+      await salvarAssinatura(checkout, preco)
+      toast(checkout.trim() ? 'Checkout salvo. Os botões de assinar já levam para ele.' : 'Checkout removido. Os botões voltam para o WhatsApp.')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não foi possível salvar.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const salvarToken = async () => {
+    setSalvandoToken(true)
+    try {
+      await salvarTokenSigilo(token)
+      setToken('')
+      toast('Token salvo. A XS já aceita os avisos de pagamento.')
+      await recarregar()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não foi possível salvar.', 'error')
+    } finally {
+      setSalvandoToken(false)
+    }
+  }
+
+  const base = enderecoXs()
+  return (
+    <Card
+      title="Vendas pela SigiloPay"
+      description="Plano Mensal: a pessoa paga no checkout e a conta vira Mensal sozinha (+1 mês a cada cobrança). Reembolso ou contestação tiram o mês de volta."
+    >
+      <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Copiavel label="Página de vendas (cole no produto, na SigiloPay)" valor={`${base}/assinar`} />
+          <Copiavel label="URL do webhook (Configurações → Webhooks)" valor={`${base}/api/sigilopay`} />
+        </div>
+
+        <div>
+          <p className="label">Token de validação do webhook</p>
+          <div className="flex max-w-xl gap-2">
+            <input
+              className="input"
+              type="password"
+              autoComplete="off"
+              placeholder={status?.token_salvo ? 'Já salvo. Cole outro para trocar' : 'Cole o token que a SigiloPay mostra no webhook'}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <Button variant="primary" loading={salvandoToken} disabled={!token.trim()} onClick={() => void salvarToken()}>
+              Salvar
+            </Button>
+          </div>
+          <p className={clsx('mt-1 text-2xs', status?.token_salvo ? 'text-go' : 'text-amber-200')}>
+            {status?.token_salvo ? 'Token salvo.' : 'Sem token, a XS recusa todos os avisos de pagamento.'}
+            {status?.ultimo_aviso && <span className="text-fg-3"> Último aviso recebido {formatRelative(status.ultimo_aviso)}.</span>}
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+          <div>
+            <p className="label">Link do checkout (oferta mensal)</p>
+            <input className="input" inputMode="url" placeholder="https://…" value={checkout} onChange={(e) => setCheckout(e.target.value)} />
+            {linkInvalido && <p className="mt-1 text-2xs text-red-300">Cole o link completo, começando com https://</p>}
+          </div>
+          <div>
+            <p className="label">Preço por mês</p>
+            <NumberInput value={preco} onChange={setPreco} prefix="R$" min={0} step={0.01} placeholder="0,00" />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="primary" loading={salvando} disabled={linkInvalido || !mudou} onClick={() => void salvar()}>
+            Salvar checkout e preço
+          </Button>
+          <p className="text-2xs text-fg-4">O preço é só o que aparece nos botões; quem cobra é a SigiloPay.</p>
+        </div>
+
+        {semConta.length > 0 && (
+          <div className="border-t border-line-soft pt-4">
+            <p className="label">Pagaram, mas não têm conta com esse e-mail</p>
+            <p className="mb-2 text-2xs text-fg-3">
+              Entra sozinho quando a pessoa criar a conta com esse e-mail. Se ela já tem conta com outro e-mail, troque o e-mail dela ou libere o plano à mão aqui em cima.
+            </p>
+            <ul className="divide-y divide-line-soft rounded-lg border border-line-soft">
+              {semConta.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs">
+                  <span className="pv min-w-0 flex-1 truncate text-fg">{p.nome || 'Sem nome'}</span>
+                  <span className="pv text-fg-2">{p.email || 'Sem e-mail'}</span>
+                  {p.valor != null && <span className="num pv text-fg-2">{formatMoney(p.valor)}</span>}
+                  <span className="num text-fg-3">{formatDateTime(p.recebido_em)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 function SuporteCard() {
   const toast = useApp((s) => s.toast)
   const atual = useSuporteWhatsApp()
@@ -610,7 +783,7 @@ function SuporteCard() {
   }
 
   return (
-    <Card title="Seu WhatsApp para renovações" description="Aparece no aviso de plano acabando e na tela de plano vencido, com o botão “Renovar pelo WhatsApp”.">
+    <Card title="Seu WhatsApp de atendimento" description="Para contas pausadas falarem com você. Enquanto o checkout da SigiloPay não estiver salvo, o botão de assinar também abre este WhatsApp.">
       <div className="flex max-w-md gap-2">
         <input className="input num" inputMode="tel" placeholder="(43) 91234-5678" value={numero} onChange={(e) => setNumero(e.target.value)} />
         <Button variant="primary" loading={salvando} disabled={(numero.trim() || null) === atual} onClick={() => void salvar()}>

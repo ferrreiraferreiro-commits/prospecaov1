@@ -90,6 +90,7 @@ const NAV_LINKS = [
   { href: '#como-funciona', label: 'Como funciona' },
   { href: '#recursos', label: 'Recursos' },
   { href: '#perguntas', label: 'Perguntas' },
+  { href: '/assinar', label: 'Preço' },
 ]
 
 function Nav() {
@@ -364,7 +365,7 @@ function Faq() {
   const items: { q: string; a: ReactNode }[] = [
     {
       q: 'Preciso instalar alguma coisa?',
-      a: 'Não. A XS funciona no navegador do computador e do celular, inclusive a busca de empresas, e pode ficar na tela inicial como um app. Só o disparo automático em massa no WhatsApp usa um programa opcional para Windows.',
+      a: 'Não. A XS funciona inteira no navegador do computador e do celular, inclusive a busca de empresas e o WhatsApp, e pode ficar na tela inicial como um app.',
     },
     {
       q: 'De onde vêm os leads?',
@@ -378,6 +379,18 @@ function Faq() {
           na{' '}
           <a href="/privacidade" className="text-fg-2 underline decoration-line-strong underline-offset-4 hover:text-fg">
             Política de Privacidade
+          </a>
+          .
+        </>
+      ),
+    },
+    {
+      q: 'Quanto custa?',
+      a: (
+        <>
+          Um plano só, o Mensal, com tudo liberado. Paga por Pix ou cartão e o acesso libera sozinho assim que o pagamento é aprovado. O valor está na{' '}
+          <a href="/assinar" className="text-fg-2 underline decoration-line-strong underline-offset-4 hover:text-fg">
+            página de assinatura
           </a>
           .
         </>
