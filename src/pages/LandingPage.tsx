@@ -6,7 +6,7 @@ import { LogoMark, Wordmark } from '../components/Brand'
 import { CallDemo } from '../components/site/CallDemo'
 import { ProductShowcase } from '../components/site/ProductShowcase'
 import { SiteFooter } from '../components/site/SiteFooter'
-import { formatPreco, marcarAssinarDepois, useAssinatura } from '../lib/assinatura'
+import { formatPreco, linkCheckout, useAssinatura } from '../lib/assinatura'
 import '@fontsource-variable/manrope'
 
 /** Atraso da animação de entrada (classe land-in / reveal). */
@@ -532,9 +532,9 @@ function Pricing() {
           </ul>
           <PrimaryCta className="mt-7 w-full" />
           {checkout && (
-            <Link to="/criar-conta" onClick={marcarAssinarDepois} className="mt-3 block text-center text-[13px] text-fg-2 underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg">
+            <a href={linkCheckout(checkout)} className="mt-3 block text-center text-[13px] text-fg-2 underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg">
               Ou assine agora
-            </Link>
+            </a>
           )}
         </div>
       </div>
