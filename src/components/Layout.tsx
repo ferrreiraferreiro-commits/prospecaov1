@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAvisos } from '../lib/avisos'
 import { useComunidade } from '../lib/comunidade'
 import { CANAL_TUTORIAIS } from '../lib/tutoriais'
 import { useDisparoSync } from '../lib/disparo'
@@ -126,6 +127,7 @@ export function Layout() {
   const temWhatsApp = useHasWhatsApp()
   const groups = useGroups()
   useReminders()
+  useAvisos()
   usePrivacyMode()
 
   useEffect(() => setSheet(false), [pathname])

@@ -22,6 +22,8 @@ export interface Profile {
   boas_vindas_feitas: boolean
   /** Dono da XS: vê a tela Contas e muda o plano dos outros */
   admin?: boolean
+  /** Até quando a conta já viu os avisos da XS no sininho (hora do último aviso visto) */
+  avisos_vistos_em?: string | null
 }
 
 type EditableProfile = Partial<Pick<Profile, 'nome' | 'cidade' | 'boas_vindas_feitas'>>
