@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { BadgeDollarSign, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Trash2, Users } from 'lucide-react'
+import { BadgeDollarSign, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Smartphone, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, NumberInput, SearchInput, Stat } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
@@ -30,10 +30,11 @@ import { formatDateKey, formatDateTime, formatRelative, toDateKey } from '../lib
 import { formatMoney } from '../lib/insights'
 import { salvarSuporteWhatsApp, useSuporteWhatsApp } from '../lib/suporte'
 import { linkComunidadeValido, salvarComunidade, useComunidade } from '../lib/comunidade'
+import { painelWhatsApp, type PainelWhatsApp } from '../lib/waServico'
 import { planInfo, type Profile } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
-type Filtro = 'todas' | 'teste' | 'pagantes' | 'vitalicio' | 'bloqueadas'
+type Filtro = 'todas' | 'online' | 'teste' | 'pagantes' | 'vitalicio' | 'bloqueadas'
 
 const DIA = 86_400_000
 
@@ -52,6 +53,47 @@ function nomeDe(c: Conta): string {
   return c.nome || c.usuario || loginDe(c.email)
 }
 
+type LinhaWa = PainelWhatsApp['sessoes'][number]
+
+/** Online = o app falou com o WhatsApp da XS há menos disso (ele pergunta a cada 6 s com a aba aberta). */
+const ONLINE_MS = 45_000
+
+/** O WhatsApp de cada conta, lido do servidor a cada 15 s enquanto a aba está visível. */
+function usePainelWhatsApp() {
+  const [painel, setPainel] = useState<PainelWhatsApp | null>(null)
+  const [falhou, setFalhou] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    const ler = () =>
+      painelWhatsApp().then(
+        (p) => {
+          if (!vivo) return
+          setPainel(p)
+          setFalhou(false)
+        },
+        () => vivo && setFalhou(true),
+      )
+    void ler()
+    const id = setInterval(() => document.visibilityState === 'visible' && void ler(), 15_000)
+    return () => {
+      vivo = false
+      clearInterval(id)
+    }
+  }, [])
+  return { painel, falhou }
+}
+
+/** Sessão de WhatsApp da conta: a automática (pelo id) ou a fixa do dono (pelo usuário de login). */
+function linhaDa(c: Conta, p: PainelWhatsApp | null): LinhaWa | null {
+  if (!p) return null
+  return p.sessoes.find((s) => s.conta === c.user_id) ?? p.sessoes.find((s) => !!s.usuario && s.usuario === c.usuario?.toLowerCase()) ?? null
+}
+
+function estaOnline(c: Conta, p: PainelWhatsApp | null, now: number): boolean {
+  const v = p?.vistos[c.user_id]
+  return !!v && now - Date.parse(v) < ONLINE_MS
+}
+
 export function ContasPage() {
   const [contas, setContas] = useState<Conta[] | null>(null)
   const [pagamentos, setPagamentos] = useState<PagamentoXs[]>([])
@@ -60,6 +102,7 @@ export function ContasPage() {
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [editando, setEditando] = useState<string | null>(null)
   const [eu, setEu] = useState<string | null>(null)
+  const { painel, falhou } = usePainelWhatsApp()
 
   const carregar = useCallback(async () => {
     if (!supabase) return
@@ -102,13 +145,14 @@ export function ContasPage() {
     const q = busca.trim().toLowerCase()
     return (contas ?? []).filter((c) => {
       if (q && ![c.nome, c.usuario, c.email, c.cidade].some((v) => v?.toLowerCase().includes(q))) return false
+      if (filtro === 'online') return estaOnline(c, painel, now)
       if (filtro === 'teste') return c.plano === 'teste' && !vencida(c, now)
       if (filtro === 'pagantes') return c.plano === 'ativo' && !vencida(c, now)
       if (filtro === 'vitalicio') return c.plano === 'vitalicio'
       if (filtro === 'bloqueadas') return c.plano === 'cancelado' || vencida(c, now)
       return true
     })
-  }, [contas, busca, filtro, now])
+  }, [contas, busca, filtro, now, painel])
 
   const contaAberta = contas?.find((c) => c.user_id === editando) ?? null
 
@@ -125,6 +169,9 @@ export function ContasPage() {
 
   const mesAtual = recebidoNoMes(pagamentos)
   const totalGeral = pagamentos.reduce((s, p) => s + p.valor, 0)
+  const onlineAgora = (contas ?? []).filter((c) => estaOnline(c, painel, now)).length
+  /** Sessões fixas (a do dono) ficam sempre ligadas e não contam no limite das automáticas */
+  const fixasWa = painel?.sessoes.filter((s) => s.fixa).length ?? 0
 
   return (
     <div className="space-y-4">
@@ -153,6 +200,7 @@ export function ContasPage() {
             onChange={setFiltro}
             options={[
               { id: 'todas', label: 'Todas' },
+              { id: 'online', label: painel ? `Online (${onlineAgora})` : 'Online' },
               { id: 'teste', label: 'Teste' },
               { id: 'pagantes', label: 'Pagantes' },
               { id: 'vitalicio', label: 'Vitalício' },
@@ -160,6 +208,26 @@ export function ContasPage() {
             ]}
           />
           <SearchInput value={busca} onChange={setBusca} placeholder="Buscar nome, e-mail, cidade…" className="w-full sm:ml-auto sm:w-64" />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line-soft px-4 py-2 text-2xs text-fg-3">
+          <span className="inline-flex items-center gap-1.5 font-medium text-fg-2">
+            <Smartphone className="size-3.5" aria-hidden /> WhatsApp
+          </span>
+          {!painel ? (
+            <span className={falhou ? 'text-orange-300' : undefined}>{falhou ? 'Não deu para ler o WhatsApp das contas agora. Tentando de novo…' : 'Carregando…'}</span>
+          ) : (
+            <>
+              <span>
+                <b className="num font-semibold text-fg">{onlineAgora}</b> com a XS aberta agora
+              </span>
+              <span>
+                <b className="num font-semibold text-fg">{painel.sessoes.filter((s) => s.estado === 'connected').length}</b> conectado(s)
+              </span>
+              <span>
+                <b className="num font-semibold text-fg">{painel.ligados + fixasWa}</b> de {painel.max + fixasWa} vagas ligadas
+              </span>
+            </>
+          )}
         </div>
 
         {erro ? (
@@ -172,16 +240,26 @@ export function ContasPage() {
           <p className="px-4 py-10 text-center text-xs text-fg-3">Nenhuma conta aqui.</p>
         ) : (
           <ul className="divide-y divide-line-soft">
-            <li className="hidden grid-cols-[minmax(0,1.6fr)_120px_minmax(0,1.3fr)_100px_110px_auto] gap-4 px-4 py-2 text-2xs font-medium text-fg-4 md:grid">
+            <li className="hidden grid-cols-[minmax(0,1.6fr)_110px_130px_minmax(0,1.3fr)_100px_110px_auto] gap-4 px-4 py-2 text-2xs font-medium text-fg-4 md:grid">
               <span>Conta</span>
               <span>Plano</span>
+              <span>WhatsApp</span>
               <span>Acaba em</span>
               <span className="text-right">Já pagou</span>
               <span>Último acesso</span>
               <span className="w-[92px]" />
             </li>
             {visiveis.map((c) => (
-              <ContaRow key={c.user_id} conta={c} now={now} pago={totalPorConta.get(c.user_id) ?? 0} onEditar={() => setEditando(c.user_id)} />
+              <ContaRow
+                key={c.user_id}
+                conta={c}
+                now={now}
+                pago={totalPorConta.get(c.user_id) ?? 0}
+                wa={painel ? linhaDa(c, painel) : undefined}
+                online={estaOnline(c, painel, now)}
+                visto={painel?.vistos[c.user_id] ?? null}
+                onEditar={() => setEditando(c.user_id)}
+              />
             ))}
           </ul>
         )}
@@ -239,12 +317,57 @@ function FimLabel({ conta, now }: { conta: Conta; now: number }) {
   )
 }
 
-function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; pago: number; onEditar: () => void }) {
-  const legacy = isLegacyEmail(conta.email)
+/** O WhatsApp da conta. undefined = ainda não leu o servidor; null = a conta não tem WhatsApp ligado na XS. */
+function WhatsAppCell({ wa }: { wa: LinhaWa | null | undefined }) {
+  if (wa === undefined) return <span className="text-2xs text-fg-4">—</span>
+  const [texto, tone] = !wa
+    ? ['Nunca ligou', 'text-fg-4']
+    : wa.estado === 'connected'
+      ? ['Conectado', 'text-emerald-300']
+      : wa.estado === 'qrcode' || (wa.estado === 'connecting' && !wa.sessaoSalva)
+        ? ['Lendo QR Code', 'text-amber-200']
+        : wa.estado === 'connecting'
+          ? ['Reconectando', 'text-amber-200']
+          : wa.estado === 'disconnected'
+            ? ['Desconectado', 'text-fg-3']
+            : wa.estado === 'fora'
+              ? ['Fora do ar', 'text-red-300']
+              : ['Desligado', 'text-fg-4']
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-xs md:grid-cols-[minmax(0,1.6fr)_120px_minmax(0,1.3fr)_100px_110px_auto]">
+    <span className="min-w-0 text-2xs">
+      <span className={clsx('inline-flex items-center gap-1.5 font-medium', tone)}>
+        <span className={clsx('size-1.5 shrink-0 rounded-full bg-current', !wa || wa.estado === 'desligado' ? 'opacity-40' : undefined)} aria-hidden />
+        {texto}
+      </span>
+      {wa?.final && <span className="pv num block text-fg-4">final {wa.final}</span>}
+    </span>
+  )
+}
+
+function ContaRow({
+  conta,
+  now,
+  pago,
+  wa,
+  online,
+  visto,
+  onEditar,
+}: {
+  conta: Conta
+  now: number
+  pago: number
+  wa: LinhaWa | null | undefined
+  online: boolean
+  visto: string | null
+  onEditar: () => void
+}) {
+  const legacy = isLegacyEmail(conta.email)
+  const ultimo = visto && (!conta.ultimo_acesso || Date.parse(visto) > Date.parse(conta.ultimo_acesso)) ? visto : conta.ultimo_acesso
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-xs md:grid-cols-[minmax(0,1.6fr)_110px_130px_minmax(0,1.3fr)_100px_110px_auto]">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate font-medium text-fg">
+          {online && <span className="size-2 shrink-0 rounded-full bg-go" title="Com a XS aberta agora" aria-label="Online agora" />}
           <span className="pv truncate">{nomeDe(conta)}</span>
           {conta.admin && <ShieldCheck className="size-3.5 shrink-0 text-blue-300" aria-label="Dono" />}
         </p>
@@ -257,13 +380,18 @@ function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; p
         <PlanoBadge conta={conta} now={now} />
       </div>
       <div className="col-span-2 md:col-span-1">
+        <WhatsAppCell wa={wa} />
+      </div>
+      <div className="col-span-2 md:col-span-1">
         <FimLabel conta={conta} now={now} />
       </div>
       <div className={clsx('pv num md:text-right', pago ? 'text-fg' : 'text-fg-4')}>
         <span className="text-2xs text-fg-4 md:hidden">Já pagou </span>
         {formatMoney(pago)}
       </div>
-      <div className="text-2xs text-fg-3">{conta.ultimo_acesso ? formatRelative(conta.ultimo_acesso) : 'Nunca entrou'}</div>
+      <div className="text-2xs text-fg-3">
+        {online ? <span className="font-medium text-emerald-300">Online agora</span> : ultimo ? formatRelative(ultimo) : 'Nunca entrou'}
+      </div>
       <Button size="sm" onClick={onEditar} className="col-span-2 w-full justify-self-end md:col-span-1 md:w-[92px]">
         Gerenciar
       </Button>

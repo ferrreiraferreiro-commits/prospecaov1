@@ -30,7 +30,7 @@ const CARLA = 'cccccccc-0000-4000-8000-000000000003'
 const VENCIDA = 'dddddddd-0000-4000-8000-000000000004'
 
 const contas: Record<string, Conta> = {
-  'token-dono-aaaaaaaaaaaaaaaa': { id: DONO, usuario: 'gabriel', podeUsar: true },
+  'token-dono-aaaaaaaaaaaaaaaa': { id: DONO, usuario: 'gabriel', podeUsar: true, admin: true },
   'token-ana-aaaaaaaaaaaaaaaaa': { id: ANA, usuario: 'ana.web', podeUsar: true },
   'token-bruno-aaaaaaaaaaaaaaa': { id: BRUNO, usuario: 'bruno', podeUsar: true },
   'token-carla-aaaaaaaaaaaaaaa': { id: CARLA, usuario: 'carla', podeUsar: true },
@@ -50,7 +50,7 @@ function abrirMotor(porta: number): Promise<void> {
     recebidos.push({ porta, method: req.method!, url: req.url!, body: Buffer.concat(chunks).toString(), origin: req.headers.origin })
     res.setHeader('Content-Type', 'application/json')
     if (req.url === '/health') return res.end(JSON.stringify({ ok: true, versao: '1.4.0', computador: 'vps-123', acordado: false, whatsapp: { status: waStatus, user: null } }))
-    if (req.url === '/whatsapp/status') return res.end(JSON.stringify({ status: waStatus, qrCodeUrl: null, user: null, lastError: 'connect ECONNREFUSED 127.0.0.1:443' }))
+    if (req.url === '/whatsapp/status') return res.end(JSON.stringify({ status: waStatus, qrCodeUrl: null, user: waStatus === 'connected' ? { id: '5543999129525:7@s.whatsapp.net', name: 'Ana' } : null, lastError: 'connect ECONNREFUSED 127.0.0.1:443' }))
     if (req.url === '/whatsapp/teste') return res.writeHead(400).end(JSON.stringify({ error: 'Este número não tem WhatsApp ativo.' }))
     res.end(JSON.stringify({ ok: true, porta }))
   })
@@ -268,4 +268,23 @@ test('limparMensagem mantém textos normais (inclusive horários)', () => {
   assert.notEqual(limparMensagem('fetch failed: http://127.0.0.1:3077'), 'fetch failed: http://127.0.0.1:3077')
   assert.equal(limparMensagem(''), null)
   assert.deepEqual(ajustarResposta('/disparo/campanhas', [1, 2], principal), [1, 2])
+})
+
+test('painel: só o dono vê; mostra cada WhatsApp, o final do número e quem está com a XS aberta', async () => {
+  assert.equal((await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/painel')).status, 404)
+  waStatus = 'connected'
+  const r = await pedir('token-dono-aaaaaaaaaaaaaaaa', '/painel')
+  waStatus = 'disconnected'
+  assert.equal(r.status, 200)
+  const p = (await r.json()) as { sessoes: Record<string, any>[]; vistos: Record<string, string>; max: number }
+  const dono = p.sessoes.find((s) => s.sessao === 'principal')!
+  assert.equal(dono.fixa, true)
+  assert.equal(dono.usuario, 'gabriel')
+  assert.equal(dono.estado, 'connected')
+  assert.equal(dono.final, '9525')
+  const ana = p.sessoes.find((s) => s.conta === ANA)!
+  assert.ok(ana && !ana.fixa)
+  assert.ok(p.vistos[ANA] && p.vistos[DONO])
+  assert.equal(p.vistos[VENCIDA] !== undefined, true) // entrou, mesmo sem WhatsApp na nuvem
+  for (const s of p.sessoes) assert.ok(!('motor' in s) && !('dados' in s), 'nada de porta ou pasta')
 })

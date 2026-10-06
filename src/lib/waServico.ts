@@ -70,6 +70,36 @@ export async function waFetch<T>(path: string, init: { method?: string; json?: u
   return body
 }
 
+export interface PainelWhatsApp {
+  sessoes: {
+    sessao: string
+    fixa: boolean
+    conta: string | null
+    usuario: string | null
+    estado: WaStatus | 'desligado' | 'fora'
+    /** 4 últimos dígitos do número conectado */
+    final: string | null
+    sessaoSalva: boolean
+  }[]
+  /** user_id → último pedido ao WhatsApp da XS (o app pergunta a cada 6 s com a aba aberta) */
+  vistos: Record<string, string>
+  ligados: number
+  max: number
+}
+
+/** Só para o dono (tela Contas): o WhatsApp de cada conta e quem está com a XS aberta. */
+export async function painelWhatsApp(): Promise<PainelWhatsApp> {
+  const auth = await token()
+  let res: Response
+  try {
+    res = await fetch(`${WA_URL}/painel`, { headers: { Authorization: `Bearer ${auth}` }, signal: AbortSignal.timeout(15000) })
+  } catch {
+    throw new WaError(MSG_INDISPONIVEL, true)
+  }
+  if (!res.ok) throw new WaError(MSG_INDISPONIVEL, true)
+  return (await res.json()) as PainelWhatsApp
+}
+
 export type WaStatus = 'disconnected' | 'connecting' | 'qrcode' | 'connected'
 
 export interface WaHealth {

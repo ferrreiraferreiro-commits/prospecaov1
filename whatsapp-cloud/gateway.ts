@@ -19,6 +19,7 @@
  *
  * GET  /saude                aberto: o gateway e os Motores estão de pé?
  * GET  /acesso               esta conta usa o WhatsApp na nuvem?
+ * GET  /painel               só o dono (profiles.admin): o WhatsApp de cada conta e quem está com a XS aberta
  * *    /motor/<caminho>      repassa ao WhatsApp da conta (/health, /whatsapp/…, /disparo/…, /agenda…)
  *
  * Variáveis (arquivo /etc/xs-whatsapp/gateway.env na VPS):
@@ -106,6 +107,7 @@ export interface Perfil {
   plano?: unknown
   plano_ate?: unknown
   teste_ate?: unknown
+  admin?: unknown
 }
 
 export interface Conta {
@@ -113,6 +115,8 @@ export interface Conta {
   usuario: string | null
   /** Plano em dia e com o recurso do Motor (pode ganhar sessão automática) */
   podeUsar: boolean
+  /** Dono da XS (profiles.admin): vê o painel */
+  admin?: boolean
 }
 
 /** Mesma regra do app (src/store/useAccount.ts → accessOf) + o recurso "motor". */
@@ -169,6 +173,10 @@ let controle: Controle = { ligar: (n) => systemctl('start', n), desligar: (n) =>
 const ligados = new Set<string>()
 /** Último pedido de cada sessão */
 const ultimoUso = new Map<string, number>()
+/** Último pedido de cada conta (id → quando). O app pergunta a cada 6 s com a aba aberta: é o "online". */
+const vistoConta = new Map<string, number>()
+/** Conta que usou cada sessão por último (as fixas são configuradas pelo usuário de login, não pelo id) */
+const contaDaSessao = new Map<string, string>()
 const ligando = new Map<string, Promise<void>>()
 let fila: Promise<unknown> = Promise.resolve()
 
@@ -308,13 +316,13 @@ async function verificarNoSupabase(token: string): Promise<Conta | null> {
   const user = (await res.json()) as { id?: unknown }
   if (typeof user.id !== 'string' || !UUID_OK.test(user.id)) return null
   // O próprio perfil, lido com o login da pessoa (a regra do banco só deixa cada um ler o seu)
-  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=usuario,recursos,plano,plano_ate,teste_ate&user_id=eq.${user.id}`, {
+  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=usuario,recursos,plano,plano_ate,teste_ate,admin&user_id=eq.${user.id}`, {
     headers,
     signal: AbortSignal.timeout(8000),
   })
   if (!perfil.ok) throw new Error(`supabase perfil ${perfil.status}`)
   const [p] = (await perfil.json()) as Perfil[]
-  return { id: user.id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p) }
+  return { id: user.id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p), admin: p?.admin === true }
 }
 
 let verificar: Verificador = verificarNoSupabase
@@ -436,6 +444,70 @@ async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: 
   }
 }
 
+// ---------------------------------------------------------------- painel do dono
+
+export type EstadoPainel = 'connected' | 'qrcode' | 'connecting' | 'disconnected' | 'desligado' | 'fora'
+
+export interface LinhaPainel {
+  sessao: string
+  fixa: boolean
+  /** Id da conta (quando se sabe) e o usuário de login configurado na sessão fixa */
+  conta: string | null
+  usuario: string | null
+  estado: EstadoPainel
+  /** Só os 4 últimos dígitos do número conectado */
+  final: string | null
+  sessaoSalva: boolean
+}
+
+export interface Painel {
+  sessoes: LinhaPainel[]
+  /** Conta → último pedido (ISO), só desde que o gateway ligou */
+  vistos: Record<string, string>
+  ligados: number
+  max: number
+}
+
+/** O WhatsApp de cada sessão. Não conta como uso: não segura Motor ligado nem liga Motor desligado. */
+export async function montarPainel(): Promise<Painel> {
+  const chaveFixa = new Map([...usuarios].map(([conta, nome]) => [nome, conta]))
+  const donoDe = new Map(Object.entries(registro).map(([id, r]) => [r.nome, id]))
+  const todas = [
+    ...fixas.values(),
+    ...Object.values(registro)
+      .filter((r) => NOME_OK.test(r.nome))
+      .map((r) => sessao(r.nome, r.porta, false)),
+  ]
+  const sessoes = await Promise.all(
+    todas.map(async (s): Promise<LinhaPainel> => {
+      const chave = s.fixa ? (chaveFixa.get(s.nome) ?? null) : null
+      const linha: LinhaPainel = {
+        sessao: s.nome,
+        fixa: s.fixa,
+        conta: donoDe.get(s.nome) ?? contaDaSessao.get(s.nome) ?? (chave && UUID_OK.test(chave) ? chave : null),
+        usuario: chave && !UUID_OK.test(chave) ? chave : null,
+        estado: 'desligado',
+        final: null,
+        sessaoSalva: credsSalvas(s),
+      }
+      if (!s.fixa && !ligados.has(s.nome)) return linha
+      try {
+        const b = (await chamarMotor(s, 'GET', '/whatsapp/status', undefined, 3000)).body as { status?: unknown; user?: { id?: unknown } | null } | null
+        const st = b?.status
+        linha.estado = st === 'connected' || st === 'qrcode' || st === 'connecting' || st === 'disconnected' ? st : 'fora'
+        const id = typeof b?.user?.id === 'string' ? b.user.id.split(/[:@]/)[0].replace(/\D/g, '') : ''
+        if (linha.estado === 'connected' && id.length >= 4) linha.final = id.slice(-4)
+      } catch {
+        linha.estado = 'fora'
+      }
+      return linha
+    }),
+  )
+  const vistos: Record<string, string> = {}
+  for (const [id, em] of vistoConta) vistos[id] = new Date(em).toISOString()
+  return { sessoes, vistos, ligados: ligados.size, max: MAX_AUTO }
+}
+
 // ---------------------------------------------------------------- vigia (reconexão automática)
 
 const ultimaReconexao = new Map<string, number>()
@@ -518,7 +590,10 @@ export const server = http.createServer(async (req, res) => {
       falhasPorIp.set(ip, (falhasPorIp.get(ip) ?? 0) + 1)
       return send(res, 401, { error: 'Entre na sua conta da XS de novo.' })
     }
+    vistoConta.set(conta.id, Date.now())
+    if (url.pathname === '/painel') return conta.admin ? send(res, 200, await montarPainel()) : send(res, 404, { error: 'Não encontrado.' })
     const s = await sessaoDa(conta)
+    if (s) contaDaSessao.set(s.nome, conta.id)
 
     if (url.pathname === '/acesso') return send(res, s ? 200 : 403, { permitido: !!s })
     if (!s) return send(res, 403, { error: 'Sua conta não usa o WhatsApp na nuvem.' })
@@ -529,7 +604,7 @@ export const server = http.createServer(async (req, res) => {
   } finally {
     // Sem token, sem corpo e sem mensagens: só o caminho, o resultado e de quem foi
     const caminho = (req.url ?? '').split('?')[0]
-    if (caminho !== '/saude' && !caminho.endsWith('/health') && !caminho.endsWith('/whatsapp/status'))
+    if (caminho !== '/saude' && caminho !== '/painel' && !caminho.endsWith('/health') && !caminho.endsWith('/whatsapp/status'))
       log(`${req.method} ${caminho} → ${res.statusCode} ${Date.now() - inicio}ms${conta ? ` conta ${conta.id.slice(0, 8)}` : ''}`)
   }
 })
