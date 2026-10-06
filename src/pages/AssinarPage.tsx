@@ -78,7 +78,7 @@ export function AssinarPage({ logado }: { logado: boolean }) {
           </a>
         )}
         <p className="mt-3 flex items-center justify-center gap-1.5 text-2xs text-fg-3">
-          <ShieldCheck className="size-3.5" aria-hidden /> Pagamento seguro pela SigiloPay · 7 dias de garantia
+          <ShieldCheck className="size-3.5" aria-hidden /> Pagamento seguro
         </p>
       </div>
     </div>
