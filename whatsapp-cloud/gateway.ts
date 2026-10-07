@@ -405,7 +405,16 @@ export function ajustarResposta(caminho: string, body: unknown, s: Sessao): unkn
 
 // ---------------------------------------------------------------- Motor
 
-const CAMINHO_OK = /^\/(health|whatsapp\/(status|conectar|desconectar|teste)|disparo\/[A-Za-z0-9/_-]{1,120}|agenda(\/[A-Za-z0-9/_-]{1,120})?)$/
+const CAMINHO_OK = /^\/(health|whatsapp\/(status|conectar|desconectar|teste)|disparo\/[A-Za-z0-9/_-]{1,120}|agenda(\/[A-Za-z0-9/_-]{1,120})?|conversas(\/\d{8,15}(\/(enviar|lidas))?)?)$/
+
+/** Ler as conversas (a tela fica conferindo) não liga Motor de ninguém nem conta como uso. */
+function leituraDeConversa(method: string, caminho: string): boolean {
+  return method === 'GET' && (caminho === '/conversas' || caminho.startsWith('/conversas/'))
+}
+
+function semConversas(caminho: string): unknown {
+  return caminho === '/conversas' ? { versao: 0, conversas: [] } : { versao: 0, telefone: caminho.split('/')[2] ?? '', nome: null, naoLidas: 0, msgs: [] }
+}
 const METODOS = new Set(['GET', 'POST', 'DELETE'])
 
 /** Última vez que alguém olhou a tela de conexão de cada sessão (para não deixar QR Code girando à toa) */
@@ -442,8 +451,10 @@ async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: 
   const leitura = method === 'GET' && Object.hasOwn(SEM_WHATSAPP, caminho)
   // Só olhar o status não liga o Motor de ninguém: quem nunca conectou (ou desconectou) não ocupa vaga
   if (leitura && !s.fixa && !ligados.has(s.nome) && !credsSalvas(s)) return send(res, 200, SEM_WHATSAPP[caminho])
-  // O status que o app confere sozinho (/health) não conta como uso; a tela de conexão aberta conta
-  if (caminho !== '/health') ultimoUso.set(s.nome, Date.now())
+  const conversa = leituraDeConversa(method, caminho)
+  if (conversa && !s.fixa && !ligados.has(s.nome) && !credsSalvas(s)) return send(res, 200, semConversas(caminho))
+  // O status que o app confere sozinho (/health) e as conversas não contam como uso; a tela de conexão aberta conta
+  if (caminho !== '/health' && !conversa) ultimoUso.set(s.nome, Date.now())
   if (caminho.startsWith('/whatsapp/')) vistoEm.set(s.nome, Date.now())
   try {
     await garantirMotor(s)

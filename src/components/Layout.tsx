@@ -14,6 +14,7 @@ import {
   LayoutList,
   MapPinned,
   Menu,
+  MessageCircle,
   PlayCircle,
   MessagesSquare,
   ScrollText,
@@ -80,6 +81,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'WhatsApp',
     items: [
+      { to: '/conversas', label: 'Conversas', icon: MessageCircle, whatsapp: true },
       { to: '/disparo', label: 'Disparo', icon: Send, whatsapp: true },
       { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
       { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },

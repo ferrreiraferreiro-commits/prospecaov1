@@ -57,6 +57,7 @@ function lazyPage<T extends ComponentType>(load: () => Promise<{ default: T }>) 
 
 // Telas carregadas sob demanda (o mapa e a gestão não pesam na abertura do app)
 const ClientesPage = lazyPage(() => import('./pages/ClientesPage').then((m) => ({ default: m.ClientesPage })))
+const ConversasPage = lazyPage(() => import('./pages/ConversasPage').then((m) => ({ default: m.ConversasPage })))
 const DisparoPage = lazyPage(() => import('./pages/DisparoPage').then((m) => ({ default: m.DisparoPage })))
 const FinanceiroPage = lazyPage(() => import('./pages/FinanceiroPage').then((m) => ({ default: m.FinanceiroPage })))
 const FunisPage = lazyPage(() => import('./pages/FunisPage').then((m) => ({ default: m.FunisPage })))
@@ -106,6 +107,7 @@ function Routed() {
           <Route path="roteiros" element={<RoteirosPage />} />
           <Route path="maps" element={<MapsPage />} />
           <Route path="mensagens" element={<MensagensPage />} />
+          <Route path="conversas" element={m(<ConversasPage />)} />
           <Route path="funis" element={m(<FunisPage />)} />
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />

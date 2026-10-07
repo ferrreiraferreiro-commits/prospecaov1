@@ -40,7 +40,23 @@ const onConnected = new Set<Listener<[]>>()
 const onRisk = new Set<Listener<[{ statusCode?: number; reason: string }]>>()
 const onReceipt = new Set<Listener<[string, ReceiptStatus]>>()
 const onIncoming = new Set<Listener<[string, string]>>()
+const onMessage = new Set<Listener<[WaMessage]>>()
 const recentReceipts = new Map<string, ReceiptStatus>()
+
+/** Mensagem de uma conversa individual (enviada ou recebida), para a tela Conversas. */
+export interface WaMessage {
+  id: string
+  /** Só dígitos, com 55 */
+  telefone: string
+  jid: string
+  deMim: boolean
+  message: Record<string, any> | null | undefined
+  /** Segundos desde 1970 (hora do WhatsApp) */
+  em: number
+  nome: string | null
+  /** 'notify' = chegou agora; 'append' = cópia de algo enviado por esta sessão ou recuperado */
+  tipo: string
+}
 
 function emit<A extends unknown[]>(set: Set<Listener<A>>, ...args: A) {
   for (const l of set) Promise.resolve(l(...args)).catch((err) => console.error('[whatsapp] listener falhou:', err))
@@ -51,6 +67,7 @@ export const waEvents = {
   risk: (l: Listener<[{ statusCode?: number; reason: string }]>) => (onRisk.add(l), () => onRisk.delete(l)),
   receipt: (l: Listener<[string, ReceiptStatus]>) => (onReceipt.add(l), () => onReceipt.delete(l)),
   incoming: (l: Listener<[string, string]>) => (onIncoming.add(l), () => onIncoming.delete(l)),
+  message: (l: Listener<[WaMessage]>) => (onMessage.add(l), () => onMessage.delete(l)),
 }
 
 export function getWa() {
@@ -154,9 +171,11 @@ export async function connect(): Promise<void> {
       s.ev.on('messages.upsert', async (m) => {
         if (gen !== generation || !Array.isArray(m?.messages)) return
         for (const msg of m.messages) {
-          if (msg.key.fromMe) continue
           const key = msg.key as typeof msg.key & { participantAlt?: string; remoteJidAlt?: string }
-          let jid = phoneJid(key.participantAlt, key.remoteJidAlt, key.participant, key.remoteJid)
+          // Grupos, status e canais não entram nas conversas (as respostas continuam valendo como antes)
+          const individual = !!key.remoteJid && !/@(g\.us|broadcast|newsletter)$/.test(key.remoteJid)
+          if (msg.key.fromMe && !individual) continue
+          let jid = msg.key.fromMe ? phoneJid(key.remoteJidAlt, key.remoteJid) : phoneJid(key.participantAlt, key.remoteJidAlt, key.participant, key.remoteJid)
           if (!jid && key.remoteJid?.endsWith('@lid')) {
             try {
               const pn = await (s as any).signalRepository?.lidMapping?.getPNForLID(key.remoteJid)
@@ -166,7 +185,21 @@ export async function connect(): Promise<void> {
             }
           }
           if (!jid) continue
-          emit(onIncoming, jid.split('@')[0].split(':')[0], extractText(msg.message as Record<string, any>))
+          const telefone = jid.split('@')[0].split(':')[0]
+          if (individual && key.id) {
+            emit(onMessage, {
+              id: key.id,
+              telefone,
+              jid: key.remoteJid!,
+              deMim: !!msg.key.fromMe,
+              message: msg.message as Record<string, any> | null | undefined,
+              em: Number(msg.messageTimestamp) || Math.floor(Date.now() / 1000),
+              nome: msg.key.fromMe ? null : msg.pushName || null,
+              tipo: m.type,
+            })
+          }
+          if (msg.key.fromMe) continue
+          emit(onIncoming, telefone, extractText(msg.message as Record<string, any>))
         }
       })
 

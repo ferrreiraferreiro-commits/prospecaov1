@@ -5,12 +5,13 @@
  * quem fala com ele é o gateway (whatsapp-cloud/gateway.ts), que confere o login da pessoa.
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
+import { abrirConversa, enviarNaConversa, listarConversas, marcarLidas } from './conversas.js'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
 import { createCampaign, deleteCampaign, getCampaign, listCampaigns, markSynced, pauseCampaign, runningCount, sentPhones, startCampaign, summary } from './disparo.js'
 import { storageDir } from './store.js'
 import { connect, disconnect, getWa, resumeStoredSession, sendText, shutdown } from './whatsapp.js'
 
-const VERSION = '2.0.0'
+const VERSION = '2.1.0'
 const PORT = Number(process.env.XS_PORT ?? 3077)
 
 const app = express()
@@ -90,6 +91,12 @@ app.post('/agenda/:id/editar', wrap((req) => updateAgenda(String(req.params.id),
 app.post('/agenda/:id/cancelar', wrap((req) => cancelAgenda(String(req.params.id))))
 app.delete('/agenda/:id', wrap((req) => deleteAgenda(String(req.params.id))))
 app.post('/agenda/sincronizado', wrap((req) => markAgendaSynced(Array.isArray(req.body?.itens) ? req.body.itens : [])))
+
+// ---------------------------------------------------------------- Conversas (só texto)
+app.get('/conversas', wrap(() => listarConversas()))
+app.get('/conversas/:telefone', wrap((req) => abrirConversa(String(req.params.telefone))))
+app.post('/conversas/:telefone/enviar', wrap((req) => enviarNaConversa(String(req.params.telefone), String(req.body?.texto ?? ''))))
+app.post('/conversas/:telefone/lidas', wrap((req) => marcarLidas(String(req.params.telefone))))
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(400).json({ error: err?.message || 'Erro no WhatsApp da XS.' })

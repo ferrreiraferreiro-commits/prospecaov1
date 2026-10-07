@@ -147,6 +147,24 @@
   .panel {
     @apply rounded-[10px] border border-line-soft bg-panel;
   }
+  /* Tela Conversas: fundo com pontinhos discretos e a bolha das mensagens enviadas */
+  .chat-fundo {
+    background-color: var(--color-ink);
+    background-image: radial-gradient(rgb(255 255 255 / 0.028) 1px, transparent 1.2px);
+    background-size: 18px 18px;
+  }
+  .bolha-minha {
+    background: #12233a;
+    border: 1px solid rgb(91 141 239 / 0.22);
+  }
+}
+
+:root[data-theme='light'] .chat-fundo {
+  background-image: radial-gradient(rgb(0 0 0 / 0.05) 1px, transparent 1.2px);
+}
+:root[data-theme='light'] .bolha-minha {
+  background: #e4edfd;
+  border-color: #c9d9f8;
 }
 
 @media (prefers-reduced-motion: reduce) {
