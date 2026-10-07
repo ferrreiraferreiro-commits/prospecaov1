@@ -76,6 +76,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
       { to: '/maps', label: 'Buscar empresas', icon: MapPinned },
+      { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
     ],
   },
   {
@@ -85,7 +86,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/disparo', label: 'Disparo', icon: Send, whatsapp: true },
       { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
       { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },
-      { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
       { to: '/whatsapp', label: 'Conexão', icon: Smartphone, whatsapp: true },
     ],
   },
