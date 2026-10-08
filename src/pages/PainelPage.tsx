@@ -22,7 +22,7 @@ import { Avatar } from '../components/Avatar'
 import { Progress } from '../components/ui'
 import { monthKey, PROJECT_STATUS, projectProgress, summarize } from '../lib/biz'
 import { formatDayLabel, formatLongToday, periodoLabel } from '../lib/dates'
-import { formatMoney } from '../lib/insights'
+import { contactByHour, formatMoney, MIN_SAMPLE, rate } from '../lib/insights'
 import { saudacao } from '../lib/messages'
 import { useWaServico } from '../lib/waServico'
 import { useHasWhatsApp } from '../store/useAccount'
@@ -66,6 +66,17 @@ export function PainelPage() {
     () => buildTodayPlan(leads, interactions, index, meetings, today, settings.max_tentativas),
     [leads, interactions, index, meetings, today, settings.max_tentativas],
   )
+  // Faixa de horário em que mais gente atende (últimos 60 dias, com amostra mínima)
+  const melhorHora = useMemo(() => {
+    const desde = new Date(Date.now() - 60 * 86_400_000).toISOString()
+    const { byHour } = contactByHour(interactions, desde)
+    let best: { hora: number; taxa: number } | null = null
+    byHour.forEach((c, i) => {
+      const r = rate(c)
+      if (r !== null && c.ligacoes >= MIN_SAMPLE * 2 && (!best || r > best.taxa)) best = { hora: 8 + i, taxa: r }
+    })
+    return best as { hora: number; taxa: number } | null
+  }, [interactions])
   const fin = useMemo(() => summarize(transactions, payments, today.slice(0, 7)), [transactions, payments, today])
   const ativos = projects.filter((p) => ['planejamento', 'em_andamento', 'revisao'].includes(p.status))
   const clientesAtivos = clients.filter((c) => !c.arquivado)
@@ -98,7 +109,15 @@ export function PainelPage() {
               {saudacao()}
               {nome ? `, ${nome}` : ''}
             </h1>
-            <p className="mt-0.5 text-xs text-fg-3 first-letter:uppercase">{formatLongToday()}</p>
+            <p className="mt-0.5 text-xs text-fg-3 first-letter:uppercase">
+              {formatLongToday()}
+              {melhorHora && (
+                <span className="text-fg-4">
+                  {' '}
+                  · mais gente atende às {melhorHora.hora}h ({Math.round(melhorHora.taxa * 100)}%)
+                </span>
+              )}
+            </p>
           </div>
         </div>
         <button
