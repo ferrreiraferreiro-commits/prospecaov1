@@ -22,7 +22,8 @@ export class ErroIA extends Error {
 let cliente: Anthropic | null = null
 let chaveAtual = ''
 
-function api(chave: string): Anthropic {
+/** Cliente da API para a chave atual (reaproveitado entre as chamadas). */
+export function api(chave: string): Anthropic {
   if (!cliente || chave !== chaveAtual) {
     cliente = new Anthropic({ apiKey: chave, maxRetries: 2, timeout: 90_000 })
     chaveAtual = chave
@@ -39,7 +40,7 @@ export async function testarChave(chave: string, modelo: Modelo): Promise<void> 
   }
 }
 
-function traduzir(err: unknown): ErroIA {
+export function traduzir(err: unknown): ErroIA {
   if (err instanceof ErroIA) return err
   if (err instanceof Anthropic.AuthenticationError) return new ErroIA('A chave da API foi recusada. Confira se copiou a chave inteira.', true)
   if (err instanceof Anthropic.PermissionDeniedError) return new ErroIA('A chave da API não tem permissão para este modelo.', true)

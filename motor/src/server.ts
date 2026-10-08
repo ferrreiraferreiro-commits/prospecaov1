@@ -6,6 +6,7 @@
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
 import * as agente from './agente/agente.js'
+import * as xico from './agente/xico.js'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
 import { createCampaign, deleteCampaign, getCampaign, listCampaigns, markSynced, pauseCampaign, runningCount, sentPhones, startCampaign, summary } from './disparo.js'
 import { storageDir } from './store.js'
@@ -137,6 +138,15 @@ app.post(
 app.get('/agente/sinc', wrap(soAgente(() => agente.pendentesSinc())))
 app.post('/agente/sinc', wrap(soAgente((req) => agente.marcarSinc(req.body?.itens ?? []))))
 app.post('/agente/conhecidos', wrap(soAgente((req) => agente.definirConhecidos(req.body?.telefones))))
+
+// Xico, o assistente do dono (mesma sessão e mesma chave do Agente IA)
+app.get('/agente/xico', wrap(soAgente(() => xico.ver())))
+app.post('/agente/xico/abrir', wrap(soAgente(() => xico.abrir())))
+app.post('/agente/xico/mensagem', wrap(soAgente((req) => xico.mensagem(String(req.body?.texto ?? '')))))
+app.post('/agente/xico/app', wrap(soAgente((req) => xico.responderApp(req.body?.resultados ?? []))))
+app.post('/agente/xico/propostas/:id', wrap(soAgente((req) => xico.decidir(id(req), req.body?.aceitar === true))))
+app.delete('/agente/xico/memoria/:id', wrap(soAgente((req) => xico.apagarLembranca(id(req)))))
+app.post('/agente/xico/recomecar', wrap(soAgente(() => xico.recomecar())))
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(400).json({ error: err?.message || 'Erro no WhatsApp da XS.' })

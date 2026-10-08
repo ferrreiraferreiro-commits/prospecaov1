@@ -38,7 +38,7 @@ export function AgentePage() {
   if (!dados.estado || !dados.config) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Agente IA" />
+        <PageHeader title="Vendedor no WhatsApp" />
         {dados.erro ? (
           <Empty icon={<Bot />} title="Agente indisponível agora">
             {dados.erro}
@@ -68,7 +68,7 @@ export function AgentePage() {
       <PageHeader
         title={
           <span className="flex items-center gap-2.5">
-            Agente IA
+            Vendedor no WhatsApp
             <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium ring-1 ring-inset', trabalhando ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/25' : 'bg-tint/[0.04] text-fg-3 ring-line')}>
               <span className={clsx('size-1.5 rounded-full', trabalhando ? 'animate-pulse bg-go' : 'bg-fg-4')} />
               {trabalhando ? 'Trabalhando' : e.ativo ? 'Ligado, parado' : 'Desligado'}

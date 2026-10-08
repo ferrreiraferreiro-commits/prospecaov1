@@ -132,7 +132,9 @@ function Detalhe({ id, voltar, mudou }: { id: string; voltar: () => void; mudou:
     const t = setInterval(() => document.visibilityState === 'visible' && void carregar(), 8000)
     return () => clearInterval(t)
   }, [carregar])
-  useEffect(() => fim.current?.scrollIntoView({ block: 'end' }), [total])
+  useEffect(() => {
+    fim.current?.scrollIntoView({ block: 'end' })
+  }, [total])
 
   async function acao(nome: string, fn: () => Promise<Conversa>, aviso?: string) {
     setBusy(nome)

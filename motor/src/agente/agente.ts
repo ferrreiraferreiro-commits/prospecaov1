@@ -65,6 +65,13 @@ function registrar(tipo: Atividade['tipo'], texto: string, conversa?: string) {
 
 const ctx = (): ia.Contexto => ({ chave, cfg: db.config, licoes: db.licoes })
 
+/** Para o Xico (o assistente do dono): a mesma chave e o mesmo caixa de gasto do dia. */
+export const chaveDaApi = () => chave
+export function registrarGasto(custo: number) {
+  hoje().custoUSD += custo
+  salvar()
+}
+
 /** Chama a IA, conta o gasto e transforma falha em registro (devolve null). */
 async function comIA<T>(fn: () => Promise<{ dados: T; uso: ia.Uso }>, oQue: string): Promise<T | null> {
   try {

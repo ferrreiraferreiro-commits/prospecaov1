@@ -62,6 +62,13 @@ interface NavItem {
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
+    title: 'Assistente',
+    items: [
+      { to: '/xico', label: 'Xico', icon: Sparkles, whatsapp: true, dono: true },
+      { to: '/agente', label: 'Vendedor no WhatsApp', icon: Bot, whatsapp: true, dono: true },
+    ],
+  },
+  {
     title: 'Gestão',
     items: [
       { to: '/clientes', label: 'Clientes', icon: Users },
@@ -83,7 +90,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'WhatsApp',
     items: [
-      { to: '/agente', label: 'Agente IA', icon: Bot, whatsapp: true, dono: true },
       { to: '/disparo', label: 'Disparo', icon: Send, whatsapp: true },
       { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
       { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },
