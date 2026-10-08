@@ -6,6 +6,7 @@
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
 import * as agente from './agente/agente.js'
+import * as conector from './agente/conector.js'
 import * as xico from './agente/xico.js'
 import { abrirConversa, enviarNaConversa, listarConversas, marcarLidas } from './conversas.js'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
@@ -154,6 +155,10 @@ app.delete('/agente/xico/sites/:id', wrap(soAgente((req) => xico.apagarPrompt(id
 app.get('/agente/testes', wrap(soAgente(() => agente.listarTestes())))
 app.post('/agente/testes/:id', wrap(soAgente((req) => agente.mudarTeste(id(req), req.body ?? {}))))
 app.get('/agente/ramos', wrap(soAgente(() => agente.numerosPorRamo())))
+
+// Conector da XS para o Claude (MCP). A chave pessoal é conferida dentro dele (o gateway não confere login aqui).
+app.post('/mcp', (req, res, next) => void conector.atender(req, res).catch(next))
+app.all('/mcp', (_req, res) => void res.status(405).set('Allow', 'POST').json({ error: 'Use POST.' }))
 
 // ---------------------------------------------------------------- Conversas (só texto)
 app.get('/conversas', wrap(() => listarConversas()))

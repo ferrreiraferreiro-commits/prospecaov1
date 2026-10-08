@@ -890,6 +890,31 @@ export function verPrompt(id: string) {
   return p
 }
 
+/** Prompt de site escrito fora (ex.: pelo Claude Code, pelo conector): entra na lista, como versão nova se tiver base. */
+export function salvarPromptSite(entrada: { empresa?: unknown; texto?: unknown; base?: unknown; ajustes?: unknown }) {
+  const textoPrompt = texto(entrada.texto, 120_000)
+  if (textoPrompt.length < 50) throw new Error('O prompt está vazio ou curto demais.')
+  const base = entrada.base ? d.prompts.find((p) => p.id === texto(entrada.base, 60)) : undefined
+  if (entrada.base && !base) throw new Error('Não achei o prompt base.')
+  const empresa = texto(entrada.empresa, 120) || base?.empresa
+  if (!empresa) throw new Error('Diga de qual empresa é o site.')
+  const p: PromptSite = {
+    id: randomUUID().slice(0, 8),
+    empresa,
+    versao: base ? Math.max(...d.prompts.filter((x) => x.origem === base.origem).map((x) => x.versao)) + 1 : 1,
+    origem: base?.origem ?? '',
+    dados: base?.dados ?? { empresa },
+    ajustes: texto(entrada.ajustes, 3000) || 'Escrito no Claude',
+    texto: textoPrompt,
+    incompleto: false,
+    em: iso(),
+  }
+  if (!p.origem) p.origem = p.id
+  d.prompts.push(p)
+  salvar()
+  return { id: p.id, empresa: p.empresa, versao: p.versao }
+}
+
 export function apagarPrompt(id: string) {
   d.prompts = d.prompts.filter((x) => x.id !== id)
   salvar()

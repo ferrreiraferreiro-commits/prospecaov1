@@ -40,7 +40,7 @@ const contas: Record<string, Conta> = {
 }
 
 /** Motores de mentira: cada um guarda o que recebeu, como o de verdade */
-type Recebido = { porta: number; method: string; url: string; body: string; origin?: string }
+type Recebido = { porta: number; method: string; url: string; body: string; origin?: string; auth?: string }
 const recebidos: Recebido[] = []
 let waStatus = 'disconnected'
 const motores = new Map<number, http.Server>()
@@ -49,7 +49,8 @@ function abrirMotor(porta: number): Promise<void> {
   const m = http.createServer(async (req, res) => {
     const chunks: Buffer[] = []
     for await (const c of req) chunks.push(c as Buffer)
-    recebidos.push({ porta, method: req.method!, url: req.url!, body: Buffer.concat(chunks).toString(), origin: req.headers.origin })
+    recebidos.push({ porta, method: req.method!, url: req.url!, body: Buffer.concat(chunks).toString(), origin: req.headers.origin, auth: req.headers.authorization })
+    if (req.url === '/mcp') return res.writeHead(req.headers.authorization === 'Bearer xs_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ? 200 : 401, { 'content-type': 'application/json' }).end('{"jsonrpc":"2.0"}')
     res.setHeader('Content-Type', 'application/json')
     if (req.url === '/health') return res.end(JSON.stringify({ ok: true, versao: '1.4.0', computador: 'vps-123', acordado: false, whatsapp: { status: waStatus, user: null } }))
     if (req.url === '/whatsapp/status') return res.end(JSON.stringify({ status: waStatus, qrCodeUrl: null, user: waStatus === 'connected' ? { id: '5543999129525:7@s.whatsapp.net', name: 'Ana' } : null, lastError: 'connect ECONNREFUSED 127.0.0.1:443' }))
@@ -143,6 +144,19 @@ test('sem login ou com login errado: 401, e nenhum motor é chamado', async () =
   assert.equal((await fetch(`${base}/motor/health`)).status, 401)
   assert.equal((await pedir('token-invalido-aaaaaaaaaaaa', '/motor/health')).status, 401)
   assert.equal(recebidos.length, antes)
+})
+
+test('conector do Claude (/mcp): vai direto para o WhatsApp do dono, com a chave pessoal e sem login do Supabase', async () => {
+  const boa = await fetch(`${base}/mcp`, { method: 'POST', headers: { Authorization: 'Bearer xs_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' })
+  assert.equal(boa.status, 200)
+  assert.equal(await boa.text(), '{"jsonrpc":"2.0"}')
+  const r = recebidos.at(-1)!
+  assert.equal(r.url, '/mcp')
+  assert.equal(r.porta, portaPrincipal)
+  assert.equal(r.auth, 'Bearer xs_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+  assert.match(r.body, /tools\/list/)
+  const ruim = await fetch(`${base}/mcp`, { method: 'POST', headers: { Authorization: 'Bearer xs_errada', 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(ruim.status, 401)
 })
 
 test('origem estranha é recusada mesmo com login', async () => {

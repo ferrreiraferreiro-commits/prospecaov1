@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { ArrowRight, Check, Copy, Download, FileText, Globe, KeyRound, LoaderCircle, MessageSquarePlus, Send, Sparkles, X } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { ConectorClaude } from '../components/agente/ConectorClaude'
 import { Card } from '../components/kit'
 import { Button, Modal, Spinner } from '../components/ui'
 import { ag, type EstadoAgente } from '../lib/agente'
@@ -206,6 +207,7 @@ export function XicoPage() {
       <aside className="min-w-0 space-y-4">
         <Propostas s={s} setS={setS} />
         <LevarParaClaude s={s} setS={setS} />
+        <ConectorClaude />
         <Vendedor />
         <Memoria s={s} setS={setS} />
       </aside>

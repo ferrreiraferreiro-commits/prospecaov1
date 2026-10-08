@@ -100,6 +100,8 @@ if [ -f /etc/xs-busca.env ] && ! grep -q '^XS_BUSCA_TOKEN=' "$CONF/motor-$SESSAO
   grep '^XS_BUSCA_TOKEN=' /etc/xs-busca.env >> "$CONF/motor-$SESSAO.env"
   echo "XS_BUSCA_URL=http://127.0.0.1:8091" >> "$CONF/motor-$SESSAO.env"
 fi
+# Conector do Claude (MCP): o Motor do dono confere a chave pessoal e lê o CRM pelo Supabase (chave pública)
+grep -q '^SUPABASE_URL=' "$CONF/motor-$SESSAO.env" || grep -E '^SUPABASE_(URL|ANON_KEY)=' "$CONF/gateway.env" >> "$CONF/motor-$SESSAO.env"
 chmod 600 "$CONF/motor-$SESSAO.env"
 
 echo "== Serviços (sobem sozinhos com a VPS e reiniciam se cair)"

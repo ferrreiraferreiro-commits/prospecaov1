@@ -477,6 +477,40 @@ async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: 
   }
 }
 
+// ---------------------------------------------------------------- conector do Claude (MCP)
+
+const CABECALHOS_MCP = ['content-type', 'accept', 'authorization', 'mcp-protocol-version', 'mcp-session-id', 'last-event-id']
+
+/**
+ * POST /mcp → Motor do dono (a primeira sessão fixa, "principal"). Não confere login do Supabase: quem
+ * confere é o Motor, pela chave pessoal. Chave recusada conta como tentativa errada do endereço.
+ */
+async function conectorMcp(req: http.IncomingMessage, res: http.ServerResponse, ip: string) {
+  const s = [...fixas.values()][0]
+  if (!s) return send(res, 404, { error: 'Não encontrado.' })
+  const method = (req.method ?? 'GET').toUpperCase()
+  const corpo = method === 'POST' ? await lerCorpo(req) : undefined
+  const headers: Record<string, string> = {}
+  for (const h of CABECALHOS_MCP) {
+    const v = req.headers[h]
+    if (typeof v === 'string') headers[h] = v
+  }
+  let r: Response
+  try {
+    r = await fetch(`${s.motor}/mcp`, { method, headers, body: corpo?.length ? corpo : undefined, signal: AbortSignal.timeout(TEMPO_MOTOR_MS) })
+  } catch {
+    return send(res, 503, { error: MSG_INDISPONIVEL })
+  }
+  if (r.status === 401) falhasPorIp.set(ip, (falhasPorIp.get(ip) ?? 0) + 1)
+  const saida: Record<string, string> = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
+  for (const h of ['content-type', 'mcp-session-id', 'allow']) {
+    const v = r.headers.get(h)
+    if (v) saida[h] = v
+  }
+  res.writeHead(r.status, saida)
+  res.end(Buffer.from(await r.arrayBuffer()))
+}
+
 // ---------------------------------------------------------------- painel do dono
 
 export type EstadoPainel = 'connected' | 'qrcode' | 'connecting' | 'disconnected' | 'desligado' | 'fora'
@@ -610,6 +644,8 @@ export const server = http.createServer(async (req, res) => {
 
     const ip = ipDe(req)
     if ((falhasPorIp.get(ip) ?? 0) >= MAX_FALHAS) return send(res, 429, { error: 'Muitas tentativas. Aguarde alguns minutos.' })
+    // Conector do Claude (MCP): vai para o WhatsApp do dono, que confere a chave pessoal (xs_…)
+    if (url.pathname === '/mcp') return await conectorMcp(req, res, ip)
     const token = /^Bearer (\S{20,4096})$/.exec(String(req.headers.authorization ?? ''))?.[1]
     try {
       conta = token ? await quemE(token) : null
