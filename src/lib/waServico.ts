@@ -125,6 +125,8 @@ export interface WaHealth {
   whatsapp: { status: WaStatus; user: { id: string; name: string } | null; sessaoSalva?: boolean }
   disparo: { running: number }
   agenda?: { pendentes: number }
+  /** Só no WhatsApp do dono: o Agente IA existe ali */
+  agente?: { ativo: boolean }
 }
 
 export interface WaInfo {

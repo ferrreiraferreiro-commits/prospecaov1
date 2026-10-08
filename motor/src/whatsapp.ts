@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import makeWASocket, { DisconnectReason, useMultiFileAuthState, type WASocket } from '@whiskeysockets/baileys'
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, type WAMessageKey, type WASocket } from '@whiskeysockets/baileys'
 import pino from 'pino'
 import QRCode from 'qrcode'
 import { storageDir } from './store.js'
@@ -35,12 +35,29 @@ let initPromise: Promise<void> | null = null
 let reconnectTimer: NodeJS.Timeout | null = null
 let lastError: string | null = null
 
+/** Detalhes de uma mensagem recebida: a chave (para marcar como lida) e se veio de um grupo. */
+export interface IncomingInfo {
+  key: WAMessageKey
+  grupo: boolean
+}
+
 type Listener<A extends unknown[]> = (...args: A) => void | Promise<void>
 const onConnected = new Set<Listener<[]>>()
 const onRisk = new Set<Listener<[{ statusCode?: number; reason: string }]>>()
 const onReceipt = new Set<Listener<[string, ReceiptStatus]>>()
-const onIncoming = new Set<Listener<[string, string]>>()
+const onIncoming = new Set<Listener<[string, string, IncomingInfo]>>()
+const onOutgoing = new Set<Listener<[string, string, string]>>()
 const recentReceipts = new Map<string, ReceiptStatus>()
+
+/** Mensagens que o próprio motor mandou (disparo, agenda, agente): o resto que sai do número foi a pessoa, pelo celular. */
+const sentByMotor = new Set<string>()
+export function registerSent(messageId: string) {
+  sentByMotor.add(messageId)
+  if (sentByMotor.size > 20_000) sentByMotor.delete(sentByMotor.values().next().value!)
+}
+export function sentByThisMotor(messageId: string): boolean {
+  return sentByMotor.has(messageId)
+}
 
 function emit<A extends unknown[]>(set: Set<Listener<A>>, ...args: A) {
   for (const l of set) Promise.resolve(l(...args)).catch((err) => console.error('[whatsapp] listener falhou:', err))
@@ -50,7 +67,9 @@ export const waEvents = {
   connected: (l: Listener<[]>) => (onConnected.add(l), () => onConnected.delete(l)),
   risk: (l: Listener<[{ statusCode?: number; reason: string }]>) => (onRisk.add(l), () => onRisk.delete(l)),
   receipt: (l: Listener<[string, ReceiptStatus]>) => (onReceipt.add(l), () => onReceipt.delete(l)),
-  incoming: (l: Listener<[string, string]>) => (onIncoming.add(l), () => onIncoming.delete(l)),
+  incoming: (l: Listener<[string, string, IncomingInfo]>) => (onIncoming.add(l), () => onIncoming.delete(l)),
+  /** Mensagem que saiu deste número (telefone, texto, id), inclusive as digitadas no celular */
+  outgoing: (l: Listener<[string, string, string]>) => (onOutgoing.add(l), () => onOutgoing.delete(l)),
 }
 
 export function getWa() {
@@ -154,19 +173,28 @@ export async function connect(): Promise<void> {
       s.ev.on('messages.upsert', async (m) => {
         if (gen !== generation || !Array.isArray(m?.messages)) return
         for (const msg of m.messages) {
-          if (msg.key.fromMe) continue
           const key = msg.key as typeof msg.key & { participantAlt?: string; remoteJidAlt?: string }
-          let jid = phoneJid(key.participantAlt, key.remoteJidAlt, key.participant, key.remoteJid)
-          if (!jid && key.remoteJid?.endsWith('@lid')) {
+          const grupo = !!key.remoteJid?.endsWith('@g.us')
+          if (key.remoteJid === 'status@broadcast') continue
+          // Saiu deste número: no privado, interessa saber para quem (o agente para quando a pessoa assume)
+          const lidToPhone = async (lid: string | null | undefined): Promise<string | null> => {
+            if (!lid?.endsWith('@lid')) return null
             try {
-              const pn = await (s as any).signalRepository?.lidMapping?.getPNForLID(key.remoteJid)
-              if (pn) jid = String(pn).endsWith('@s.whatsapp.net') ? String(pn) : `${pn}@s.whatsapp.net`
+              const pn = await (s as any).signalRepository?.lidMapping?.getPNForLID(lid)
+              return pn ? (String(pn).endsWith('@s.whatsapp.net') ? String(pn) : `${pn}@s.whatsapp.net`) : null
             } catch {
-              /* sem mapeamento */
+              return null // sem mapeamento
             }
           }
+          if (key.fromMe) {
+            if (grupo || !key.id) continue
+            const to = phoneJid(key.remoteJidAlt, key.remoteJid) ?? (await lidToPhone(key.remoteJid))
+            if (to) emit(onOutgoing, to.split('@')[0].split(':')[0], extractText(msg.message as Record<string, any>), key.id)
+            continue
+          }
+          const jid = phoneJid(key.participantAlt, key.remoteJidAlt, key.participant, key.remoteJid) ?? (await lidToPhone(key.remoteJid))
           if (!jid) continue
-          emit(onIncoming, jid.split('@')[0].split(':')[0], extractText(msg.message as Record<string, any>))
+          emit(onIncoming, jid.split('@')[0].split(':')[0], extractText(msg.message as Record<string, any>), { key: msg.key, grupo })
         }
       })
 
@@ -278,5 +306,6 @@ export async function sendText(phone: string, text: string): Promise<{ messageId
   if (!contact?.exists || !contact.jid) throw new Error('Este número não tem WhatsApp ativo.')
   const sent = await withTimeout(s.sendMessage(contact.jid, { text }), 25_000, 'Tempo esgotado ao enviar a mensagem.')
   if (!sent?.key?.id) throw new Error('O WhatsApp não confirmou o envio.')
+  registerSent(sent.key.id)
   return { messageId: sent.key.id, jid: contact.jid }
 }

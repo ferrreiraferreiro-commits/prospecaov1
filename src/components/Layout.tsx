@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import {
   AlarmClock,
   BadgeDollarSign,
+  Bot,
   Calculator,
   CheckCircle2,
   ChevronsLeft,
@@ -31,10 +32,11 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useComunidade } from '../lib/comunidade'
 import { CANAL_TUTORIAIS } from '../lib/tutoriais'
+import { useAgenteSync } from '../lib/agente'
 import { useDisparoSync } from '../lib/disparo'
 import { useWaServico, useWaPolling } from '../lib/waServico'
 import { formatDateTime } from '../lib/dates'
-import { accessOf, planInfo, useAccount, useHasWhatsApp } from '../store/useAccount'
+import { accessOf, planInfo, useAccount, useHasWhatsApp, useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -54,6 +56,8 @@ interface NavItem {
   end?: boolean
   /** Só aparece para contas com o WhatsApp da XS (recurso "motor") */
   whatsapp?: boolean
+  /** Só para o dono da XS (o Agente IA roda no WhatsApp dele) */
+  dono?: boolean
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
@@ -79,6 +83,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'WhatsApp',
     items: [
+      { to: '/agente', label: 'Agente IA', icon: Bot, whatsapp: true, dono: true },
       { to: '/disparo', label: 'Disparo', icon: Send, whatsapp: true },
       { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
       { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },
@@ -98,13 +103,15 @@ const MOBILE: NavItem[] = [
 /** Menu da conta: sem o WhatsApp da XS, somem os itens que dependem dele (e grupos vazios). */
 function useGroups() {
   const temWhatsApp = useHasWhatsApp()
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => temWhatsApp || !i.whatsapp) })).filter((g) => g.items.length)
+  const dono = useIsAdmin()
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (dono || !i.dono)) })).filter((g) => g.items.length)
 }
 
-/** Status do WhatsApp da conta e resultados dos disparos para o histórico dos leads. */
+/** Status do WhatsApp da conta e resultados dos disparos (e do Agente IA) para o histórico dos leads. */
 function WhatsAppSync() {
   useWaPolling()
   useDisparoSync()
+  useAgenteSync()
   return null
 }
 

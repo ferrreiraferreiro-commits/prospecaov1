@@ -65,6 +65,7 @@ const MapsPage = lazyPage(() => import('./pages/MapsPage').then((m) => ({ defaul
 const PrecificacaoPage = lazyPage(() => import('./pages/PrecificacaoPage').then((m) => ({ default: m.PrecificacaoPage })))
 const ProjetosPage = lazyPage(() => import('./pages/ProjetosPage').then((m) => ({ default: m.ProjetosPage })))
 const AgendamentosPage = lazyPage(() => import('./pages/AgendamentosPage').then((m) => ({ default: m.AgendamentosPage })))
+const AgentePage = lazyPage(() => import('./pages/AgentePage').then((m) => ({ default: m.AgentePage })))
 const RoteirosPage = lazyPage(() => import('./pages/RoteirosPage').then((m) => ({ default: m.RoteirosPage })))
 const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const ContasPage = lazyPage(() => import('./pages/ContasPage').then((m) => ({ default: m.ContasPage })))
@@ -110,6 +111,7 @@ function Routed() {
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />
           <Route path="whatsapp" element={m(<WhatsAppPage />)} />
+          <Route path="agente" element={admin ? m(<AgentePage />) : <Navigate to="/" replace />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />

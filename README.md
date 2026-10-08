@@ -42,6 +42,7 @@ WhatsApp: `npm run test:whatsapp` (gateway + serviço). Instalar/atualizar na VP
 | **Funis** | Sequências de WhatsApp: mensagens com variações em rodízio e esperas entre elas. Variáveis `{saudacao}`, `{responsavel}`, `{empresa}`, `{cidade}`, `{nicho}`, `{nome}`, `{servico}`. |
 | **Disparo** | Campanhas com intervalo aleatório entre leads (1–60 min), um lead por vez, trava de duplicidade por telefone, confirmação de entrega/leitura e respostas recebidas. Pausa sozinho se o WhatsApp desconectar de forma suspeita. O resultado vai para o histórico de cada lead. |
 | **Conexão** | QR Code do WhatsApp, status e mensagem de teste. |
+| **Agente IA** | Só no WhatsApp do dono (sessão `principal`, `XS_AGENTE=1`). Busca empresas na base aberta, filtra pelos critérios, aborda com a primeira mensagem escrita pela IA (Claude), responde, faz follow-up, fecha (Pix) ou chama o dono, e avisa no outro número. Aprende com 👍/👎, correções e resultados (lições). Chave da API colada na tela (fica só na VPS); limite de gasto por dia. As conversas viram leads e histórico quando o app está aberto. Código em `motor/src/agente/`. |
 | **Clientes** | Ficha do cliente (fixo/avulso, valor mensal, etiquetas), pagamentos, projetos e anotações/lembretes. "Virar cliente" na ficha do lead. |
 | **Projetos** | Kanban por etapa, tarefas, prazo, prioridade e cobrança (entrada de 50% ou total). |
 | **Financeiro** | Receitas e despesas por mês, gráfico de 6 meses, despesas por categoria, a receber. Pagamento de cliente marcado como pago vira receita sozinho. |
@@ -62,7 +63,7 @@ src/lib        regras puras (parser, duplicidade, métricas, biz.ts da gestão, 
 src/data       Repository + LocalRepository + SupabaseRepository (inclui as tabelas da gestão)
 src/store      useApp (prospecção) e useBiz (gestão)
 src/pages      Painel, Leads, Hoje, Ligação, Maps, Funis, Disparo, WhatsApp, Clientes, Projetos, Financeiro, Precificação, Números, Ajustes
-motor/src      WhatsApp de uma conta: server.ts, whatsapp.ts, disparo.ts, agenda.ts (roda na VPS)
+motor/src      WhatsApp de uma conta: server.ts, whatsapp.ts, disparo.ts, agenda.ts, agente/ (Agente IA) (roda na VPS)
 whatsapp-cloud gateway.ts (login + um WhatsApp por conta), instalar.sh (systemd, Caddy, polkit)
 ```
 

@@ -405,7 +405,7 @@ export function ajustarResposta(caminho: string, body: unknown, s: Sessao): unkn
 
 // ---------------------------------------------------------------- Motor
 
-const CAMINHO_OK = /^\/(health|whatsapp\/(status|conectar|desconectar|teste)|disparo\/[A-Za-z0-9/_-]{1,120}|agenda(\/[A-Za-z0-9/_-]{1,120})?)$/
+const CAMINHO_OK = /^\/(health|whatsapp\/(status|conectar|desconectar|teste)|disparo\/[A-Za-z0-9/_-]{1,120}|agenda(\/[A-Za-z0-9/_-]{1,120})?|agente\/[A-Za-z0-9/_-]{1,120})$/
 const METODOS = new Set(['GET', 'POST', 'DELETE'])
 
 /** Última vez que alguém olhou a tela de conexão de cada sessão (para não deixar QR Code girando à toa) */
@@ -438,6 +438,8 @@ async function desligarMotor(s: Sessao, motivo: string) {
 async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: Sessao, caminho: string) {
   const method = (req.method ?? 'GET').toUpperCase()
   if (!METODOS.has(method) || !CAMINHO_OK.test(caminho)) return send(res, 404, { error: 'Não encontrado.' })
+  // O Agente IA só existe no WhatsApp do dono (sessão fixa)
+  if (caminho.startsWith('/agente/') && !s.fixa) return send(res, 404, { error: 'Não encontrado.' })
   const corpo = method === 'GET' ? undefined : await lerCorpo(req)
   const leitura = method === 'GET' && Object.hasOwn(SEM_WHATSAPP, caminho)
   // Só olhar o status não liga o Motor de ninguém: quem nunca conectou (ou desconectou) não ocupa vaga

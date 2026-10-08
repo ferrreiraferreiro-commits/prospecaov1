@@ -94,6 +94,13 @@ chmod 640 "$CONF/gateway.env"
 chgrp xswhatsapp "$CONF/gateway.env"
 # Um arquivo por sessão: no futuro, outra sessão = outro arquivo + systemctl enable --now xs-whatsapp-motor@<nome>
 [ -f "$CONF/motor-$SESSAO.env" ] || echo "XS_PORT=$PORTA_MOTOR" > "$CONF/motor-$SESSAO.env"
+# Agente IA: só no WhatsApp do dono. Ele busca empresas na base aberta desta VPS (senha da busca, só aqui).
+grep -q '^XS_AGENTE=' "$CONF/motor-$SESSAO.env" || echo "XS_AGENTE=1" >> "$CONF/motor-$SESSAO.env"
+if [ -f /etc/xs-busca.env ] && ! grep -q '^XS_BUSCA_TOKEN=' "$CONF/motor-$SESSAO.env"; then
+  grep '^XS_BUSCA_TOKEN=' /etc/xs-busca.env >> "$CONF/motor-$SESSAO.env"
+  echo "XS_BUSCA_URL=http://127.0.0.1:8091" >> "$CONF/motor-$SESSAO.env"
+fi
+chmod 600 "$CONF/motor-$SESSAO.env"
 
 echo "== Serviços (sobem sozinhos com a VPS e reiniciam se cair)"
 cat > /etc/systemd/system/xs-whatsapp-motor@.service <<EOF

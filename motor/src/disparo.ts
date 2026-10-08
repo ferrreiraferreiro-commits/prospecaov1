@@ -7,7 +7,7 @@
  */
 import { randomInt, randomUUID } from 'node:crypto'
 import { readJson, writeJson } from './store.js'
-import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, receiptOf, samePhone, waEvents, withTimeout, type ReceiptStatus } from './whatsapp.js'
+import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, receiptOf, registerSent, samePhone, waEvents, withTimeout, type ReceiptStatus } from './whatsapp.js'
 
 export type Step = { tipo: 'mensagem' } | { tipo: 'espera'; ms: number }
 
@@ -161,6 +161,21 @@ export function runningCount(): number {
 /** Telefones que já receberam disparo (chave DDD + 8 últimos). */
 export function sentPhones(): string[] {
   return Object.keys(sent)
+}
+
+/**
+ * O destinatário de campanha com este telefone (o mais recente que recebeu algo), para o agente
+ * continuar a conversa de quem respondeu a um disparo. `enviando`: o funil dele ainda está no meio.
+ */
+export function recipientByPhone(phone: string): { campanha: string; leadId: string; nome: string; textos: string[]; enviando: boolean } | null {
+  for (const c of campaigns.slice().sort((a, b) => b.criadaEm.localeCompare(a.criadaEm))) {
+    const r = c.destinatarios.find((x) => x.enviadas > 0 && samePhone(x.telefone, phone))
+    if (r) {
+      const atual = c.status === 'enviando' && c.destinatarios[c.cursor]?.id === r.id
+      return { campanha: c.nome, leadId: r.leadId, nome: r.nome, textos: r.textos.slice(0, r.enviadas).map((t) => finalizeText(t)), enviando: atual }
+    }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +413,7 @@ async function runCampaign(c: Campaign) {
               const res = await withTimeout(s.sendMessage(contact.jid, { text }), 25_000, 'Tempo esgotado ao enviar.')
               const mid = res?.key?.id
               if (!mid) throw new Error('O WhatsApp não confirmou o envio.')
+              registerSent(mid)
               if (receiptOf(mid) === 'failed') throw new Error('O WhatsApp rejeitou a mensagem.')
               r.messageIds.push(mid)
               r.enviadas++
