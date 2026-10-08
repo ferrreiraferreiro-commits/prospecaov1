@@ -149,6 +149,36 @@ describe('tela Hoje', () => {
     expect(todayQueue(plan)).toEqual(['2', '1', '3', '5'])
   })
 
+  it('interessado sem retorno marcado há 2+ dias aparece como esfriando, antes dos frios', () => {
+    const leads = [
+      lead('q1', { status: 'cliente_potencial', ultima_ligacao: at(addDays(TODAY, -5)) }),
+      lead('q2', { status: 'falei_responsavel', ultima_ligacao: at(addDays(TODAY, -2)) }),
+      lead('q3', { status: 'pediu_whatsapp', ultima_ligacao: at(addDays(TODAY, -1)) }), // ainda fresco
+      lead('q4', { status: 'cliente_potencial', ultima_ligacao: at(addDays(TODAY, -6)) }), // tem retorno marcado
+      lead('q5', { status: 'agendou_reuniao', ultima_ligacao: at(addDays(TODAY, -4)) }), // reunião futura
+      lead('n1'),
+    ]
+    const meetings: Meeting[] = [{ id: 'm', lead_id: 'q5', data: addDays(TODAY, 2), horario: null, contato: null, observacao: null, created_at: at(TODAY) }]
+    const index = buildIndex([fu('q4', addDays(TODAY, 4))], meetings, [])
+    const plan = buildTodayPlan(leads, [], index, meetings, TODAY)
+    expect(plan.esfriando.map((e) => [e.lead.id, e.dias])).toEqual([
+      ['q1', 5],
+      ['q2', 2],
+    ])
+    expect(todayQueue(plan)).toEqual(['q1', 'q2', 'n1'])
+  })
+
+  it('tentar novamente: quem não atendeu de manhã vem primeiro à tarde', () => {
+    const leads = [
+      lead('m', { status: 'nao_atendeu', ultima_ligacao: at(addDays(TODAY, -1), '15:00') }),
+      lead('t', { status: 'nao_atendeu', ultima_ligacao: at(addDays(TODAY, -1), '09:30') }),
+    ]
+    const interactions = [call('m', 'nao_atendeu', addDays(TODAY, -1)), call('t', 'nao_atendeu', addDays(TODAY, -1))]
+    const index = buildIndex([], [], interactions)
+    expect(buildTodayPlan(leads, interactions, index, [], TODAY, Infinity, 16).tentarNovamente.map((x) => x.lead.id)).toEqual(['t', 'm'])
+    expect(buildTodayPlan(leads, interactions, index, [], TODAY, Infinity, 10).tentarNovamente.map((x) => x.lead.id)).toEqual(['m', 't'])
+  })
+
   it('follow-up aparece em "Para ligar" quando chega o dia', () => {
     const l = lead('1', { status: 'follow_up' })
     const index = buildIndex([fu('1', addDays(TODAY, 1))], [], [])
