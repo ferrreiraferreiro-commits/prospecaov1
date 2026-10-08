@@ -6,6 +6,7 @@
  * estado fica em motor/storage/*.json — os leads continuam no XS Prospecção.
  */
 import { randomInt, randomUUID } from 'node:crypto'
+import { pareceAutomatica, pediuParaParar } from './agente/regras.js'
 import { readJson, writeJson } from './store.js'
 import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, receiptOf, registerSent, samePhone, waEvents, withTimeout, type ReceiptStatus } from './whatsapp.js'
 
@@ -24,7 +25,9 @@ export interface Recipient {
   messageIds: string[]
   enviadas: number
   erro: string | null
-  respostas: { em: string; texto: string }[]
+  respostas: { em: string; texto: string; auto?: boolean }[]
+  /** Última mensagem do funil que saiu (para reconhecer resposta automática) */
+  ultimoEnvioEm?: string | null
   processadoEm: string | null
   /** O app já registrou o envio no histórico do lead */
   sincEnvio: boolean
@@ -404,6 +407,10 @@ async function runCampaign(c: Campaign) {
             return suspend(c)
           }
         } else {
+          if ((r.status as RecipientStatus) === 'respondeu') {
+            log(c, 'info', `${r.nome} respondeu: o resto do funil não foi enviado`, 'Quem responde recebe conversa de verdade, não a sequência pronta.', r.leadId)
+            break
+          }
           const text = finalizeText(r.textos[msgIndex] ?? '')
           msgIndex++
           if (text) {
@@ -417,6 +424,7 @@ async function runCampaign(c: Campaign) {
               if (receiptOf(mid) === 'failed') throw new Error('O WhatsApp rejeitou a mensagem.')
               r.messageIds.push(mid)
               r.enviadas++
+              r.ultimoEnvioEm = new Date().toISOString()
               sent[key] = { campanha: c.id, em: new Date().toISOString() }
               await new Promise((res2) => setTimeout(res2, 1500))
             } catch (err) {
@@ -516,9 +524,17 @@ waEvents.incoming((phone: string, text: string) => {
   for (const c of campaigns) {
     for (const r of c.destinatarios) {
       if (!r.enviadas || !samePhone(r.telefone, phone)) continue
+      // Resposta automática do WhatsApp Business: fica registrada, mas não conta como resposta nem para o funil
+      const segundos = r.ultimoEnvioEm ? (Date.now() - Date.parse(r.ultimoEnvioEm)) / 1000 : Infinity
+      const auto = r.status !== 'respondeu' && !pediuParaParar(text) && pareceAutomatica(text, segundos)
+      r.respostas.push({ em: new Date().toISOString(), texto: text.slice(0, 1000), ...(auto ? { auto: true } : {}) })
+      if (auto) {
+        log(c, 'info', `${r.nome}: resposta automática do WhatsApp dele`, text.slice(0, 300), r.leadId)
+        continue
+      }
       r.status = 'respondeu'
-      r.respostas.push({ em: new Date().toISOString(), texto: text.slice(0, 1000) })
       log(c, 'resposta', `${r.nome} respondeu`, text.slice(0, 300) || '[mensagem sem texto]', r.leadId)
+      if (pediuParaParar(text)) log(c, 'aviso', `${r.nome} pediu para não receber mais mensagens`, 'Não mande mais campanhas para este número.', r.leadId)
     }
   }
 })

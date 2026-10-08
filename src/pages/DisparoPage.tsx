@@ -258,8 +258,12 @@ function CampaignCard({ c, onChange }: { c: CampaignSummary; onChange: () => Pro
                     <td className="px-3 py-2">
                       <p className="pv font-medium text-fg">{r.nome}</p>
                       {r.respostas.map((resp, i) => (
-                        <p key={i} className="pv mt-1 rounded bg-emerald-500/10 px-2 py-1 text-2xs text-emerald-200">
-                          “{resp.texto || '…'}”
+                        <p
+                          key={i}
+                          title={resp.auto ? 'Resposta automática do WhatsApp dele (não conta como resposta)' : undefined}
+                          className={clsx('pv mt-1 rounded px-2 py-1 text-2xs', resp.auto ? 'bg-tint/[0.04] text-fg-4' : 'bg-emerald-500/10 text-emerald-200')}
+                        >
+                          {resp.auto && <span className="mr-1 font-medium">Automática:</span>}“{resp.texto || '…'}”
                         </p>
                       ))}
                       {r.erro && <p className="mt-0.5 text-2xs text-red-300">{r.erro}</p>}
