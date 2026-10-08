@@ -8,7 +8,6 @@
  * no Supabase (public.xs_conector, só o hash fica no banco) e o CRM é lido pela mesma função, sempre só
  * do dono da chave. O resto (vendedor, Xico, prompts de site) vem deste Motor.
  */
-import crypto from 'node:crypto'
 import type { Request, Response } from 'express'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -51,17 +50,9 @@ async function rpc(chave: string, acao: string, args: Record<string, unknown> = 
   return corpo
 }
 
-/** Chave já conferida há pouco (não pergunta ao banco a cada chamada). */
-const validas = new Map<string, number>()
-const VALIDADE_MS = 5 * 60_000
-
+/** Confere a chave no banco a cada pedido: revogar na XS corta o acesso na hora. */
 async function conferir(chave: string) {
-  const k = crypto.createHash('sha256').update(chave).digest('hex')
-  const ate = validas.get(k)
-  if (ate && ate > Date.now()) return
   await rpc(chave, 'validar')
-  if (validas.size > 50) validas.clear()
-  validas.set(k, Date.now() + VALIDADE_MS)
 }
 
 const texto = (v: unknown) => ({ content: [{ type: 'text' as const, text: typeof v === 'string' ? v : JSON.stringify(v, null, 1) }] })
