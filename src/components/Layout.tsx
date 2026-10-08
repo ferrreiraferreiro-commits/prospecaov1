@@ -15,6 +15,7 @@ import {
   LayoutList,
   MapPinned,
   Menu,
+  MessageCircle,
   PlayCircle,
   MessagesSquare,
   ScrollText,
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react'
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAvisos } from '../lib/avisos'
 import { useComunidade } from '../lib/comunidade'
 import { CANAL_TUTORIAIS } from '../lib/tutoriais'
 import { useAgenteSync } from '../lib/agente'
@@ -85,15 +87,16 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
       { to: '/maps', label: 'Buscar empresas', icon: MapPinned },
+      { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
     ],
   },
   {
     title: 'WhatsApp',
     items: [
+      { to: '/conversas', label: 'Conversas', icon: MessageCircle, whatsapp: true },
       { to: '/disparo', label: 'Disparo', icon: Send, whatsapp: true },
       { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
       { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },
-      { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
       { to: '/whatsapp', label: 'Conexão', icon: Smartphone, whatsapp: true },
     ],
   },
@@ -139,6 +142,7 @@ export function Layout() {
   const temWhatsApp = useHasWhatsApp()
   const groups = useGroups()
   useReminders()
+  useAvisos()
   usePrivacyMode()
 
   useEffect(() => setSheet(false), [pathname])

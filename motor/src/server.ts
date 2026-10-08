@@ -7,12 +7,13 @@
 import express, { type NextFunction, type Request, type Response } from 'express'
 import * as agente from './agente/agente.js'
 import * as xico from './agente/xico.js'
+import { abrirConversa, enviarNaConversa, listarConversas, marcarLidas } from './conversas.js'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
 import { createCampaign, deleteCampaign, getCampaign, listCampaigns, markSynced, pauseCampaign, runningCount, sentPhones, startCampaign, summary } from './disparo.js'
 import { storageDir } from './store.js'
 import { connect, disconnect, getWa, resumeStoredSession, sendText, shutdown } from './whatsapp.js'
 
-const VERSION = '2.0.0'
+const VERSION = '2.1.0'
 const PORT = Number(process.env.XS_PORT ?? 3077)
 
 const app = express()
@@ -147,6 +148,12 @@ app.post('/agente/xico/app', wrap(soAgente((req) => xico.responderApp(req.body?.
 app.post('/agente/xico/propostas/:id', wrap(soAgente((req) => xico.decidir(id(req), req.body?.aceitar === true))))
 app.delete('/agente/xico/memoria/:id', wrap(soAgente((req) => xico.apagarLembranca(id(req)))))
 app.post('/agente/xico/recomecar', wrap(soAgente(() => xico.recomecar())))
+
+// ---------------------------------------------------------------- Conversas (só texto)
+app.get('/conversas', wrap(() => listarConversas()))
+app.get('/conversas/:telefone', wrap((req) => abrirConversa(String(req.params.telefone))))
+app.post('/conversas/:telefone/enviar', wrap((req) => enviarNaConversa(String(req.params.telefone), String(req.body?.texto ?? ''))))
+app.post('/conversas/:telefone/lidas', wrap((req) => marcarLidas(String(req.params.telefone))))
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(400).json({ error: err?.message || 'Erro no WhatsApp da XS.' })
