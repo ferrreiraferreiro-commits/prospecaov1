@@ -203,6 +203,8 @@ export interface TesteView {
   meta: number
   variantes: ({ id: string; nome: string; angulo: string } & Numeros)[]
   total: Numeros
+  /** Quem está ganhando e com que certeza (motor mais novo) */
+  analise?: { lider: string | null; confianca: 'poucos_dados' | 'baixa' | 'media' | 'alta'; texto: string }
 }
 
 export type NumerosRamo = { ramo: string } & Numeros

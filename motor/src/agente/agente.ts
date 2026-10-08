@@ -17,16 +17,21 @@ import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, registerSent,
 import { apagarChave, completarConfig, db, gravarChave, lerChave, salvar } from './estado.js'
 import * as ia from './ia.js'
 import {
+  analisarTeste,
+  boaHoraPara,
   cotaDoDia,
   dentroDoHorario,
   diaDe,
   escolherAlvo,
   esperaRespostaMs,
   intervaloAbordagemMs,
+  pareceAutomatica,
   pediuParaParar,
   phoneKey,
+  precisaFrear,
   proximaAbertura,
   respondeu,
+  saudeDoNumero,
   tempoDigitandoMs,
 } from './regras.js'
 import {
@@ -169,6 +174,26 @@ async function avisarDono(texto: string) {
 
 const link = (c: Conversa) => `wa.me/${c.telefone}`
 
+/** O que mais a busca trouxe e ajuda a personalizar a conversa (bairro, categoria, nota, responsável). */
+export function detalhesDoBruto(bruto: Record<string, unknown> | null | undefined): string {
+  if (!bruto) return ''
+  const s = (k: string) => (typeof bruto[k] === 'string' ? (bruto[k] as string).trim() : '')
+  const n = (k: string) => (typeof bruto[k] === 'number' && Number.isFinite(bruto[k]) ? (bruto[k] as number) : 0)
+  const nota = n('rating')
+  const avaliacoes = n('reviewsCount')
+  return [
+    s('neighborhood') && `Bairro: ${s('neighborhood')}`,
+    s('category') && s('category').toLowerCase() !== s('niche').toLowerCase() && `Categoria no Google: ${s('category')}`,
+    nota > 0 && `Nota no Google: ${nota.toFixed(1).replace('.', ',')}${avaliacoes ? ` (${avaliacoes} avaliações)` : ''}`,
+    s('facebook') && 'Tem página no Facebook',
+    s('responsibleName') && bruto.enrichmentConfidence === 'confirmed' && `Responsável: ${s('responsibleName')}${s('responsibleRole') ? ` (${s('responsibleRole')})` : ''}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+const comDetalhes = (c: Conversa) => ({ ...c, detalhes: detalhesDoBruto(c.bruto) })
+
 // ---------------------------------------------------------------------------
 // Aprendizado
 // ---------------------------------------------------------------------------
@@ -245,6 +270,17 @@ export function receber(phone: string, texto: string, key: WAMessageKey) {
   if (cfg.avisos.telefone && samePhone(phone, cfg.avisos.telefone)) return
   const c = porTelefone(phone) ?? (cfg.ativo && cfg.responderDisparos ? daCampanha(phone) : undefined)
   if (!c) return
+  // Resposta automática do WhatsApp Business antes de qualquer resposta de verdade: guarda, mas não
+  // conta como resposta, não gasta IA e não zera o follow-up (a pessoa ainda não viu a mensagem)
+  const nossa = c.mensagens.filter((m) => m.de !== 'lead').at(-1)
+  const segundos = nossa ? (Date.now() - Date.parse(nossa.em)) / 1000 : Infinity
+  if (!respondeu(c) && c.estado === 'aguardando' && !pediuParaParar(texto) && pareceAutomatica(texto, segundos)) {
+    c.mensagens.push({ id: randomUUID(), de: 'lead', texto: texto || '[mensagem sem texto]', em: iso(), auto: true })
+    c.ultimaChave = key
+    c.atualizadaEm = iso()
+    registrar('aviso', `${c.empresa} mandou uma resposta automática (não conta como resposta)`, c.id)
+    return
+  }
   if (c.origem === 'agente' && !respondeu(c)) hoje().responderam++
   c.mensagens.push({ id: randomUUID(), de: 'lead', texto: texto || '[mensagem sem texto]', em: iso() })
   c.ultimaChave = key
@@ -286,8 +322,21 @@ async function optout(c: Conversa, despedida?: string[]) {
   hoje().optouts++
   db.extra.descartados.push(phoneKey(c.telefone))
   registrar('optout', `${c.empresa} pediu para não receber mais mensagens`, c.id)
+  frearSePreciso()
   if (db.config.ativo && getSock()) await enviar(c, (despedida?.length ? despedida : ['Tudo bem, não vou mais te mandar mensagens. Desculpe o incômodo e um ótimo dia!']).slice(0, 1)).catch(() => undefined)
   salvar()
+}
+
+/**
+ * Muita gente pedindo para parar no mesmo dia é o sinal que mais leva a bloqueio do número: a
+ * prospecção para até amanhã (conversas em andamento continuam) e você recebe um aviso.
+ */
+function frearSePreciso(t = new Date()) {
+  const d = hoje(t)
+  if (db.extra.freio === diaDe(t) || !db.config.prospeccao.ativa || !precisaFrear(d)) return
+  db.extra.freio = diaDe(t)
+  registrar('aviso', `Freio de segurança: ${d.optouts} pessoas pediram para parar hoje (de ${d.abordados} abordadas). A prospecção para até amanhã para proteger o número.`)
+  void avisarDono(`🛑 Freio de segurança: ${d.optouts} pessoas pediram para parar hoje (de ${d.abordados} abordadas). Parei de abordar empresas novas até amanhã para proteger o número; as conversas continuam. Vale revisar a primeira mensagem com o Xico.`)
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +415,7 @@ async function responderPendente(t: Date): Promise<boolean> {
     return true
   }
   const total = c.mensagens.length
-  const r = await comIA(() => ia.responder(ctx(), c, t), `Resposta para ${c.empresa}`)
+  const r = await comIA(() => ia.responder(ctx(), comDetalhes(c), t), `Resposta para ${c.empresa}`)
   if (!r) {
     c.responderEm = new Date(Date.now() + 2 * 60_000).toISOString()
     return true
@@ -392,7 +441,8 @@ async function fazerFollowup(t: Date): Promise<boolean> {
   let alvo: Conversa | null = null
   for (const c of db.conversas) {
     if (c.pendente || !['aguardando', 'conversando', 'quente'].includes(c.estado)) continue
-    const ultima = c.mensagens.at(-1)
+    // Resposta automática não conta: o follow-up segue o relógio da nossa última mensagem
+    const ultima = c.mensagens.filter((m) => !m.auto).at(-1)
     if (!ultima || ultima.de === 'lead') continue
     const desde = t.getTime() - Date.parse(ultima.em)
     if (c.followups >= dias.length) {
@@ -407,7 +457,7 @@ async function fazerFollowup(t: Date): Promise<boolean> {
   }
   if (!alvo) return false
   const c = alvo
-  const r = await comIA(() => ia.followup(ctx(), c, dias.length, t), `Follow-up para ${c.empresa}`)
+  const r = await comIA(() => ia.followup(ctx(), comDetalhes(c), dias.length, t), `Follow-up para ${c.empresa}`)
   proximoFollowup = Date.now() + (3 + Math.random() * 3) * 60_000
   if (!r) return true
   c.followups++
@@ -509,16 +559,28 @@ function proximaVariante(t: Teste): Variante {
   return t.variantes.reduce((menor, v) => (usadas(v) < usadas(menor) ? v : menor), t.variantes[0])
 }
 
-async function proximoDaFila(): Promise<FilaItem | null> {
+/**
+ * Posição do próximo da fila: primeiro quem está em boa hora (restaurante não no meio do almoço).
+ * -2 = só sobrou empresa em hora ruim (melhor esperar); -1 = não tem ninguém.
+ */
+function indiceNaFila(t: Date, deste: (f: FilaItem) => boolean): number {
+  const i = db.fila.findIndex((f) => deste(f) && boaHoraPara(f.nicho, t))
+  if (i >= 0) return i
+  return db.fila.some(deste) ? -2 : -1
+}
+
+async function proximoDaFila(t = new Date()): Promise<FilaItem | 'espera' | null> {
   // Teste rodando: as empresas dele vêm antes da prospecção normal
   const teste = testeAtivo()
   for (let tentativa = 0; teste && tentativa < 2; tentativa++) {
     const fora = bloqueados()
     let i: number
-    while ((i = db.fila.findIndex((f) => f.testeId === teste.id)) >= 0) {
+    while ((i = indiceNaFila(t, (f) => f.testeId === teste.id)) >= 0) {
       const [it] = db.fila.splice(i, 1)
       if (!fora.has(phoneKey(it.telefone)) && isValidBrazilWhatsApp(it.telefone)) return it
     }
+    // Empresas do teste só em hora ruim agora: segue a prospecção normal e volta ao teste depois
+    if (i === -2) break
     const r = await reabastecer(teste.alvo, teste.id).catch((err) => {
       registrar('erro', `Busca do teste "${teste.nome}": ${(err as Error).message}`)
       return null
@@ -532,10 +594,11 @@ async function proximoDaFila(): Promise<FilaItem | null> {
   for (let tentativa = 0; tentativa < 3; tentativa++) {
     const fora = bloqueados()
     let i: number
-    while ((i = db.fila.findIndex((f) => !f.testeId)) >= 0) {
+    while ((i = indiceNaFila(t, (f) => !f.testeId)) >= 0) {
       const [it] = db.fila.splice(i, 1)
       if (!fora.has(phoneKey(it.telefone)) && isValidBrazilWhatsApp(it.telefone)) return it
     }
+    if (i === -2) return 'espera'
     if (!db.config.prospeccao.alvos.some((a) => a.ativo)) return null
     const r = await reabastecer().catch((err) => {
       registrar('erro', `Busca de empresas: ${(err as Error).message}`)
@@ -549,10 +612,15 @@ async function proximoDaFila(): Promise<FilaItem | null> {
 async function prospectar(t: Date): Promise<boolean> {
   const p = db.config.prospeccao
   if (!p.ativa || t.getTime() < proximaAbordagem || !dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
+  if (db.extra.freio === diaDe(t)) return false
   const dia = hoje(t)
-  const cota = cotaDoDia(p, db.extra.desde, t)
+  const cota = cotaHoje(t)
   if (dia.abordados >= cota) return false
-  const item = await proximoDaFila()
+  const item = await proximoDaFila(t)
+  if (item === 'espera') {
+    proximaAbordagem = Date.now() + 15 * 60_000
+    return false
+  }
   if (!item) {
     proximaAbordagem = Date.now() + 30 * 60_000
     registrar('aviso', 'Sem empresas novas para abordar nas cidades e tipos de negócio escolhidos. Adicione mais em Prospecção.')
@@ -561,7 +629,14 @@ async function prospectar(t: Date): Promise<boolean> {
   db.extra.desde ??= diaDe(t)
   const sock = getSock()
   if (!sock) return false
-  const [contato] = (await withTimeout(sock.onWhatsApp(`${item.telefone}@s.whatsapp.net`), 15_000, 'Tempo esgotado ao consultar o número.').catch(() => [])) || []
+  const consulta = await withTimeout(sock.onWhatsApp(`${item.telefone}@s.whatsapp.net`), 15_000, 'Tempo esgotado ao consultar o número.').catch(() => null)
+  // Falha na consulta (rede, WhatsApp lento) não quer dizer que o número não tem WhatsApp: volta para a fila
+  if (!consulta) {
+    db.fila.unshift(item)
+    proximaAbordagem = Date.now() + 2 * 60_000
+    return false
+  }
+  const [contato] = consulta
   if (!contato?.exists || !contato.jid) {
     dia.semWhatsApp++
     db.extra.descartados.push(phoneKey(item.telefone))
@@ -572,7 +647,7 @@ async function prospectar(t: Date): Promise<boolean> {
   const lead = { empresa: item.empresa, nicho: item.nicho, cidade: item.cidade, uf: item.uf, endereco: item.endereco, site: item.site, instagram: item.instagram }
   const teste = item.testeId ? db.testes.find((x) => x.id === item.testeId && x.estado === 'rodando') : undefined
   const variante = teste ? proximaVariante(teste) : undefined
-  const r = await comIA(() => ia.abordagem(ctx(), lead, t, variante?.angulo), `Abordagem de ${item.empresa}`)
+  const r = await comIA(() => ia.abordagem(ctx(), { ...lead, detalhes: detalhesDoBruto(item.bruto) }, t, variante?.angulo), `Abordagem de ${item.empresa}`)
   if (!r?.mensagens.length) {
     db.fila.unshift(item)
     proximaAbordagem = Date.now() + 5 * 60_000
@@ -604,6 +679,57 @@ async function prospectar(t: Date): Promise<boolean> {
   return true
 }
 
+/** Os últimos `n` dias (sem hoje), para medir a saúde do número. */
+function ultimosDias(t: Date, n = 7): Dia[] {
+  return Array.from({ length: n }, (_, i) => db.dias[diaDe(new Date(t.getTime() - (i + 1) * 86_400_000))]).filter((d): d is Dia => !!d)
+}
+
+/** Cota de hoje. Semana com muita gente pedindo para parar: a cota não sobe (fica na da semana anterior). */
+function cotaHoje(t = new Date()): number {
+  const p = db.config.prospeccao
+  const saude = saudeDoNumero(ultimosDias(t))
+  return saude.ruim ? cotaDoDia(p, db.extra.desde, new Date(t.getTime() - 7 * 86_400_000)) : cotaDoDia(p, db.extra.desde, t)
+}
+
+/** Conversa que o agente passou para você e o cliente está esperando resposta há mais de 2 h: lembra uma vez. */
+async function lembrarDono(t: Date): Promise<boolean> {
+  const cfg = db.config
+  if (!cfg.avisos.telefone || !dentroDoHorario(t, cfg.respostas.inicio, cfg.respostas.fim)) return false
+  const c = db.conversas.find((x) => {
+    const ultima = x.mensagens.at(-1)
+    return x.estado === 'humano' && ultima?.de === 'lead' && !ultima.auto && t.getTime() - Date.parse(ultima.em) > 2 * 3_600_000 && (!x.lembradoEm || x.lembradoEm < ultima.em)
+  })
+  if (!c) return false
+  c.lembradoEm = iso()
+  salvar()
+  const ultima = c.mensagens.at(-1)!
+  await avisarDono(`⏰ ${c.empresa} está esperando você responder desde ${new Date(ultima.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}:\n"${ultima.texto.slice(0, 200)}"\n${link(c)}`)
+  return true
+}
+
+/**
+ * Teste que já abordou todas as empresas e deu 3 dias para responderem: encerra sozinho com a
+ * conclusão dos números e avisa você (o Xico vê no próximo papo).
+ */
+async function concluirTestes(t: Date): Promise<boolean> {
+  for (const teste of db.testes) {
+    if (teste.estado !== 'rodando') continue
+    const deste = db.conversas.filter((c) => c.testeId === teste.id)
+    if (deste.length < teste.porVariante * teste.variantes.length) continue
+    const ultima = Math.max(...deste.map((c) => Date.parse(c.criadaEm)))
+    if (t.getTime() - ultima < 3 * 86_400_000) continue
+    const a = analiseDoTeste(teste)
+    teste.estado = 'encerrado'
+    teste.encerradoEm = iso()
+    teste.conclusao = `Automática: ${a.texto}`
+    for (const f of db.fila) if (f.testeId === teste.id) delete f.testeId
+    registrar('aviso', `Teste "${teste.nome}" terminou. ${a.texto}`)
+    await avisarDono(`🧪 Teste "${teste.nome}" terminou.\n${a.texto}\nPeça ao Xico para adotar a vencedora ou montar outro teste.`)
+    return true
+  }
+  return false
+}
+
 async function resumoDoDia(t: Date) {
   const cfg = db.config
   if (!cfg.avisos.relatorio || !cfg.avisos.telefone || t.getHours() < cfg.prospeccao.fim) return
@@ -612,17 +738,22 @@ async function resumoDoDia(t: Date) {
   d.relatorio = true
   salvar()
   if (!d.abordados && !d.enviadas) return
+  const esperando = db.conversas.filter((c) => c.estado === 'humano' && c.mensagens.at(-1)?.de === 'lead').length
+  const pct = d.abordados ? ` (${Math.round((d.responderam / d.abordados) * 100)}%)` : ''
   await avisarDono(
     [
       '📊 Resumo de hoje',
       `Empresas abordadas: ${d.abordados}`,
-      `Responderam: ${d.responderam}`,
+      `Responderam: ${d.responderam}${pct}`,
       `Esquentaram: ${d.quentes}`,
       `Reuniões: ${d.reunioes}`,
       `Vendas: ${d.vendas}`,
       `Pediram para parar: ${d.optouts}`,
       `Gasto com IA: US$ ${d.custoUSD.toFixed(2)}`,
-    ].join('\n'),
+      esperando ? `\n🙋 ${esperando} conversa(s) esperando você responder.` : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
   )
 }
 
@@ -645,6 +776,8 @@ async function ciclo() {
     if (await responderPendente(t)) return
     if (await fazerFollowup(t)) return
     if (await prospectar(t)) return
+    if (await lembrarDono(t)) return
+    if (await concluirTestes(t)) return
     await resumoDoDia(t)
   } catch (err) {
     registrar('erro', (err as Error).message)
@@ -690,7 +823,9 @@ export function estado() {
     whatsapp: getWa().status,
     modelo: db.config.modelo,
     hoje: hoje(t),
-    cotaHoje: cotaDoDia(db.config.prospeccao, db.extra.desde, t),
+    cotaHoje: cotaHoje(t),
+    freioHoje: db.extra.freio === diaDe(t),
+    saude: saudeDoNumero(ultimosDias(t)),
     proximaAbordagem: proximaAbordagem > Date.now() ? new Date(proximaAbordagem).toISOString() : null,
     fila: db.fila.length,
     mes: { custoUSD: soma('custoUSD'), abordados: soma('abordados'), responderam: soma('responderam'), reunioes: soma('reunioes'), vendas: soma('vendas') },
@@ -799,6 +934,7 @@ export function removerChave() {
 
 export function retomar() {
   db.extra.pausadoPorRisco = null
+  db.extra.freio = null
   chaveRecusada = false
   registrar('aviso', 'Agente retomado')
 }
@@ -997,9 +1133,16 @@ export function numerosPorRamo() {
   return [...grupos.entries()].map(([ramo, lista]) => ({ ramo, ...numerosDe(lista) })).sort((a, b) => b.abordados - a.abordados)
 }
 
+/** Quem está ganhando o teste e com que certeza. */
+function analiseDoTeste(t: Teste) {
+  const deste = db.conversas.filter((c) => c.testeId === t.id)
+  return analisarTeste(t.variantes.map((v) => ({ id: v.id, nome: v.nome, ...numerosDe(deste.filter((c) => c.variante === v.id)) })))
+}
+
 function verTeste(t: Teste) {
   const deste = db.conversas.filter((c) => c.testeId === t.id)
   return {
+    analise: analiseDoTeste(t),
     ...t,
     abordados: deste.length,
     meta: t.porVariante * t.variantes.length,

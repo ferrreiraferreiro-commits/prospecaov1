@@ -111,6 +111,21 @@ export function instrucoes(cfg: AgenteConfig, licoes: Licao[]): string {
 
 ## Objetivo
 Entender o negócio da pessoa, mostrar como um site ajuda (ser achado no Google, passar confiança, receber contatos/pedidos pelo WhatsApp) e levar a venda adiante.
+
+## O caminho da venda
+1. Abertura: curta, pessoal (algo concreto da empresa) e uma pergunta fácil de responder.
+2. Entender antes de oferecer: descubra 1 ou 2 coisas do negócio (como os clientes acham a empresa hoje, se recebem pedidos ou agendamentos pelo WhatsApp/Instagram, se já pensaram em ter site). Uma pergunta por mensagem.
+3. Valor ligado ao que a pessoa disse, não uma lista genérica de benefícios. Ex.: "quem procura pizzaria em Londrina no Google acha quem tem site; o site manda o pedido direto pro seu WhatsApp".
+4. Proposta: quando houver interesse ou pedirem preço, passe o pacote que mais combina, de forma simples. Se pedirem preço logo de cara e você puder passar, passe (não fuja) e emende uma pergunta. Se houver portfólio do mesmo ramo, um exemplo ajuda.
+5. Próximo passo: toda mensagem que não encerra a conversa termina com um próximo passo claro e fácil (uma pergunta ou uma proposta de horário).
+- Leia os sinais: resposta curta e fria = menos texto e uma pergunta mais fácil; pergunta sobre preço, prazo ou como funciona = interesse (temperatura quente).
+
+## Objeções (as respostas do dono mais abaixo têm prioridade)
+- "Já tenho Instagram/Facebook": concorde que é ótimo; o site soma: aparece no Google quando alguém procura o ramo na cidade, passa confiança e não depende do algoritmo.
+- "Tá caro" / "sem dinheiro agora": entenda o porquê; compare com o valor de um cliente novo; se puder, use uma condição dentro do limite. Sem pressão.
+- "Vou pensar": pergunte com leveza o que falta para decidir e combine quando retomar.
+- "Manda por e-mail" / "me manda as informações": mande aqui mesmo um resumo curto e uma pergunta.
+- "Não tenho interesse": agradeça e respeite (no máximo uma pergunta leve do porquê, se couber).
 ${
   cfg.podeFechar
     ? `- Você pode passar os preços e as condições abaixo, negociar e dar desconto de no máximo ${n.descontoMax}% (nunca além disso).
@@ -131,7 +146,10 @@ ${bloco('Como se apresentar', n.apresentacao || `Diga que é assistente de ${don
 // Pedidos
 // ---------------------------------------------------------------------------
 
-type LeadInfo = Pick<Conversa, 'empresa' | 'nicho' | 'cidade' | 'uf' | 'endereco' | 'site' | 'instagram'>
+type LeadInfo = Pick<Conversa, 'empresa' | 'nicho' | 'cidade' | 'uf' | 'endereco' | 'site' | 'instagram'> & {
+  /** O que mais a busca trouxe (bairro, categoria, nota no Google, responsável) */
+  detalhes?: string
+}
 
 function ficha(l: LeadInfo): string {
   return [
@@ -141,6 +159,7 @@ function ficha(l: LeadInfo): string {
     l.endereco && `Endereço: ${l.endereco}`,
     `Site: ${l.site || 'não tem site'}`,
     l.instagram && `Instagram: ${l.instagram}`,
+    l.detalhes,
   ]
     .filter(Boolean)
     .join('\n')
@@ -155,7 +174,7 @@ function quando(iso: string, agora: Date): string {
 export function transcricao(c: Pick<Conversa, 'mensagens'>, agora = new Date()): string {
   return c.mensagens
     .slice(-40)
-    .map((m) => `[${quando(m.em, agora)}] ${m.de === 'lead' ? 'CLIENTE' : 'NÓS'}: ${m.texto}`)
+    .map((m) => `[${quando(m.em, agora)}] ${m.de === 'lead' ? (m.auto ? 'CLIENTE (resposta automática do WhatsApp dele)' : 'CLIENTE') : 'NÓS'}: ${m.texto}`)
     .join('\n')
 }
 
@@ -191,10 +210,11 @@ export async function abordagem(ctx: Contexto, lead: LeadInfo, agora = new Date(
 Escreva a PRIMEIRA mensagem para esta empresa. O dono não conhece vocês.
 ${ficha(lead)}
 ${angulo.trim() ? `\nÂngulo desta abordagem (é um teste: siga este ângulo à risca, mesmo que as lições digam outra coisa sobre a primeira mensagem):\n${angulo.trim()}\n` : ''}
-- Comece com "${saudacao(agora)}" e se apresente.
-- Mostre que você olhou a empresa (cite o nome e algo concreto, como o tipo de negócio ou a cidade; se não tem site, use isso com tato, sem ofender).
-- Termine com uma pergunta simples e fácil de responder.
-- Não mande preço nem link nesta primeira mensagem. Curta: até uns 350 caracteres no total, em 1 ou 2 balões.`
+- Comece com "${saudacao(agora)}" (se souber o nome do responsável, cumprimente pelo primeiro nome) e se apresente em poucas palavras.
+- Mostre que você olhou a empresa: cite o nome e algo concreto (o ramo, o bairro ou a cidade, a nota no Google se for boa). Se não tem site, use isso com tato, como oportunidade, nunca como crítica.
+- Termine com UMA pergunta simples, que dá para responder em poucas palavras (sobre o negócio da pessoa ou se ela toparia ver uma ideia).
+- Nada de preço, link, lista de serviços ou "espero que esteja bem". Curta: até uns 300 caracteres no total, em 1 ou 2 balões.
+- Escreva do zero para esta empresa, sem estrutura de modelo: mensagens iguais para muita gente fazem o WhatsApp bloquear o número.`
   return chamar(ctx.chave, ctx.cfg.modelo, instrucoes(ctx.cfg, ctx.licoes), pedido, Mensagens)
 }
 
@@ -213,7 +233,16 @@ Decida a próxima mensagem para o CLIENTE e a ação.`
 
 /** Retomar quem parou de responder. Lista vazia = melhor não mandar. */
 export async function followup(ctx: Contexto, c: Pick<Conversa, 'mensagens' | 'resumo' | 'followups'> & LeadInfo, total: number, agora = new Date()) {
-  const ultimo = c.followups + 1 >= total
+  const n = c.followups + 1
+  const ultimo = n >= total
+  const jaConversou = c.mensagens.some((m) => m.de === 'lead' && !m.auto)
+  const papel = ultimo
+    ? 'É a última tentativa: uma despedida leve que deixa a porta aberta (ex.: que não vai mais insistir e que, se um dia quiser, é só chamar). Costuma ser a mensagem que mais recebe resposta: sem drama, sem culpa.'
+    : jaConversou
+      ? 'Retome do ponto onde a conversa parou, com algo útil para a decisão (um exemplo, uma resposta para a dúvida que ficou, ou uma pergunta mais fácil).'
+      : n === 1
+        ? 'Um lembrete leve com um ângulo diferente da primeira mensagem e uma pergunta ainda mais fácil de responder.'
+        : 'Traga valor concreto: um exemplo do portfólio do mesmo ramo (se houver) ou um benefício bem específico para o ramo e a cidade dele.'
   const pedido = `${agoraTexto(agora)}
 
 ${ficha(c)}
@@ -221,7 +250,7 @@ ${ficha(c)}
 Conversa:
 ${transcricao(c, agora)}
 
-O cliente não respondeu a nossa última mensagem. Escreva o follow-up ${c.followups + 1} de ${total}: curto (1 balão), leve, sem cobrar resposta, trazendo algo novo (um benefício, uma pergunta diferente ou um exemplo).${ultimo ? ' É a última tentativa: deixe a porta aberta com educação.' : ''} Se pela conversa não fizer sentido mandar nada, devolva a lista vazia.`
+O cliente não respondeu a nossa última mensagem. Escreva o follow-up ${n} de ${total}: curto (1 balão), leve, sem cobrar resposta e sem repetir o que já foi dito. ${papel} Se pela conversa não fizer sentido mandar nada, devolva a lista vazia.`
   return chamar(ctx.chave, ctx.cfg.modelo, instrucoes(ctx.cfg, ctx.licoes), pedido, Mensagens)
 }
 
@@ -236,8 +265,12 @@ export async function filtrarEmpresas(ctx: Contexto, itens: Pick<FilaItem, 'empr
   const pedido = `Critérios do dono:\n${regras.map((r) => `- ${r}`).join('\n')}\n\nEmpresas:\n${itens
     .map((e, i) => `${i}. ${e.empresa} (${e.nicho}${e.cidade ? `, ${e.cidade}` : ''}${e.endereco ? ` — ${e.endereco}` : ''})`)
     .join('\n')}\n\nDevolva os números das que atendem aos critérios.`
-  return chamar(ctx.chave, ctx.cfg.modelo, sistema, pedido, Escolha, 3000)
+  // Tarefa simples e repetitiva: o modelo mais barato dá conta (custa ~1/40 do Opus)
+  return chamar(ctx.chave, MODELO_ECONOMICO, sistema, pedido, Escolha, 3000)
 }
+
+/** Para tarefas simples (filtrar a fila): rápido e barato. */
+export const MODELO_ECONOMICO: Modelo = 'claude-haiku-5-5'
 
 const NovaLicao = z.object({
   licao: z.string().describe('Uma regra curta e geral (1 frase), no imperativo. Vazio se não houver nada novo para aprender.'),

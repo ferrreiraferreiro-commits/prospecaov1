@@ -182,3 +182,74 @@ test('agente: sincronização com o CRM e lições', async () => {
   assert.equal(agente.listarLicoes().some((x) => x.id === l.id), false)
   assert.throws(() => agente.novaLicao({ texto: '  ' }), /Escreva/)
 })
+
+test('regras: resposta automática, hora de pico e saúde do número', async () => {
+  const { pareceAutomatica, boaHoraPara, saudeDoNumero, precisaFrear } = await import('./agente/regras.js')
+  for (const s of [
+    'Olá! Obrigado por entrar em contato com a Pizzaria Bella. Em breve retornaremos.',
+    'Esta é uma mensagem automática.',
+    'Nosso horário de atendimento é de terça a domingo, das 18h às 23h.',
+    'Digite 1 para fazer pedido, 2 para falar com atendente',
+  ])
+    assert.equal(pareceAutomatica(s, 5), true, s)
+  // Saudação de robô só conta se chegar quase na hora
+  assert.equal(pareceAutomatica('Seja bem-vindo! Como podemos ajudar?', 4), true)
+  assert.equal(pareceAutomatica('Seja bem-vindo! Como podemos ajudar?', 300), false)
+  for (const s of ['Oi, quanto custa?', 'Já tenho site', 'quem é?']) assert.equal(pareceAutomatica(s, 3), false, s)
+  // Muito tempo depois: é gente
+  assert.equal(pareceAutomatica('Obrigado pelo contato, vou pensar', 3600), false)
+
+  assert.equal(boaHoraPara('Pizzaria', new Date('2026-10-06T12:30:00')), false)
+  assert.equal(boaHoraPara('Restaurante', new Date('2026-10-06T19:00:00')), false)
+  assert.equal(boaHoraPara('Restaurante', new Date('2026-10-06T15:00:00')), true)
+  assert.equal(boaHoraPara('Barbearia', new Date('2026-10-06T12:30:00')), true)
+
+  assert.equal(saudeDoNumero([{ abordados: 100, optouts: 3 }]).ruim, false)
+  assert.equal(saudeDoNumero([{ abordados: 60, optouts: 5 }]).ruim, true)
+  assert.equal(saudeDoNumero([{ abordados: 10, optouts: 2 }]).ruim, false) // poucos dados
+  assert.equal(precisaFrear({ abordados: 20, optouts: 2 }), false)
+  assert.equal(precisaFrear({ abordados: 20, optouts: 3 }), true)
+  assert.equal(precisaFrear({ abordados: 50, optouts: 3 }), false)
+})
+
+test('regras: análise do teste de abordagens', async () => {
+  const { analisarTeste } = await import('./agente/regras.js')
+  const v = (id: string, abordados: number, responderam: number) => ({ id, nome: id.toUpperCase(), abordados, responderam, quentes: 0, vendas: 0 })
+  assert.equal(analisarTeste([v('a', 5, 3), v('b', 15, 1)]).confianca, 'poucos_dados')
+  const clara = analisarTeste([v('a', 30, 12), v('b', 30, 2)])
+  assert.equal(clara.confianca, 'alta')
+  assert.equal(clara.lider, 'a')
+  const empate = analisarTeste([v('a', 15, 4), v('b', 15, 3)])
+  assert.equal(empate.confianca, 'baixa')
+  assert.equal(empate.lider, null)
+})
+
+test('agente: resposta automática não conta como resposta e não gasta IA', async () => {
+  const agente = await import('./agente/agente.js')
+  const { db } = await import('./agente/estado.js')
+  const agora = new Date().toISOString()
+  db.conversas.push({
+    id: 'auto1', telefone: '5543999990009', empresa: 'Bar do Zé', origem: 'agente', estado: 'aguardando',
+    jid: null, nicho: 'Bar', cidade: 'Londrina', uf: 'PR', endereco: '', site: '', instagram: '', alvoId: null, leadId: null, bruto: { neighborhood: 'Centro', rating: 4.7, reviewsCount: 120 },
+    temperatura: 'frio', resumo: '', followups: 1, pendente: false, responderEm: null, ultimaChave: null, avisadoQuente: false,
+    criadaEm: agora, atualizadaEm: agora, sinc: { mensagens: 0, estado: null, lead: false },
+    mensagens: [{ id: 'm1', de: 'agente', texto: 'Boa tarde!', em: agora }],
+  })
+  db.config.ativo = true
+  const antes = agente.estado().hoje.responderam
+  agente.receber('5543999990009', 'Olá! Obrigado pelo contato. Em breve retornaremos.', { remoteJid: 'x@s.whatsapp.net', id: 'k2' })
+  const c = db.conversas.find((x) => x.id === 'auto1')!
+  assert.equal(c.estado, 'aguardando')
+  assert.equal(c.pendente, false)
+  assert.equal(c.followups, 1)
+  assert.equal(c.mensagens.at(-1)!.auto, true)
+  assert.equal(agente.estado().hoje.responderam, antes)
+  // Depois a pessoa responde de verdade
+  agente.receber('5543999990009', 'Oi, é sobre o quê?', { remoteJid: 'x@s.whatsapp.net', id: 'k3' })
+  assert.equal(c.estado, 'conversando')
+  assert.equal(c.pendente, true)
+  assert.equal(agente.estado().hoje.responderam, antes + 1)
+  // Os detalhes da busca vão para a IA
+  assert.match(agente.detalhesDoBruto(c.bruto), /Bairro: Centro[\s\S]*4,7 \(120 avaliações\)/)
+  db.config.ativo = false
+})

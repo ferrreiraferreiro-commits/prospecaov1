@@ -80,8 +80,87 @@ export function pediuParaParar(texto: string): boolean {
   return PARAR.test(texto)
 }
 
-/** Já respondeu alguma vez? */
-export const respondeu = (c: Pick<Conversa, 'mensagens'>) => c.mensagens.some((m) => m.de === 'lead')
+/** Já respondeu alguma vez (de verdade: resposta automática do WhatsApp Business não conta)? */
+export const respondeu = (c: Pick<Conversa, 'mensagens'>) => c.mensagens.some((m) => m.de === 'lead' && !m.auto)
+
+/** Frases típicas de resposta automática (WhatsApp Business, robôs de atendimento). */
+const AUTOMATICA_FORTE =
+  /mensagem\s+autom[aá]tica|resposta\s+autom[aá]tica|(obrigad[oa]|agradecemos|agrade[cç]o)\s+(por|pelo|pela)\s+(o\s+|seu\s+|sua\s+)?(entrar\s+em\s+)?(contato|mensagem)|em\s+breve\s+(retornaremos|responderemos|entraremos|daremos|retorno|um\s+de\s+nossos|um\s+atendente|voc[eê]\s+ser[aá]|iremos)|(no\s+momento|agora)\s+(n[aã]o\s+)?(estamos|estou|nos\s+encontramos)\s+(dispon[ií]ve(l|is)|ausentes?|fora|fechad[oa]s?)|nosso\s+hor[aá]rio\s+de\s+(atendimento|funcionamento)|(digite|escolha|selecione|responda\s+com)\s+(o\s+n[uú]mero|uma\s+das\s+op[cç][oõ]es|a\s+op[cç][aã]o|\d)|assim\s+que\s+poss[ií]vel\s+(retornaremos|responderemos|te\s+respond)|fora\s+do\s+(nosso\s+)?hor[aá]rio\s+de\s+atendimento|confira\s+(nosso|o)\s+card[aá]pio\s*:?\s*(https?:|www\.)/i
+/** Frases que um robô e uma pessoa usam: só contam como automáticas se chegarem quase na hora. */
+const AUTOMATICA_FRACA = /seja\s+(muito\s+)?bem[\s-]?vind[oa]|como\s+(podemos|posso)\s+(te\s+|lhe\s+)?(ajudar|ser\s+[uú]til)|em\s+que\s+(podemos|posso)\s+(te\s+|lhe\s+)?ajudar|ol[aá]!?\s+tudo\s+bem\?\s*$/i
+
+/**
+ * Parece resposta automática? `segundos` = tempo desde a nossa mensagem. As fortes valem até 15 min;
+ * as fracas só até 20 s (gente de verdade não responde tão rápido com saudação de robô).
+ */
+export function pareceAutomatica(texto: string, segundos: number): boolean {
+  const t = String(texto ?? '')
+  if (segundos > 15 * 60) return false
+  if (AUTOMATICA_FORTE.test(t)) return true
+  return segundos <= 20 && AUTOMATICA_FRACA.test(t)
+}
+
+/** Ramos que vivem de horário de pico (comida): não abordar no meio do almoço nem do jantar. */
+const RAMO_COMIDA =
+  /restaurante|pizzaria|pizza|lanchonete|lanche|hamburgu|burger|\bbar\b|boteco|padaria|panificadora|a[cç]a[ií]|sorveteria|marmit|churrascaria|cafeteria|caf[eé]\b|delivery|pastelaria|sushi|japones|temaki|espetinho|food|comida|cozinha|esfiha|esfirra|confeitaria|doceria|petiscaria|cervejaria|choperia|bistr[oô]/i
+
+/** Boa hora para abordar este ramo? Comida: fora de 11h30–14h e 18h30–21h. */
+export function boaHoraPara(nicho: string, agora: Date): boolean {
+  if (!RAMO_COMIDA.test(nicho ?? '')) return true
+  const h = agora.getHours() + agora.getMinutes() / 60
+  return !((h >= 11.5 && h < 14) || (h >= 18.5 && h < 21))
+}
+
+/** Saúde do número nos últimos dias: muita gente pedindo para parar = risco de bloqueio. */
+export function saudeDoNumero(dias: { abordados: number; optouts: number }[]): { abordados: number; optouts: number; taxaOptout: number; ruim: boolean } {
+  const abordados = dias.reduce((s, d) => s + (d.abordados || 0), 0)
+  const optouts = dias.reduce((s, d) => s + (d.optouts || 0), 0)
+  const taxaOptout = abordados ? optouts / abordados : 0
+  return { abordados, optouts, taxaOptout, ruim: abordados >= 20 && taxaOptout > 0.05 }
+}
+
+/** Freio do dia: 3 ou mais pedidos para parar e pelo menos 10% dos abordados hoje. */
+export function precisaFrear(d: { abordados: number; optouts: number }): boolean {
+  return d.optouts >= 3 && d.optouts >= 0.1 * Math.max(1, d.abordados)
+}
+
+export interface NumerosVariante {
+  id: string
+  nome: string
+  abordados: number
+  responderam: number
+  quentes: number
+  vendas: number
+}
+
+export interface AnaliseTeste {
+  /** Abordagem na frente (null = empate ou poucos dados) */
+  lider: string | null
+  confianca: 'poucos_dados' | 'baixa' | 'media' | 'alta'
+  texto: string
+}
+
+/**
+ * Compara as abordagens de um teste pela % de resposta (teste de duas proporções entre a 1ª e a 2ª).
+ * Menos de 10 empresas por abordagem = poucos dados. 90% de certeza = média; 95% = alta.
+ */
+export function analisarTeste(vs: NumerosVariante[]): AnaliseTeste {
+  const taxa = (v: NumerosVariante) => (v.abordados ? v.responderam / v.abordados : 0)
+  const ordem = vs.slice().sort((a, b) => taxa(b) - taxa(a) || b.quentes - a.quentes)
+  const [a, b] = ordem
+  const pct = (v: NumerosVariante) => `${Math.round(taxa(v) * 100)}%`
+  if (!a || !b) return { lider: null, confianca: 'poucos_dados', texto: 'O teste precisa de pelo menos 2 abordagens.' }
+  if (vs.some((v) => v.abordados < 10)) {
+    return { lider: null, confianca: 'poucos_dados', texto: `Poucos dados ainda (menos de 10 empresas em alguma abordagem). Por enquanto: ${a.nome} ${pct(a)} de resposta x ${b.nome} ${pct(b)}.` }
+  }
+  const p = (a.responderam + b.responderam) / (a.abordados + b.abordados)
+  const erro = Math.sqrt(p * (1 - p) * (1 / a.abordados + 1 / b.abordados))
+  const z = erro > 0 ? (taxa(a) - taxa(b)) / erro : 0
+  const extra = a.quentes || a.vendas ? ` (${a.quentes} quente(s), ${a.vendas} venda(s))` : ''
+  if (z >= 1.96) return { lider: a.id, confianca: 'alta', texto: `${a.nome} venceu: ${pct(a)} de resposta contra ${pct(b)} da ${b.nome}${extra}. Diferença clara (95% de certeza).` }
+  if (z >= 1.645) return { lider: a.id, confianca: 'media', texto: `${a.nome} está na frente: ${pct(a)} contra ${pct(b)} da ${b.nome}${extra}. Boa chance de ser melhor (90% de certeza).` }
+  return { lider: null, confianca: 'baixa', texto: `Empate técnico: ${a.nome} ${pct(a)} x ${b.nome} ${pct(b)} de resposta. A diferença ainda pode ser sorte; olhe também quentes e vendas.` }
+}
 
 /**
  * Próxima cidade/nicho para buscar: sorteio com peso pela taxa de resposta de cada alvo (as que

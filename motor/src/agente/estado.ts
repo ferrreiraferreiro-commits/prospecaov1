@@ -30,6 +30,8 @@ export interface Extra {
   /** Pausado porque o WhatsApp caiu de forma suspeita (você retoma na tela) */
   pausadoPorRisco: string | null
   ultimoErro: string | null
+  /** Dia (AAAA-MM-DD) em que a prospecção freou sozinha (muita gente pediu para parar) */
+  freio: string | null
 }
 
 /** Junta o que foi salvo com o padrão (campos novos ganham o valor padrão). */
@@ -52,7 +54,7 @@ export const db = {
   licoes: readJson<Licao[]>(ARQ.licoes, []),
   fila: readJson<FilaItem[]>(ARQ.fila, []),
   dias: readJson<Record<string, Dia>>(ARQ.dias, {}),
-  extra: { conhecidos: [], descartados: [], desde: null, pausadoPorRisco: null, ultimoErro: null, ...readJson<Partial<Extra>>(ARQ.extra, {}) } as Extra,
+  extra: { conhecidos: [], descartados: [], desde: null, pausadoPorRisco: null, ultimoErro: null, freio: null, ...readJson<Partial<Extra>>(ARQ.extra, {}) } as Extra,
   atividade: readJson<Atividade[]>(ARQ.atividade, []),
   testes: readJson<Teste[]>(ARQ.testes, []),
 }

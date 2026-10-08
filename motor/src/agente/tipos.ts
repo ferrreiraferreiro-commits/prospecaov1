@@ -184,6 +184,8 @@ export interface Mensagem {
   nota?: 'bom' | 'ruim'
   /** Como você teria respondido */
   correcao?: string
+  /** Resposta automática (WhatsApp Business): não conta como resposta e o agente não responde */
+  auto?: boolean
 }
 
 export interface Conversa {
@@ -216,6 +218,8 @@ export interface Conversa {
   /** Chave da última mensagem recebida (para marcar como lida antes de responder) */
   ultimaChave: unknown
   avisadoQuente: boolean
+  /** Último lembrete para você de que o cliente está esperando (conversa com você) */
+  lembradoEm?: string | null
   criadaEm: string
   atualizadaEm: string
   sinc: { mensagens: number; estado: Estado | null; lead: boolean }

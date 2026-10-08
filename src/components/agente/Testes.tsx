@@ -116,6 +116,9 @@ export function Testes() {
                   </div>
                 ))}
                 {t.abordados > 0 && t.abordados < t.variantes.length * 10 && <p className="text-2xs text-fg-4">Ainda são poucas empresas: veja como tendência, não como certeza.</p>}
+                {t.analise && !t.conclusao && (
+                  <p className={}>{t.analise.texto}</p>
+                )}
                 {t.conclusao && <p className="rounded-md bg-tint/[0.03] px-2.5 py-1.5 text-xs text-fg-2">Conclusão: {t.conclusao}</p>}
               </div>
             </Card>
