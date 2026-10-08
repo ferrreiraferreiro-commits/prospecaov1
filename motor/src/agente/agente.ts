@@ -29,7 +29,23 @@ import {
   respondeu,
   tempoDigitandoMs,
 } from './regras.js'
-import { DIA_VAZIO, ESTADOS_ATIVOS, MODELOS, type AgenteConfig, type Alvo, type Atividade, type Conversa, type Dia, type Estado, type FilaItem, type Licao, type Mensagem, type Modelo } from './tipos.js'
+import {
+  DIA_VAZIO,
+  ESTADOS_ATIVOS,
+  MODELOS,
+  type AgenteConfig,
+  type Alvo,
+  type Atividade,
+  type Conversa,
+  type Dia,
+  type Estado,
+  type FilaItem,
+  type Licao,
+  type Mensagem,
+  type Modelo,
+  type Teste,
+  type Variante,
+} from './tipos.js'
 
 /** Só a sessão do dono liga o agente (no systemd: /etc/xs-whatsapp/motor-principal.env). */
 export const AGENTE_LIGADO = process.env.XS_AGENTE === '1'
@@ -420,7 +436,7 @@ interface ResultadoBase {
 }
 
 /** Busca mais empresas para a fila numa cidade/nicho (sorteado pelos resultados, ou o que você escolher). */
-async function reabastecer(alvoEscolhido?: Alvo): Promise<{ achadas: number; mantidas: FilaItem[] }> {
+async function reabastecer(alvoEscolhido?: Alvo, testeId?: string): Promise<{ achadas: number; mantidas: FilaItem[] }> {
   const p = db.config.prospeccao
   const alvo = alvoEscolhido ?? escolherAlvo(p.alvos, db.conversas)
   if (!alvo) throw new Error('Cadastre ao menos uma cidade com tipos de negócio em Prospecção.')
@@ -462,6 +478,7 @@ async function reabastecer(alvoEscolhido?: Alvo): Promise<{ achadas: number; man
       alvoId: alvo.id,
       bruto: r as unknown as Record<string, unknown>,
       em: agora,
+      ...(testeId ? { testeId } : {}),
     }))
     .filter((f) => isValidBrazilWhatsApp(f.telefone))
   const achadas = itens.length
@@ -481,13 +498,45 @@ async function reabastecer(alvoEscolhido?: Alvo): Promise<{ achadas: number; man
   return { achadas, mantidas: itens }
 }
 
+/** Teste que ainda precisa abordar empresas (o mais antigo primeiro). */
+function testeAtivo(): Teste | undefined {
+  return db.testes.find((t) => t.estado === 'rodando' && db.conversas.filter((c) => c.testeId === t.id).length < t.porVariante * t.variantes.length)
+}
+
+/** Abordagem do teste com menos empresas até agora (divide igual). */
+function proximaVariante(t: Teste): Variante {
+  const usadas = (v: Variante) => db.conversas.filter((c) => c.testeId === t.id && c.variante === v.id).length
+  return t.variantes.reduce((menor, v) => (usadas(v) < usadas(menor) ? v : menor), t.variantes[0])
+}
+
 async function proximoDaFila(): Promise<FilaItem | null> {
-  for (let tentativa = 0; tentativa < 3; tentativa++) {
+  // Teste rodando: as empresas dele vêm antes da prospecção normal
+  const teste = testeAtivo()
+  for (let tentativa = 0; teste && tentativa < 2; tentativa++) {
     const fora = bloqueados()
-    while (db.fila.length) {
-      const it = db.fila.shift()!
+    let i: number
+    while ((i = db.fila.findIndex((f) => f.testeId === teste.id)) >= 0) {
+      const [it] = db.fila.splice(i, 1)
       if (!fora.has(phoneKey(it.telefone)) && isValidBrazilWhatsApp(it.telefone)) return it
     }
+    const r = await reabastecer(teste.alvo, teste.id).catch((err) => {
+      registrar('erro', `Busca do teste "${teste.nome}": ${(err as Error).message}`)
+      return null
+    })
+    if (!r?.mantidas.length) {
+      teste.estado = 'pausado'
+      registrar('aviso', `Teste "${teste.nome}" pausado: acabaram as empresas novas de ${teste.alvo.nichos.map((n) => n.nome).join(', ')} em ${teste.alvo.cidade}.`)
+      break
+    }
+  }
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    const fora = bloqueados()
+    let i: number
+    while ((i = db.fila.findIndex((f) => !f.testeId)) >= 0) {
+      const [it] = db.fila.splice(i, 1)
+      if (!fora.has(phoneKey(it.telefone)) && isValidBrazilWhatsApp(it.telefone)) return it
+    }
+    if (!db.config.prospeccao.alvos.some((a) => a.ativo)) return null
     const r = await reabastecer().catch((err) => {
       registrar('erro', `Busca de empresas: ${(err as Error).message}`)
       return null
@@ -521,13 +570,24 @@ async function prospectar(t: Date): Promise<boolean> {
     return true
   }
   const lead = { empresa: item.empresa, nicho: item.nicho, cidade: item.cidade, uf: item.uf, endereco: item.endereco, site: item.site, instagram: item.instagram }
-  const r = await comIA(() => ia.abordagem(ctx(), lead, t), `Abordagem de ${item.empresa}`)
+  const teste = item.testeId ? db.testes.find((x) => x.id === item.testeId && x.estado === 'rodando') : undefined
+  const variante = teste ? proximaVariante(teste) : undefined
+  const r = await comIA(() => ia.abordagem(ctx(), lead, t, variante?.angulo), `Abordagem de ${item.empresa}`)
   if (!r?.mensagens.length) {
     db.fila.unshift(item)
     proximaAbordagem = Date.now() + 5 * 60_000
     return true
   }
-  const c = novaConversa({ ...lead, telefone: item.telefone, jid: contato.jid, origem: 'agente', alvoId: item.alvoId, bruto: item.bruto })
+  const c = novaConversa({
+    ...lead,
+    telefone: item.telefone,
+    jid: contato.jid,
+    origem: 'agente',
+    alvoId: item.alvoId,
+    bruto: item.bruto,
+    testeId: teste?.id ?? null,
+    variante: variante?.id ?? null,
+  })
   db.conversas.push(c)
   try {
     await enviar(c, r.mensagens.slice(0, 2))
@@ -538,7 +598,7 @@ async function prospectar(t: Date): Promise<boolean> {
     return true
   }
   dia.abordados++
-  registrar('abordou', `Abordou ${c.empresa} (${[c.nicho, c.cidade].filter(Boolean).join(', ')})`, c.id)
+  registrar('abordou', `Abordou ${c.empresa} (${[c.nicho, c.cidade].filter(Boolean).join(', ')})${teste && variante ? ` · teste "${teste.nome}", abordagem ${variante.nome}` : ''}`, c.id)
   proximaAbordagem = Date.now() + intervaloAbordagemMs(t, p.fim, cota - dia.abordados)
   salvar()
   return true
@@ -892,6 +952,106 @@ export async function buscarAgora(alvoId?: string) {
   if (alvoId && !alvo) throw new Error('Cidade não encontrada em Prospecção.')
   const r = await reabastecer(alvo)
   return { achadas: r.achadas, novas: r.mantidas.length, fila: listarFila() }
+}
+
+// ---------------------------------------------------------------------------
+// Testes de abordagens e números por ramo
+// ---------------------------------------------------------------------------
+
+export interface Numeros {
+  abordados: number
+  responderam: number
+  quentes: number
+  reunioes: number
+  vendas: number
+  pediramParar: number
+  /** % que respondeu */
+  taxaResposta: number
+}
+
+const QUENTE: Estado[] = ['quente', 'reuniao', 'fechado']
+
+/** Contas de um grupo de conversas abordadas pelo agente. */
+export function numerosDe(lista: Conversa[]): Numeros {
+  const abordados = lista.length
+  const responderam = lista.filter(respondeu).length
+  return {
+    abordados,
+    responderam,
+    quentes: lista.filter((c) => c.avisadoQuente || QUENTE.includes(c.estado)).length,
+    reunioes: lista.filter((c) => c.estado === 'reuniao').length,
+    vendas: lista.filter((c) => c.estado === 'fechado').length,
+    pediramParar: lista.filter((c) => c.estado === 'optout').length,
+    taxaResposta: abordados ? Math.round((responderam / abordados) * 100) : 0,
+  }
+}
+
+/** Como cada ramo (tipo de negócio) está indo, só com o que o agente abordou. */
+export function numerosPorRamo() {
+  const grupos = new Map<string, Conversa[]>()
+  for (const c of db.conversas) {
+    if (c.origem !== 'agente') continue
+    const k = c.nicho || 'Sem ramo'
+    grupos.set(k, [...(grupos.get(k) ?? []), c])
+  }
+  return [...grupos.entries()].map(([ramo, lista]) => ({ ramo, ...numerosDe(lista) })).sort((a, b) => b.abordados - a.abordados)
+}
+
+function verTeste(t: Teste) {
+  const deste = db.conversas.filter((c) => c.testeId === t.id)
+  return {
+    ...t,
+    abordados: deste.length,
+    meta: t.porVariante * t.variantes.length,
+    variantes: t.variantes.map((v) => ({ ...v, ...numerosDe(deste.filter((c) => c.variante === v.id)) })),
+    total: numerosDe(deste),
+  }
+}
+
+export function listarTestes() {
+  return db.testes
+    .slice()
+    .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))
+    .map(verTeste)
+}
+
+/** Cria um teste (a prospecção precisa estar ligada para ele rodar). */
+export function criarTeste(body: { nome?: unknown; alvo?: Partial<Alvo>; variantes?: { nome?: unknown; angulo?: unknown }[]; porVariante?: unknown }) {
+  const alvo = limparAlvo({ ...body.alvo, id: randomUUID(), ativo: true })
+  if (!alvo) throw new Error('O teste precisa de cidade, UF e tipos de negócio da busca.')
+  const variantes = (Array.isArray(body.variantes) ? body.variantes : [])
+    .slice(0, 4)
+    .map((v, i) => ({ id: randomUUID().slice(0, 8), nome: txt(v.nome, 60) || String.fromCharCode(65 + i), angulo: txt(v.angulo, 800) }))
+    .filter((v) => v.angulo)
+  if (variantes.length < 2) throw new Error('O teste precisa de pelo menos 2 abordagens, cada uma com o seu ângulo.')
+  const t: Teste = {
+    id: randomUUID(),
+    nome: txt(body.nome, 80) || `${alvo.nichos.map((n) => n.nome).join(', ')} em ${alvo.cidade}`,
+    alvo,
+    variantes,
+    porVariante: Math.round(num(body.porVariante, 3, 100, 15)),
+    estado: 'rodando',
+    criadoEm: iso(),
+    encerradoEm: null,
+    conclusao: '',
+  }
+  db.testes.push(t)
+  registrar('aviso', `Teste criado: "${t.nome}" (${variantes.length} abordagens, ${t.porVariante} empresas cada)`)
+  return verTeste(t)
+}
+
+export function mudarTeste(id: string, body: { estado?: unknown; conclusao?: unknown }) {
+  const t = db.testes.find((x) => x.id === id)
+  if (!t) throw new Error('Teste não encontrado.')
+  if (body.estado === 'rodando' || body.estado === 'pausado' || body.estado === 'encerrado') {
+    t.estado = body.estado
+    t.encerradoEm = body.estado === 'encerrado' ? iso() : null
+    // Empresas buscadas para o teste que não foram usadas voltam a ser da prospecção normal
+    if (body.estado === 'encerrado') for (const f of db.fila) if (f.testeId === t.id) delete f.testeId
+  }
+  if (typeof body.conclusao === 'string') t.conclusao = txt(body.conclusao, 1500)
+  registrar('aviso', `Teste "${t.nome}": ${t.estado}`)
+  return verTeste(t)
 }
 
 const leadDeTeste = (l: Partial<Conversa> = {}) => ({

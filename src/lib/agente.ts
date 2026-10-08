@@ -180,6 +180,33 @@ export interface Atividade {
   conversa?: string
 }
 
+export interface Numeros {
+  abordados: number
+  responderam: number
+  quentes: number
+  reunioes: number
+  vendas: number
+  pediramParar: number
+  taxaResposta: number
+}
+
+export interface TesteView {
+  id: string
+  nome: string
+  alvo: Alvo
+  estado: 'rodando' | 'pausado' | 'encerrado'
+  porVariante: number
+  criadoEm: string
+  encerradoEm: string | null
+  conclusao: string
+  abordados: number
+  meta: number
+  variantes: ({ id: string; nome: string; angulo: string } & Numeros)[]
+  total: Numeros
+}
+
+export type NumerosRamo = { ramo: string } & Numeros
+
 export interface RespostaSimulada {
   mensagens: string[]
   acao: 'continuar' | 'aguardar' | 'chamar_dono' | 'reuniao_marcada' | 'venda_fechada' | 'perdido' | 'optout'

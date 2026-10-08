@@ -185,12 +185,12 @@ export interface Contexto {
 }
 
 /** Primeira mensagem para uma empresa que não conhece vocês. */
-export async function abordagem(ctx: Contexto, lead: LeadInfo, agora = new Date()) {
+export async function abordagem(ctx: Contexto, lead: LeadInfo, agora = new Date(), angulo = '') {
   const pedido = `${agoraTexto(agora)}
 
 Escreva a PRIMEIRA mensagem para esta empresa. O dono não conhece vocês.
 ${ficha(lead)}
-
+${angulo.trim() ? `\nÂngulo desta abordagem (é um teste: siga este ângulo à risca, mesmo que as lições digam outra coisa sobre a primeira mensagem):\n${angulo.trim()}\n` : ''}
 - Comece com "${saudacao(agora)}" e se apresente.
 - Mostre que você olhou a empresa (cite o nome e algo concreto, como o tipo de negócio ou a cidade; se não tem site, use isso com tato, sem ofender).
 - Termine com uma pergunta simples e fácil de responder.
@@ -263,6 +263,89 @@ export async function licaoDoResultado(ctx: Contexto, c: Pick<Conversa, 'mensage
   const sistema = `Você analisa conversas de venda de sites pelo WhatsApp e tira lições curtas e práticas para as próximas.`
   const pedido = `${ficha(c)}\n\nConversa:\n${transcricao(c)}\n\nResultado: ${resultado}.\n\nLições que já existem:\n${listaLicoes(ctx.licoes, 'conversa')}\n\nSe esta conversa ensina algo novo e útil (o que fez dar certo ou o que fez perder), escreva UMA lição geral. Se não ensina nada novo, devolva vazio.`
   return chamar(ctx.chave, ctx.cfg.modelo, sistema, pedido, NovaLicao, 2000)
+}
+
+// ---------------------------------------------------------------------------
+// Prompt de site (para o dono colar no Claude e construir o site do cliente)
+// ---------------------------------------------------------------------------
+
+export interface DadosSite {
+  empresa: string
+  ramo?: string
+  cidade?: string
+  uf?: string
+  endereco?: string
+  telefone?: string
+  instagram?: string
+  siteAtual?: string
+  /** Tudo o que se sabe do negócio: serviços, preços, história, diferenciais, links (pedido, agendamento…) */
+  informacoes?: string
+  /** Estilo visual e tom: moderno, casual, premium, retrô, cores, fontes, referências */
+  estilo?: string
+  /** Seções que quer, que não quer, ordem */
+  secoes?: string
+  /** Site de demonstração (selo discreto "Site para demonstração") */
+  demonstracao?: boolean
+}
+
+const SISTEMA_SITE = (exemplos: { titulo: string; texto: string }[]) => `Você escreve prompts para o Claude (um agente de código) construir sites completos para pequenos negócios locais. Quem usa é um vendedor de sites: ele cola o seu prompt no Claude junto com as imagens do cliente (logo, fotos, cardápio, tabela de preços) e o Claude constrói o site.
+
+Siga o MODELO dos exemplos abaixo, que já deram certo: mesma profundidade, mesma estrutura (identidade e posicionamento, objetivo, informações oficiais, identidade visual, o que NÃO fazer, tom de comunicação, estrutura das seções com orientação de cada uma, dados que viram arquivos (cardápio, planos, serviços), LGPD, imagens, animações, mobile first com as larguras a testar, SEO local, acessibilidade, performance, implementação em Vite + React + TypeScript + Tailwind, regras sobre informações (o que pode usar e o que NUNCA inventar) e checklist final). Adapte as seções ao ramo do cliente: um restaurante tem cardápio; uma academia tem planos; um salão tem serviços e agendamento; uma oficina tem serviços e orçamento.
+
+Regras:
+- Use somente as informações fornecidas. Onde faltar dado (preço, horário, endereço), escreva no prompt que o Claude deve tirar das imagens anexadas ou deixar marcado como "a confirmar", nunca inventar.
+- Deixe explícito: não inventar depoimentos, números, prêmios, anos de mercado, CNPJ, profissionais, promoções ou resultados.
+- Evite estética de IA e de template (gradientes exagerados, glassmorphism, blobs, cards iguais em sequência, frases motivacionais genéricas). Peça personalidade da marca.
+- Respeite o estilo pedido (moderno, casual, premium, retrô etc.) em cores, tipografia, tom dos textos e animações.
+- Se for demonstração, inclua o selo discreto "Site para demonstração".
+- Escreva em português do Brasil, em texto simples com títulos (pode usar "#", "##" e listas com "-").
+- Responda SÓ com o prompt, do começo ao fim, sem comentários antes ou depois.
+
+${exemplos.map((e, i) => `===== EXEMPLO ${i + 1}: ${e.titulo} =====\n${e.texto}`).join('\n\n')}`
+
+/** Escreve (ou reescreve com ajustes) o prompt do site de um cliente. */
+export async function promptDeSite(chave: string, modelo: Modelo, exemplos: { titulo: string; texto: string }[], dados: DadosSite, anterior?: { texto: string; ajustes: string }) {
+  const campo = (rotulo: string, v?: string) => (v?.trim() ? `${rotulo}: ${v.trim()}` : '')
+  const ficha = [
+    campo('Empresa', dados.empresa),
+    campo('Ramo', dados.ramo),
+    campo('Cidade', [dados.cidade, dados.uf].filter(Boolean).join(' - ')),
+    campo('Endereço', dados.endereco),
+    campo('Telefone/WhatsApp', dados.telefone),
+    campo('Instagram', dados.instagram),
+    campo('Site atual', dados.siteAtual),
+    campo('Informações do negócio', dados.informacoes),
+    campo('Estilo desejado', dados.estilo),
+    campo('Seções', dados.secoes),
+    `Demonstração: ${dados.demonstracao ? 'sim (incluir o selo "Site para demonstração")' : 'não'}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const pedido = anterior
+    ? `Este é o prompt atual do site:\n\n${anterior.texto}\n\n---\nDados do cliente:\n${ficha}\n\nReescreva o prompt COMPLETO aplicando estes ajustes do vendedor (mantenha o resto):\n${anterior.ajustes}`
+    : `Escreva o prompt do site para este cliente:\n\n${ficha}`
+  try {
+    const res = await api(chave)
+      .messages.stream({
+        model: modelo,
+        max_tokens: 32000,
+        system: [{ type: 'text', text: SISTEMA_SITE(exemplos), cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: pedido }],
+        output_config: { effort: 'medium' },
+      })
+      .finalMessage()
+    const uso = { custo: custoUSD(modelo, res.usage) }
+    if (res.stop_reason === 'refusal') throw Object.assign(new ErroIA('A IA preferiu não escrever este prompt.'), { uso })
+    const texto = res.content
+      .filter((b) => b.type === 'text')
+      .map((b) => (b as { text: string }).text)
+      .join('\n')
+      .trim()
+    if (!texto) throw Object.assign(new ErroIA('A IA não devolveu o prompt.'), { uso })
+    return { texto, incompleto: res.stop_reason === 'max_tokens', uso }
+  } catch (err) {
+    throw traduzir(err)
+  }
 }
 
 /** "Não aborde empresas assim": sua avaliação de um item da fila vira lição de busca. */

@@ -6,7 +6,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { readJson, storageDir, writeJson } from '../store.js'
-import { CONFIG_PADRAO, type AgenteConfig, type Atividade, type Conversa, type Dia, type FilaItem, type Licao } from './tipos.js'
+import { CONFIG_PADRAO, type AgenteConfig, type Atividade, type Conversa, type Dia, type FilaItem, type Licao, type Teste } from './tipos.js'
 
 const ARQ = {
   config: 'agente-config.json',
@@ -16,6 +16,7 @@ const ARQ = {
   dias: 'agente-dias.json',
   extra: 'agente-extra.json',
   atividade: 'agente-atividade.json',
+  testes: 'agente-testes.json',
   chave: 'agente-chave.json',
 }
 
@@ -53,6 +54,7 @@ export const db = {
   dias: readJson<Record<string, Dia>>(ARQ.dias, {}),
   extra: { conhecidos: [], descartados: [], desde: null, pausadoPorRisco: null, ultimoErro: null, ...readJson<Partial<Extra>>(ARQ.extra, {}) } as Extra,
   atividade: readJson<Atividade[]>(ARQ.atividade, []),
+  testes: readJson<Teste[]>(ARQ.testes, []),
 }
 
 let timer: NodeJS.Timeout | null = null
@@ -69,6 +71,7 @@ export function salvar(agora = false) {
     writeJson(ARQ.dias, db.dias)
     writeJson(ARQ.extra, db.extra)
     writeJson(ARQ.atividade, db.atividade)
+    writeJson(ARQ.testes, db.testes)
   }
   if (agora) gravar()
   else timer = setTimeout(gravar, 500)

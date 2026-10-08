@@ -40,6 +40,18 @@ export interface ChamadaApp {
   input: Record<string, unknown>
 }
 
+/** Prompt de site de um cliente (sem o texto: ele vem ao abrir). */
+export interface PromptSiteResumo {
+  id: string
+  empresa: string
+  versao: number
+  origem: string
+  ajustes: string
+  incompleto: boolean
+  em: string
+  tamanho: number
+}
+
 export interface EstadoXico {
   estado: 'livre' | 'pensando' | 'esperando_app'
   fazendo: string
@@ -47,6 +59,7 @@ export interface EstadoXico {
   mensagens: MensagemXico[]
   propostas: PropostaXico[]
   memoria: Lembranca[]
+  prompts: PromptSiteResumo[]
   temChave: boolean
 }
 

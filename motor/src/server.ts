@@ -148,6 +148,12 @@ app.post('/agente/xico/app', wrap(soAgente((req) => xico.responderApp(req.body?.
 app.post('/agente/xico/propostas/:id', wrap(soAgente((req) => xico.decidir(id(req), req.body?.aceitar === true))))
 app.delete('/agente/xico/memoria/:id', wrap(soAgente((req) => xico.apagarLembranca(id(req)))))
 app.post('/agente/xico/recomecar', wrap(soAgente(() => xico.recomecar())))
+app.get('/agente/xico/prompt', wrap(soAgente(() => ({ texto: xico.promptParaClaude() }))))
+app.get('/agente/xico/sites/:id', wrap(soAgente((req) => xico.verPrompt(id(req)))))
+app.delete('/agente/xico/sites/:id', wrap(soAgente((req) => xico.apagarPrompt(id(req)))))
+app.get('/agente/testes', wrap(soAgente(() => agente.listarTestes())))
+app.post('/agente/testes/:id', wrap(soAgente((req) => agente.mudarTeste(id(req), req.body ?? {}))))
+app.get('/agente/ramos', wrap(soAgente(() => agente.numerosPorRamo())))
 
 // ---------------------------------------------------------------- Conversas (só texto)
 app.get('/conversas', wrap(() => listarConversas()))

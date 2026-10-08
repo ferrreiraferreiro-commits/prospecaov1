@@ -16,7 +16,8 @@ import { randomUUID } from 'node:crypto'
 import type { BetaContentBlock, BetaContentBlockParam, BetaMessageParam, BetaTool, BetaToolResultBlockParam } from '@anthropic-ai/sdk/resources/beta/messages/messages'
 import { readJson, writeJson } from '../store.js'
 import * as agente from './agente.js'
-import { api, ErroIA, traduzir } from './ia.js'
+import { api, ErroIA, promptDeSite, traduzir, type DadosSite } from './ia.js'
+import { EXEMPLOS_PROMPT_SITE } from './modelosSite.js'
 import { custoUSD } from './regras.js'
 import type { AgenteConfig, Alvo, Modelo } from './tipos.js'
 
@@ -41,6 +42,8 @@ export interface Proposta {
   titulo: string
   detalhe: string
   patch: Patch
+  /** Além (ou em vez) da configuração: criar um teste de abordagens */
+  teste?: Parameters<typeof agente.criarTeste>[0]
   estado: 'pendente' | 'aceita' | 'recusada'
   em: string
 }
@@ -51,7 +54,22 @@ export interface Lembranca {
   em: string
 }
 
+/** Prompt de site de um cliente, para colar no Claude. Cada ajuste vira uma versão nova. */
+export interface PromptSite {
+  id: string
+  empresa: string
+  versao: number
+  /** Primeira versão desta linha (as versões seguintes apontam para ela) */
+  origem: string
+  dados: DadosSite
+  ajustes: string
+  texto: string
+  incompleto: boolean
+  em: string
+}
+
 interface Dados {
+  prompts: PromptSite[]
   historico: BetaMessageParam[]
   visiveis: Visivel[]
   memoria: Lembranca[]
@@ -64,9 +82,10 @@ interface Dados {
 }
 
 const ARQ = 'xico.json'
-const d: Dados = { historico: [], visiveis: [], memoria: [], propostas: [], resumo: '', notas: [], ultimaConversaEm: null, ...readJson<Partial<Dados>>(ARQ, {}) }
+const d: Dados = { prompts: [], historico: [], visiveis: [], memoria: [], propostas: [], resumo: '', notas: [], ultimaConversaEm: null, ...readJson<Partial<Dados>>(ARQ, {}) }
 
 function salvar() {
+  if (d.prompts.length > 60) d.prompts.splice(0, d.prompts.length - 60)
   if (d.visiveis.length > 400) d.visiveis.splice(0, d.visiveis.length - 400)
   if (d.propostas.length > 100) d.propostas.splice(0, d.propostas.length - 100)
   writeJson(ARQ, d)
@@ -114,6 +133,9 @@ const SISTEMA = `Você é o Xico, o assistente pessoal e braço direito do dono 
 ## O que você cuida
 1. O vendedor do WhatsApp: um agente de IA que busca empresas sem site, aborda, conversa, faz follow-up e fecha vendas pelo WhatsApp do dono. Você acompanha o que ele faz e ajusta o treino dele conforme o dono quiser.
 2. O negócio na XS: leads, retornos, reuniões, clientes, projetos e financeiro.
+3. Testes de abordagem: quando o dono quer testar um ramo ou um jeito de abordar, monte um teste com 2 a 4 abordagens bem diferentes (criar_teste), acompanhe os números (testes, numeros_por_ramo) e diga com franqueza se vale a pena, lembrando que poucas empresas abordadas ainda não provam nada (com menos de ~10 por abordagem, fale em "tendência").
+4. Prompts de site: o dono constrói os sites dos clientes no Claude a partir de prompts longos e detalhados. Quando ele pedir o site de um cliente, junte os dados (ficha do lead, conversa do vendedor, o que ele te contar), pergunte o estilo se faltar e use prompt_de_site. Para ajustes ("mais moderno", "mais casual", outras cores), gere uma versão nova com base e ajustes.
+5. Levar tudo para o Claude: prompt_para_claude monta o documento com tudo o que vocês sabem, para o dono colar num Projeto do Claude.
 
 ## Regras
 - Antes de falar de números ou de uma conversa, olhe com as ferramentas. Nunca invente dado, preço, nome ou resultado.
@@ -234,6 +256,64 @@ const DO_SERVIDOR: BetaTool[] = [
     ),
   },
   { name: 'fila_empresas', description: 'As próximas empresas que o vendedor vai abordar.', input_schema: obj({}) },
+  {
+    name: 'criar_teste',
+    description:
+      'Propõe um teste de abordagens num ramo e cidade (vira proposta). Crie de 2 a 4 abordagens bem diferentes entre si (ângulos: dor do cliente, prova social/exemplo, preço, curiosidade, Google, iFood…), cada uma com um ângulo claro que a IA do vendedor vai seguir na primeira mensagem. As empresas são divididas igualmente e o teste roda antes da prospecção normal. Os nichos precisam vir de tipos_de_negocio.',
+    input_schema: obj(
+      {
+        nome: str('Nome curto do teste'),
+        uf: str('UF'),
+        cidade: str('Cidade'),
+        nichos: { type: 'array', items: NICHO },
+        porVariante: int('Empresas por abordagem (padrão 15; mínimo 3)'),
+        variantes: { type: 'array', items: obj({ nome: str('Nome curto (ex.: "A · iFood")'), angulo: str('O ângulo da primeira mensagem, explicado para o vendedor') }, ['nome', 'angulo']) },
+      },
+      ['uf', 'cidade', 'nichos', 'variantes'],
+    ),
+  },
+  { name: 'testes', description: 'Testes de abordagens com os números de cada abordagem (abordados, responderam, quentes, reuniões, vendas, pediram para parar, % de resposta).', input_schema: obj({}) },
+  {
+    name: 'mudar_teste',
+    description: 'Pausa, retoma ou encerra um teste e registra a conclusão (vale na hora).',
+    input_schema: obj({ id: str('Id do teste'), estado: { type: 'string', enum: ['rodando', 'pausado', 'encerrado'] }, conclusao: str('O que o teste mostrou (curto)') }, ['id']),
+  },
+  {
+    name: 'adotar_abordagem',
+    description: 'Transforma a abordagem vencedora de um teste em lição do vendedor (vale na hora): dali em diante, a primeira mensagem para aquele ramo segue esse ângulo.',
+    input_schema: obj({ teste: str('Id do teste'), variante: str('Id da abordagem') }, ['teste', 'variante']),
+  },
+  { name: 'numeros_por_ramo', description: 'Como cada ramo (tipo de negócio) está indo no vendedor: abordados, % de resposta, quentes, reuniões, vendas e quem pediu para parar.', input_schema: obj({}) },
+  {
+    name: 'prompt_de_site',
+    description:
+      'Escreve o prompt completo para o Claude construir o site de um cliente, no modelo dos prompts que o dono já usou (estrutura, regras de não inventar, mobile, SEO, LGPD, checklist). Antes, junte os dados: ficha do lead (crm_lead) e/ou a conversa do vendedor, e pergunte ao dono o estilo se ele não disse. Para ajustar um prompt que já existe ("mais moderno", "mais casual", "cores verde e preto", "tira a galeria"), mande `base` com o id e os `ajustes`: sai uma versão nova. O prompt aparece na tela em "Prompts de site" para copiar; não cole o prompt inteiro no chat.',
+    input_schema: obj(
+      {
+        empresa: str('Nome do negócio'),
+        ramo: str('Tipo de negócio'),
+        cidade: str('Cidade'),
+        uf: str('UF'),
+        endereco: str('Endereço completo'),
+        telefone: str('Telefone/WhatsApp'),
+        instagram: str('Instagram'),
+        site_atual: str('Site atual, se tiver'),
+        informacoes: str('Tudo o que se sabe do negócio: serviços, preços, história, diferenciais, links de pedido/agendamento, o que o cliente pediu na conversa'),
+        estilo: str('Estilo e tom: moderno, casual, premium, retrô, minimalista, cores, fontes, referências'),
+        secoes: str('Seções que quer ou não quer'),
+        demonstracao: { type: 'boolean', description: 'É site de demonstração (selo discreto)?' },
+        base: str('Id de um prompt já feito, para gerar uma versão nova com ajustes'),
+        ajustes: str('O que mudar em relação à versão base'),
+      },
+      ['empresa'],
+    ),
+  },
+  { name: 'prompts_de_site', description: 'Lista os prompts de site já feitos (id, empresa, versão, data, ajustes).', input_schema: obj({}) },
+  {
+    name: 'prompt_para_claude',
+    description: 'Monta o "prompt mestre" com tudo o que você e o vendedor sabem (o dono, a oferta, as regras, as lições, os números por ramo) para o dono colar num Projeto do Claude. Ele também tem um botão na tela para copiar.',
+    input_schema: obj({}),
+  },
   { name: 'buscar_empresas_agora', description: 'Busca empresas novas agora para a fila (numa cidade da prospecção, ou sorteada) e mostra quantas vieram.', input_schema: obj({ cidade: str('Cidade (opcional)') }) },
 ]
 
@@ -269,14 +349,22 @@ const ROTULO: Record<string, string> = {
   testar_resposta: 'Testou uma resposta',
   fila_empresas: 'Olhou a fila',
   buscar_empresas_agora: 'Buscou empresas',
+  criar_teste: 'Montou um teste',
+  testes: 'Olhou os testes',
+  mudar_teste: 'Mexeu num teste',
+  adotar_abordagem: 'Adotou uma abordagem',
+  numeros_por_ramo: 'Olhou os números por ramo',
+  prompt_para_claude: 'Montou o prompt para o Claude',
+  prompt_de_site: 'Escreveu o prompt do site',
+  prompts_de_site: 'Olhou os prompts de site',
 }
 
 const texto = (v: unknown, max = 6000) => String(v ?? '').trim().slice(0, max)
 const json = (v: unknown) => JSON.stringify(v)
 
-function propor(titulo: string, detalhe: string, patch: Patch): string {
+function propor(titulo: string, detalhe: string, patch: Patch, teste?: Proposta['teste']): string {
   for (const p of d.propostas) if (p.estado === 'pendente' && p.titulo === titulo) p.estado = 'recusada' // a nova substitui
-  const p: Proposta = { id: randomUUID(), titulo, detalhe, patch, estado: 'pendente', em: iso() }
+  const p: Proposta = { id: randomUUID(), titulo, detalhe, patch, ...(teste ? { teste } : {}), estado: 'pendente', em: iso() }
   d.propostas.push(p)
   return `Proposta criada: "${titulo}". Ela aparece na tela com os botões Confirmar e Recusar; só vale depois que o dono confirmar.`
 }
@@ -430,6 +518,90 @@ async function executar(nome: string, entrada: Record<string, any>): Promise<str
       if (cidade && !alvo) throw new Error(`"${entrada.cidade}" não está nas cidades da prospecção.`)
       const r = await agente.buscarAgora(alvo?.id)
       return json({ achadas: r.achadas, novasNaFila: r.novas, primeiras: r.fila.slice(0, 10).map((f) => `${f.empresa} (${f.nicho})`) })
+    }
+    case 'criar_teste': {
+      const variantes = (Array.isArray(entrada.variantes) ? entrada.variantes : []).slice(0, 4)
+      const nichos = Array.isArray(entrada.nichos) ? entrada.nichos : []
+      if (variantes.length < 2) throw new Error('Crie pelo menos 2 abordagens.')
+      if (!nichos.length || nichos.some((n: { tax?: unknown[]; nomes?: unknown[] }) => !n?.tax?.length && !n?.nomes?.length)) throw new Error('Os nichos precisam vir de tipos_de_negocio (com tax e nomes).')
+      const porVariante = Math.max(3, Math.min(100, Number(entrada.porVariante) || 15))
+      const teste = { nome: entrada.nome, alvo: { uf: entrada.uf, cidade: entrada.cidade, nichos }, variantes, porVariante }
+      const avisos = [
+        !cfg.prospeccao.ativa ? 'A prospecção estava desligada: confirmar também liga a prospecção.' : '',
+        !cfg.ativo ? 'O vendedor está desligado: o teste só começa quando ele for ligado.' : '',
+      ].filter(Boolean)
+      const detalhe = [
+        `${nichos.map((n: { nome: string }) => n.nome).join(', ')} em ${texto(entrada.cidade, 80)} - ${texto(entrada.uf, 2).toUpperCase()} · ${porVariante} empresas por abordagem (${porVariante * variantes.length} no total)`,
+        '',
+        ...variantes.map((v: { nome?: string; angulo?: string }, i: number) => `${v.nome || String.fromCharCode(65 + i)}: ${texto(v.angulo, 300)}`),
+        ...(avisos.length ? ['', ...avisos] : []),
+      ].join('\n')
+      return propor(`Teste: ${texto(entrada.nome, 60) || nichos.map((n: { nome: string }) => n.nome).join(', ')}`, detalhe, cfg.prospeccao.ativa ? {} : { prospeccao: { ativa: true } }, teste)
+    }
+    case 'testes':
+      return json(agente.listarTestes().map((t) => ({ id: t.id, nome: t.nome, estado: t.estado, criadoEm: t.criadoEm, abordados: `${t.abordados}/${t.meta}`, conclusao: t.conclusao, total: t.total, abordagens: t.variantes })))
+    case 'mudar_teste': {
+      const t = agente.mudarTeste(texto(entrada.id, 60), { estado: entrada.estado, conclusao: entrada.conclusao })
+      return `Teste "${t.nome}" agora está ${t.estado}.`
+    }
+    case 'adotar_abordagem': {
+      const t = agente.listarTestes().find((x) => x.id === entrada.teste)
+      const v = t?.variantes.find((x) => x.id === entrada.variante)
+      if (!t || !v) throw new Error('Teste ou abordagem não encontrados.')
+      const ramo = t.alvo.nichos.map((n) => n.nome).join(', ')
+      const l = agente.novaLicao({ tipo: 'conversa', texto: `Na primeira mensagem para ${ramo}, use este ângulo (venceu o teste "${t.nome}"): ${v.angulo}` })
+      return `Adotado. Lição criada (id ${l.id}).`
+    }
+    case 'numeros_por_ramo':
+      return json(agente.numerosPorRamo())
+    case 'prompt_de_site': {
+      const chave = agente.chaveDaApi()
+      const base = entrada.base ? d.prompts.find((p) => p.id === texto(entrada.base, 60)) : undefined
+      if (entrada.base && !base) throw new Error('Não achei esse prompt (veja prompts_de_site).')
+      const novo: DadosSite = {
+        empresa: texto(entrada.empresa, 120),
+        ramo: texto(entrada.ramo, 80),
+        cidade: texto(entrada.cidade, 80),
+        uf: texto(entrada.uf, 2).toUpperCase(),
+        endereco: texto(entrada.endereco, 300),
+        telefone: texto(entrada.telefone, 40),
+        instagram: texto(entrada.instagram, 120),
+        siteAtual: texto(entrada.site_atual, 300),
+        informacoes: texto(entrada.informacoes, 20_000),
+        estilo: texto(entrada.estilo, 2000),
+        secoes: texto(entrada.secoes, 2000),
+        demonstracao: entrada.demonstracao === true,
+      }
+      // Na versão nova, o que não veio continua como estava
+      const dados: DadosSite = { ...novo }
+      if (base) {
+        for (const k of Object.keys(base.dados) as (keyof DadosSite)[]) if (dados[k] === '') Object.assign(dados, { [k]: base.dados[k] })
+        if (typeof entrada.demonstracao !== 'boolean') dados.demonstracao = base.dados.demonstracao
+      }
+      const ajustes = texto(entrada.ajustes, 3000)
+      fazendo = base ? 'Reescrevendo o prompt do site' : 'Escrevendo o prompt do site'
+      const r = await promptDeSite(chave, agente.lerConfig().modelo, EXEMPLOS_PROMPT_SITE, dados, base ? { texto: base.texto, ajustes: ajustes || 'Revise e melhore.' } : undefined)
+      agente.registrarGasto(r.uso.custo)
+      const p: PromptSite = {
+        id: randomUUID().slice(0, 8),
+        empresa: dados.empresa || base?.empresa || 'Cliente',
+        versao: base ? Math.max(...d.prompts.filter((x) => x.origem === base.origem).map((x) => x.versao)) + 1 : 1,
+        origem: base?.origem ?? '',
+        dados,
+        ajustes,
+        texto: r.texto,
+        incompleto: r.incompleto,
+        em: iso(),
+      }
+      if (!p.origem) p.origem = p.id
+      d.prompts.push(p)
+      return `Prompt do site de ${p.empresa} pronto (id ${p.id}, versão ${p.versao}, ${p.texto.length} caracteres)${p.incompleto ? '. ATENÇÃO: ficou longo demais e foi cortado no fim; peça uma versão mais enxuta' : ''}. Ele está na tela em "Prompts de site" para o dono copiar e colar no Claude. Começo:\n${p.texto.slice(0, 700)}`
+    }
+    case 'prompts_de_site':
+      return json(d.prompts.map((p) => ({ id: p.id, empresa: p.empresa, versao: p.versao, em: p.em, ajustes: p.ajustes })))
+    case 'prompt_para_claude': {
+      const p = promptParaClaude()
+      return `Prompt montado (${p.length} caracteres). O dono copia pelo botão "Levar para o Claude" na tela do Xico. Começo:\n${p.slice(0, 1500)}`
     }
   }
   throw new Error('Ferramenta desconhecida.')
@@ -667,6 +839,63 @@ export function abrir() {
   return ver()
 }
 
+/**
+ * O "prompt mestre": tudo o que o Xico e o vendedor sabem, organizado para colar nas instruções de um
+ * Projeto do Claude. Montado na hora a partir dos dados (não gasta IA).
+ */
+export function promptParaClaude(): string {
+  const cfg = agente.lerConfig()
+  const n = cfg.negocio
+  const licoes = agente.listarLicoes().filter((l) => l.ativa)
+  const ramos = agente.numerosPorRamo().filter((r) => r.abordados > 0)
+  const testes = agente.listarTestes().filter((t) => t.abordados > 0)
+  const secao = (titulo: string, corpo: string) => (corpo.trim() ? `\n## ${titulo}\n${corpo.trim()}\n` : '')
+  const lista = (itens: string[]) => itens.map((i) => `- ${i}`).join('\n')
+  const dono = n.seuNome || 'o dono'
+  return `# Contexto de trabalho: ${dono}${n.empresa ? `, ${n.empresa}` : ''}
+
+Você vai trabalhar comigo como meu braço direito. Eu vendo sites para pequenos negócios locais (comércios e prestadores de serviço) e prospecto clientes pelo WhatsApp e por ligação com a XS Prospecção, um CRM com um vendedor de IA. Este documento reúne o que eu já ensinei e o que os números mostram até ${new Date().toLocaleDateString('pt-BR')}. Use isso em tudo: ao criar sites para os meus clientes, escrever mensagens e propostas, pensar estratégia e tomar decisões comigo. Se algo aqui parecer desatualizado, pergunte.
+${secao('Quem eu sou e como eu trabalho', lista(d.memoria.map((m) => m.texto)))}${secao('O que eu vendo (pacotes, preços, o que inclui, prazo)', n.oferta)}${secao('Pagamento', n.pagamento)}${secao(
+    'Negociação',
+    cfg.podeFechar ? `Pode dar desconto de até ${n.descontoMax}%. Acima disso, só comigo.` : 'Quem fecha a venda sou eu; o papel do vendedor é marcar a conversa comigo.',
+  )}${secao('Sites que já fiz (portfólio)', n.portfolio)}${secao('Como eu me apresento', n.apresentacao)}${secao('Meu jeito de falar', n.estilo)}${secao('Objeções que eu mais ouço e como respondo', n.objecoes)}${secao('Regras', n.regras)}${secao(
+    'O que aprendi vendendo (lições)',
+    lista(licoes.filter((l) => l.tipo === 'conversa').map((l) => l.texto)),
+  )}${secao('Que empresas eu procuro', [cfg.prospeccao.criterios, lista(licoes.filter((l) => l.tipo === 'busca').map((l) => l.texto))].filter(Boolean).join('\n'))}${secao(
+    'O que os números mostram por ramo',
+    lista(ramos.map((r) => `${r.ramo}: ${r.abordados} abordados, ${r.taxaResposta}% responderam, ${r.quentes} quentes, ${r.reunioes} reuniões, ${r.vendas} vendas, ${r.pediramParar} pediram para parar`)),
+  )}${secao(
+    'Testes de abordagem',
+    testes
+      .map(
+        (t) =>
+          `${t.nome} (${t.estado}${t.conclusao ? `; conclusão: ${t.conclusao}` : ''}):\n${t.variantes
+            .map((v) => `  - ${v.nome} — "${v.angulo}": ${v.abordados} abordados, ${v.taxaResposta}% responderam, ${v.quentes} quentes, ${v.vendas} vendas`)
+            .join('\n')}`,
+      )
+      .join('\n'),
+  )}${secao('Resumo das minhas conversas com o meu assistente', d.resumo)}`
+}
+
+export function listarPrompts() {
+  return d.prompts
+    .slice()
+    .reverse()
+    .map(({ texto: t, dados: _d, ...p }) => ({ ...p, tamanho: t.length }))
+}
+
+export function verPrompt(id: string) {
+  const p = d.prompts.find((x) => x.id === id)
+  if (!p) throw new Error('Prompt não encontrado.')
+  return p
+}
+
+export function apagarPrompt(id: string) {
+  d.prompts = d.prompts.filter((x) => x.id !== id)
+  salvar()
+  return listarPrompts()
+}
+
 export function ver() {
   return {
     estado,
@@ -675,6 +904,7 @@ export function ver() {
     mensagens: d.visiveis.slice(-200),
     propostas: d.propostas.filter((p) => p.estado === 'pendente'),
     memoria: d.memoria,
+    prompts: listarPrompts().slice(0, 30),
     temChave: !!agente.chaveDaApi(),
   }
 }
@@ -688,7 +918,8 @@ export function decidir(id: string, aceitar: boolean) {
     const junto = Object.fromEntries(
       Object.entries(p.patch).map(([k, v]) => [k, v && typeof v === 'object' && !Array.isArray(v) ? { ...(atual[k as keyof AgenteConfig] as object), ...v } : v]),
     )
-    agente.salvarConfig(junto as Partial<AgenteConfig>)
+    if (Object.keys(junto).length) agente.salvarConfig(junto as Partial<AgenteConfig>)
+    if (p.teste) agente.criarTeste(p.teste)
   }
   p.estado = aceitar ? 'aceita' : 'recusada'
   d.notas.push(`O dono ${aceitar ? 'confirmou' : 'recusou'} a proposta "${p.titulo}"`)

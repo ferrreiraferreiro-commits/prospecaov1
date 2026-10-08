@@ -1,10 +1,10 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import clsx from 'clsx'
-import { ArrowRight, Check, KeyRound, LoaderCircle, MessageSquarePlus, Send, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Check, Copy, Download, FileText, Globe, KeyRound, LoaderCircle, MessageSquarePlus, Send, Sparkles, X } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/kit'
-import { Button, Spinner } from '../components/ui'
+import { Button, Modal, Spinner } from '../components/ui'
 import { ag, type EstadoAgente } from '../lib/agente'
 import { formatRelative } from '../lib/dates'
 import { executarNoApp, type EstadoXico, type MensagemXico } from '../lib/xico'
@@ -205,6 +205,7 @@ export function XicoPage() {
 
       <aside className="min-w-0 space-y-4">
         <Propostas s={s} setS={setS} />
+        <LevarParaClaude s={s} setS={setS} />
         <Vendedor />
         <Memoria s={s} setS={setS} />
       </aside>
@@ -309,6 +310,126 @@ function Propostas({ s, setS }: { s: EstadoXico; setS: (v: EstadoXico) => void }
           </li>
         ))}
       </ul>
+    </Card>
+  )
+}
+
+/**
+ * O que vai para o Claude: o prompt mestre (tudo o que vocês sabem, para um Projeto do Claude) e os
+ * prompts de site de cada cliente (para colar no Claude e construir o site).
+ */
+function LevarParaClaude({ s, setS }: { s: EstadoXico; setS: (v: EstadoXico) => void }) {
+  const toast = useApp((x) => x.toast)
+  const [aberto, setAberto] = useState<{ titulo: string; subtitulo: string; texto: string; arquivo: string; id?: string } | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  async function abrirMestre() {
+    setBusy('mestre')
+    try {
+      const r = await ag<{ texto: string }>('/xico/prompt')
+      setAberto({ titulo: 'Prompt mestre', subtitulo: 'Crie um Projeto no Claude e cole isto nas instruções do projeto.', texto: r.texto, arquivo: 'contexto-xs.md' })
+    } catch (err) {
+      toast(erroTexto(err), 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function abrirSite(id: string) {
+    setBusy(id)
+    try {
+      const p = await ag<{ id: string; empresa: string; versao: number; texto: string; incompleto: boolean }>(`/xico/sites/${id}`)
+      setAberto({
+        titulo: `Site · ${p.empresa} (versão ${p.versao})`,
+        subtitulo: p.incompleto ? 'Ficou longo demais e foi cortado no fim. Peça ao Xico uma versão mais enxuta.' : 'Cole no Claude junto com as imagens do cliente (logo, fotos, cardápio ou tabela de preços).',
+        texto: p.texto,
+        arquivo: `site-${p.empresa.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-v${p.versao}.md`,
+        id: p.id,
+      })
+    } catch (err) {
+      toast(erroTexto(err), 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function copiar(t: string) {
+    try {
+      await navigator.clipboard.writeText(t)
+      toast('Copiado. Agora é só colar no Claude.')
+    } catch {
+      toast('Não consegui copiar. Use "Baixar".', 'error')
+    }
+  }
+
+  function baixar(t: string, arquivo: string) {
+    const url = URL.createObjectURL(new Blob([t], { type: 'text/markdown;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = arquivo
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function apagar(id: string) {
+    if (!window.confirm('Apagar este prompt de site?')) return
+    try {
+      await ag(`/xico/sites/${id}`, { method: 'DELETE' })
+      setAberto(null)
+      setS(await ag<EstadoXico>('/xico'))
+    } catch (err) {
+      toast(erroTexto(err), 'error')
+    }
+  }
+
+  return (
+    <Card title="Levar para o Claude" description="Para colar no Claude: o que vocês sabem e os prompts dos sites dos clientes.">
+      <Button size="sm" variant="secondary" className="w-full" icon={<FileText className="size-3.5" />} loading={busy === 'mestre'} onClick={() => void abrirMestre()}>
+        Prompt mestre (tudo o que vocês sabem)
+      </Button>
+      <p className="mt-3 mb-1.5 text-2xs font-medium text-fg-3">Prompts de site</p>
+      {s.prompts.length === 0 ? (
+        <p className="text-xs text-fg-4">Peça ao Xico: "faz o prompt do site da Pizzaria X, estilo moderno".</p>
+      ) : (
+        <ul className="max-h-60 space-y-1 overflow-y-auto">
+          {s.prompts.map((p) => (
+            <li key={p.id}>
+              <button type="button" onClick={() => void abrirSite(p.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover">
+                {busy === p.id ? <LoaderCircle className="size-3.5 animate-spin text-fg-3" /> : <Globe className="size-3.5 shrink-0 text-fg-3" />}
+                <span className="min-w-0 flex-1 truncate text-xs text-fg">{p.empresa}</span>
+                <span className="shrink-0 text-2xs text-fg-4">v{p.versao}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Modal
+        open={!!aberto}
+        onClose={() => setAberto(null)}
+        title={aberto?.titulo ?? ''}
+        subtitle={aberto?.subtitulo}
+        width="max-w-3xl"
+        footer={
+          aberto && (
+            <>
+              {aberto.id && (
+                <Button size="sm" variant="ghost" onClick={() => void apagar(aberto.id!)}>
+                  Apagar
+                </Button>
+              )}
+              <span className="flex-1" />
+              <Button size="sm" variant="secondary" icon={<Download className="size-3.5" />} onClick={() => baixar(aberto.texto, aberto.arquivo)}>
+                Baixar
+              </Button>
+              <Button size="sm" variant="primary" icon={<Copy className="size-3.5" />} onClick={() => void copiar(aberto.texto)}>
+                Copiar
+              </Button>
+            </>
+          )
+        }
+      >
+        <pre className="px-5 py-4 font-mono text-xs leading-5 whitespace-pre-wrap text-fg-2">{aberto?.texto}</pre>
+      </Modal>
     </Card>
   )
 }

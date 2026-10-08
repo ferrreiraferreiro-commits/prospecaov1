@@ -8,17 +8,19 @@ import { useAgente, type AgenteCtx } from '../components/agente/comum'
 import { Conversas } from '../components/agente/Conversas'
 import { Painel } from '../components/agente/Painel'
 import { Prospeccao } from '../components/agente/Prospeccao'
+import { Testes } from '../components/agente/Testes'
 import { Treino } from '../components/agente/Treino'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Segmented, Spinner } from '../components/ui'
 
-type Aba = 'painel' | 'conversas' | 'treino' | 'prospeccao' | 'ajustes'
+type Aba = 'painel' | 'conversas' | 'treino' | 'prospeccao' | 'testes' | 'ajustes'
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: 'painel', label: 'Painel' },
   { id: 'conversas', label: 'Conversas' },
   { id: 'treino', label: 'Treino' },
   { id: 'prospeccao', label: 'Prospecção' },
+  { id: 'testes', label: 'Testes' },
   { id: 'ajustes', label: 'Ajustes' },
 ]
 
@@ -91,6 +93,7 @@ export function AgentePage() {
       {aba === 'conversas' && <Conversas abrir={conversa} setAbrir={(id) => ir('conversas', id ? { conversa: id } : {})} />}
       {aba === 'treino' && <Treino ctx={ctx} />}
       {aba === 'prospeccao' && <Prospeccao ctx={ctx} />}
+      {aba === 'testes' && <Testes />}
       {aba === 'ajustes' && <Ajustes ctx={ctx} />}
     </div>
   )

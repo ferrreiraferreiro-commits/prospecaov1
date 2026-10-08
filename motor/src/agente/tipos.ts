@@ -130,6 +130,32 @@ export interface FilaItem {
   alvoId: string
   bruto: Record<string, unknown>
   em: string
+  /** Empresa buscada para um teste de abordagens */
+  testeId?: string
+}
+
+/** Um jeito de abordar, num teste: o ângulo vai para a IA ao escrever a primeira mensagem. */
+export interface Variante {
+  id: string
+  nome: string
+  angulo: string
+}
+
+/**
+ * Teste de abordagens: empresas de um ramo/cidade divididas entre 2 a 4 abordagens, para ver qual
+ * conversa e vende mais (e se o ramo vale a pena). Tem prioridade sobre a prospecção normal até
+ * abordar `porVariante` empresas em cada abordagem.
+ */
+export interface Teste {
+  id: string
+  nome: string
+  alvo: Alvo
+  variantes: Variante[]
+  porVariante: number
+  estado: 'rodando' | 'pausado' | 'encerrado'
+  criadoEm: string
+  encerradoEm: string | null
+  conclusao: string
 }
 
 export type Estado =
@@ -173,6 +199,9 @@ export interface Conversa {
   site: string
   instagram: string
   alvoId: string | null
+  /** Teste de abordagens e a abordagem usada (quando veio de um teste) */
+  testeId?: string | null
+  variante?: string | null
   /** Lead do CRM (quando já existe ou depois que o app sincronizou) */
   leadId: string | null
   bruto: Record<string, unknown> | null
