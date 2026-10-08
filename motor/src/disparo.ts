@@ -6,11 +6,12 @@
  * estado fica em motor/storage/*.json — os leads continuam no XS Prospecção.
  */
 import { randomInt, randomUUID } from 'node:crypto'
-import { pareceAutomatica, pediuParaParar } from './agente/regras.js'
+import { pareceAutomatica, pediuParaParar, recusou } from './agente/regras.js'
 import { readJson, writeJson } from './store.js'
 import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, receiptOf, registerSent, samePhone, waEvents, withTimeout, type ReceiptStatus } from './whatsapp.js'
 
-export type Step = { tipo: 'mensagem' } | { tipo: 'espera'; ms: number }
+/** `ateResposta`: a espera acaba antes se a pessoa responder (resposta automática ou dela mesma). */
+export type Step = { tipo: 'mensagem' } | { tipo: 'espera'; ms: number; ateResposta?: boolean }
 
 export type RecipientStatus = 'pendente' | 'enviando' | 'aceito' | 'entregue' | 'lido' | 'respondeu' | 'falhou' | 'ignorado'
 
@@ -26,6 +27,8 @@ export interface Recipient {
   enviadas: number
   erro: string | null
   respostas: { em: string; texto: string; auto?: boolean }[]
+  /** Pediu para parar ou disse que não tem interesse: o resto do funil não sai */
+  parar?: boolean
   /** Última mensagem do funil que saiu (para reconhecer resposta automática) */
   ultimoEnvioEm?: string | null
   processadoEm: string | null
@@ -326,6 +329,30 @@ async function waitActive(c: Campaign, ms: number): Promise<boolean> {
   return isActive(c)
 }
 
+/**
+ * Espera até `ms` ou até a pessoa responder. Respondeu: espera mais 20 s (muita empresa manda duas
+ * mensagens automáticas seguidas) e segue para a próxima etapa.
+ */
+async function esperarResposta(c: Campaign, r: Recipient, ms: number): Promise<boolean> {
+  const antes = r.respostas.length
+  const fim = Date.now() + Math.max(0, ms)
+  while (Date.now() < fim) {
+    if (!isActive(c)) return false
+    if (r.respostas.length > antes || r.parar) {
+      let ultima = r.respostas.length
+      // Mais uma mensagem chegando: espera de novo (até 2 min no total)
+      for (let i = 0; i < 6 && isActive(c); i++) {
+        if (!(await waitActive(c, 20_000))) return false
+        if (r.respostas.length === ultima) break
+        ultima = r.respostas.length
+      }
+      return isActive(c)
+    }
+    await new Promise((res) => setTimeout(res, 1000))
+  }
+  return isActive(c)
+}
+
 function greeting(now = new Date()): string {
   const h = now.getHours()
   return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
@@ -402,13 +429,14 @@ async function runCampaign(c: Campaign) {
         }
         const step = c.etapas[i]
         if (step.tipo === 'espera') {
-          if (!(await waitActive(c, step.ms))) {
+          if (!(await (step.ateResposta ? esperarResposta(c, r, step.ms) : waitActive(c, step.ms)))) {
             r.status = 'pendente'
             return suspend(c)
           }
         } else {
-          if ((r.status as RecipientStatus) === 'respondeu') {
-            log(c, 'info', `${r.nome} respondeu: o resto do funil não foi enviado`, 'Quem responde recebe conversa de verdade, não a sequência pronta.', r.leadId)
+          // Responder "boa tarde" não para o funil; pedir para parar ou dizer que não tem interesse, sim
+          if (r.parar) {
+            log(c, 'info', `${r.nome} não quer receber: o resto do funil não foi enviado`, undefined, r.leadId)
             break
           }
           const text = finalizeText(r.textos[msgIndex] ?? '')
@@ -534,7 +562,10 @@ waEvents.incoming((phone: string, text: string) => {
       }
       r.status = 'respondeu'
       log(c, 'resposta', `${r.nome} respondeu`, text.slice(0, 300) || '[mensagem sem texto]', r.leadId)
-      if (pediuParaParar(text)) log(c, 'aviso', `${r.nome} pediu para não receber mais mensagens`, 'Não mande mais campanhas para este número.', r.leadId)
+      if (pediuParaParar(text)) {
+        r.parar = true
+        log(c, 'aviso', `${r.nome} pediu para não receber mais mensagens`, 'Não mande mais campanhas para este número.', r.leadId)
+      } else if (recusou(text)) r.parar = true
     }
   }
 })

@@ -95,7 +95,7 @@ export function phoneKeyBr(phone: string): string {
 export function buildCampaignPayload(funnel: Funnel, leads: Lead[], settings: Settings) {
   const etapas = funnel.etapas
     .filter((s) => (s.tipo === 'mensagem' ? s.variacoes.some((v) => v.trim()) : true))
-    .map((s) => (s.tipo === 'mensagem' ? { tipo: 'mensagem' as const } : { tipo: 'espera' as const, ms: stepDelayMs(s) }))
+    .map((s) => (s.tipo === 'mensagem' ? { tipo: 'mensagem' as const } : { tipo: 'espera' as const, ms: stepDelayMs(s), ...(s.ateResposta ? { ateResposta: true } : {}) }))
   const msgSteps = funnel.etapas.filter((s): s is Extract<typeof s, { tipo: 'mensagem' }> => s.tipo === 'mensagem' && s.variacoes.some((v) => v.trim()))
   const destinatarios = leads.map((lead, i) => ({
     leadId: lead.id,

@@ -244,12 +244,53 @@ test('agente: resposta automática não conta como resposta e não gasta IA', as
   assert.equal(c.followups, 1)
   assert.equal(c.mensagens.at(-1)!.auto, true)
   assert.equal(agente.estado().hoje.responderam, antes)
-  // Depois a pessoa responde de verdade
+  // Minutos depois a pessoa responde de verdade
+  c.mensagens.at(-1)!.em = new Date(Date.now() - 5 * 60_000).toISOString()
   agente.receber('5543999990009', 'Oi, é sobre o quê?', { remoteJid: 'x@s.whatsapp.net', id: 'k3' })
   assert.equal(c.estado, 'conversando')
   assert.equal(c.pendente, true)
   assert.equal(agente.estado().hoje.responderam, antes + 1)
   // Os detalhes da busca vão para a IA
   assert.match(agente.detalhesDoBruto(c.bruto), /Bairro: Centro[\s\S]*4,7 \(120 avaliações\)/)
+  db.config.ativo = false
+})
+
+test('regras: cumprimento do primeiro passo e recusa clara', async () => {
+  const { cumprimento, recusou } = await import('./agente/regras.js')
+  const tarde = new Date('2026-10-06T15:00:00')
+  const frases = new Set(Array.from({ length: 20 }, (_, i) => cumprimento('Pizzaria Sol', tarde, i / 20)))
+  assert.ok(frases.size >= 5, 'varia a frase')
+  for (const f of frases) assert.match(f, /boa tarde/i)
+  assert.ok([...frases].some((f) => f.includes('Pizzaria Sol')))
+  // Nome comprido não entra no cumprimento
+  assert.ok(Array.from({ length: 20 }, (_, i) => cumprimento('Restaurante e Pizzaria Sabor da Terra Ltda', tarde, i / 20)).every((f) => !f.includes('Ltda')))
+  for (const s of ['Não tenho interesse', 'nao quero, obrigado', 'Já temos site', 'sem interesse']) assert.equal(recusou(s), true, s)
+  for (const s of ['Boa tarde! Quem é?', 'Oi, tudo bem', 'quero saber o preço', 'não tenho site ainda']) assert.equal(recusou(s), false, s)
+})
+
+test('agente: cumprimento primeiro, apresentação depois da resposta automática', async () => {
+  const agente = await import('./agente/agente.js')
+  const { db } = await import('./agente/estado.js')
+  const agora = new Date().toISOString()
+  db.conversas.push({
+    id: 'dois1', telefone: '5543999990077', empresa: 'Pizzaria Sol', origem: 'agente', estado: 'aguardando', apresentar: true,
+    jid: null, nicho: 'Pizzaria', cidade: 'Londrina', uf: 'PR', endereco: '', site: '', instagram: '', alvoId: null, leadId: null, bruto: null,
+    temperatura: 'frio', resumo: '', followups: 0, pendente: false, responderEm: null, ultimaChave: null, avisadoQuente: false,
+    criadaEm: agora, atualizadaEm: agora, sinc: { mensagens: 0, estado: null, lead: false },
+    mensagens: [{ id: 'm1', de: 'agente', texto: 'Oi, boa tarde! Tudo bem?', em: agora }],
+  })
+  db.config.ativo = true
+  const antes = agente.estado().hoje.responderam
+  const key = { remoteJid: 'x@s.whatsapp.net', id: 'k9' }
+  agente.receber('5543999990077', 'Olá! Obrigado por entrar em contato com a Pizzaria Sol.', key)
+  // A segunda mensagem automática não tem frase de robô, mas chegou logo depois
+  agente.receber('5543999990077', 'Funcionamos de terça a domingo, das 18h às 23h. Peça pelo link abaixo!', key)
+  const c = db.conversas.find((x) => x.id === 'dois1')!
+  assert.deepEqual(c.mensagens.slice(1).map((m) => m.auto), [true, true])
+  assert.equal(c.estado, 'aguardando')
+  assert.equal(c.pendente, true, 'a apresentação vai sair')
+  assert.equal(agente.estado().hoje.responderam, antes, 'resposta automática não conta')
+  // Com o padrão ligado, a configuração mantém o cumprimento primeiro
+  assert.equal(agente.lerConfig().prospeccao.cumprimentarPrimeiro, true)
   db.config.ativo = false
 })

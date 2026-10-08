@@ -65,6 +65,11 @@ export interface AgenteConfig {
     /** Quantas abordagens a mais por dia a cada semana sem problema no número */
     aumentoSemana: number
     soSemSite: boolean
+    /**
+     * Abordagem em dois passos, como o dono faz: primeiro só "Oi, boa tarde! Tudo bem?"; a apresentação
+     * vem depois da resposta (automática ou da pessoa), ou depois de 2 h sem resposta.
+     */
+    cumprimentarPrimeiro: boolean
     /** Critérios em texto livre para escolher as empresas (o agente filtra a fila com eles) */
     criterios: string
     /** 0 = domingo … 6 = sábado */
@@ -105,6 +110,7 @@ export const CONFIG_PADRAO: AgenteConfig = {
     porDiaMax: 50,
     aumentoSemana: 5,
     soSemSite: true,
+    cumprimentarPrimeiro: true,
     criterios: '',
     dias: [1, 2, 3, 4, 5, 6],
     inicio: 9,
@@ -218,6 +224,8 @@ export interface Conversa {
   /** Chave da última mensagem recebida (para marcar como lida antes de responder) */
   ultimaChave: unknown
   avisadoQuente: boolean
+  /** Só mandou o cumprimento: a apresentação vai depois da resposta (ou depois de 2 h) */
+  apresentar?: boolean
   /** Último lembrete para você de que o cliente está esperando (conversa com você) */
   lembradoEm?: string | null
   criadaEm: string

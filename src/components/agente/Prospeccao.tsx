@@ -81,6 +81,11 @@ export function Prospeccao({ ctx }: { ctx: AgenteCtx }) {
           </div>
           <Horario label="Horário das abordagens" inicio={p.inicio} fim={p.fim} onChange={(inicio, fim) => setP({ inicio, fim })} />
           <Chave ligado={p.soSemSite} onChange={(v) => setP({ soSemSite: v })} label="Só empresas sem site" />
+          <Chave
+            ligado={p.cumprimentarPrimeiro !== false}
+            onChange={(v) => setP({ cumprimentarPrimeiro: v })}
+            label="Cumprimentar primeiro: manda só “Oi, boa tarde!” e a apresentação vem depois da resposta (automática ou da pessoa)"
+          />
         </section>
 
         <Field label="Que empresas você quer (ou não quer)?" hint="Ele usa isso para tirar da fila quem não combina. Tirar empresas da fila com um motivo também ensina.">

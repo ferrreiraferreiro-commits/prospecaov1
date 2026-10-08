@@ -20,6 +20,7 @@ import {
   analisarTeste,
   boaHoraPara,
   cotaDoDia,
+  cumprimento,
   dentroDoHorario,
   diaDe,
   escolherAlvo,
@@ -274,11 +275,21 @@ export function receber(phone: string, texto: string, key: WAMessageKey) {
   // conta como resposta, não gasta IA e não zera o follow-up (a pessoa ainda não viu a mensagem)
   const nossa = c.mensagens.filter((m) => m.de !== 'lead').at(-1)
   const segundos = nossa ? (Date.now() - Date.parse(nossa.em)) / 1000 : Infinity
-  if (!respondeu(c) && c.estado === 'aguardando' && !pediuParaParar(texto) && pareceAutomatica(texto, segundos)) {
+  const anterior = c.mensagens.at(-1)
+  // Muita empresa manda 2 ou 3 mensagens automáticas seguidas (saudação, depois "sobre a empresa"):
+  // o que chega até 30 s depois de uma automática também é automático (gente demora mais para digitar)
+  const emSequencia = !!anterior?.auto && Date.now() - Date.parse(anterior.em) < 30_000
+  if (!respondeu(c) && c.estado === 'aguardando' && !pediuParaParar(texto) && (emSequencia || pareceAutomatica(texto, segundos))) {
     c.mensagens.push({ id: randomUUID(), de: 'lead', texto: texto || '[mensagem sem texto]', em: iso(), auto: true })
     c.ultimaChave = key
     c.atualizadaEm = iso()
-    registrar('aviso', `${c.empresa} mandou uma resposta automática (não conta como resposta)`, c.id)
+    // Só mandou o cumprimento: a resposta automática é a deixa para a apresentação (espera as outras chegarem)
+    if (c.apresentar && cfg.ativo) {
+      c.pendente = true
+      c.responderEm = new Date(Date.now() + 60_000 + Math.random() * 60_000).toISOString()
+    }
+    if (!emSequencia) registrar('aviso', `${c.empresa} mandou uma resposta automática (não conta como resposta)`, c.id)
+    else salvar()
     return
   }
   if (c.origem === 'agente' && !respondeu(c)) hoje().responderam++
@@ -343,7 +354,7 @@ function frearSePreciso(t = new Date()) {
 // Responder, follow-up, prospectar, resumo do dia
 // ---------------------------------------------------------------------------
 
-async function aplicar(c: Conversa, d: ia.RespostaIA) {
+async function aplicar(c: Conversa, d: ia.RespostaIA, apresentou = false) {
   c.temperatura = d.temperatura
   if (d.resumo.trim()) c.resumo = d.resumo.trim()
   if (d.acao === 'aguardar') return salvar()
@@ -384,8 +395,8 @@ async function aplicar(c: Conversa, d: ia.RespostaIA) {
           registrar('quente', `${c.empresa} esquentou: ${aviso}`, c.id)
           await avisarDono(`🔥 ${c.empresa} esquentou.\n${aviso}\nO agente continua a conversa; se quiser assumir, é só responder pelo celular.\n${link(c)}`)
         }
-      } else if (c.estado === 'aguardando') c.estado = 'conversando'
-      registrar('respondeu', `Respondeu ${c.empresa}`, c.id)
+      } else if (c.estado === 'aguardando' && respondeu(c)) c.estado = 'conversando'
+      registrar('respondeu', apresentou ? `Mandou a apresentação para ${c.empresa}` : `Respondeu ${c.empresa}`, c.id)
   }
   salvar()
 }
@@ -415,7 +426,13 @@ async function responderPendente(t: Date): Promise<boolean> {
     return true
   }
   const total = c.mensagens.length
-  const r = await comIA(() => ia.responder(ctx(), comDetalhes(c), t), `Resposta para ${c.empresa}`)
+  // Só mandou o cumprimento: a vez agora é da apresentação (com o ângulo do teste, se for de um)
+  const apresentar = !!c.apresentar
+  const angulo = apresentar && c.testeId ? (db.testes.find((x) => x.id === c.testeId)?.variantes.find((v) => v.id === c.variante)?.angulo ?? '') : ''
+  const r = await comIA(
+    () => (apresentar ? ia.apresentacao(ctx(), comDetalhes(c), t, angulo) : ia.responder(ctx(), comDetalhes(c), t)),
+    `${apresentar ? 'Apresentação' : 'Resposta'} para ${c.empresa}`,
+  )
   if (!r) {
     c.responderEm = new Date(Date.now() + 2 * 60_000).toISOString()
     return true
@@ -429,8 +446,24 @@ async function responderPendente(t: Date): Promise<boolean> {
   if (!c.pendente || !ESTADOS_ATIVOS.includes(c.estado)) return true
   c.pendente = false
   c.responderEm = null
-  await aplicar(c, r)
+  if (apresentar) c.apresentar = false
+  await aplicar(c, r, apresentar)
   return true
+}
+
+/**
+ * Cumprimentou e ninguém respondeu (nem a resposta automática) em 2 h: manda a apresentação mesmo
+ * assim, dentro do horário de prospecção.
+ */
+function apresentarSemResposta(t: Date): boolean {
+  const p = db.config.prospeccao
+  if (!dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
+  const c = db.conversas.find((x) => x.apresentar && !x.pendente && x.estado === 'aguardando' && t.getTime() - Date.parse(x.mensagens.at(-1)?.em ?? x.criadaEm) > 2 * 3_600_000)
+  if (!c) return false
+  c.pendente = true
+  c.responderEm = new Date(t.getTime()).toISOString()
+  salvar()
+  return false // quem manda é o responderPendente, no próximo ciclo
 }
 
 async function fazerFollowup(t: Date): Promise<boolean> {
@@ -440,7 +473,8 @@ async function fazerFollowup(t: Date): Promise<boolean> {
   if (!cfg.followup.ativo || !dias.length || t.getTime() < proximoFollowup || !dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
   let alvo: Conversa | null = null
   for (const c of db.conversas) {
-    if (c.pendente || !['aguardando', 'conversando', 'quente'].includes(c.estado)) continue
+    // Ainda falta a apresentação: o follow-up só começa depois dela
+    if (c.pendente || c.apresentar || !['aguardando', 'conversando', 'quente'].includes(c.estado)) continue
     // Resposta automática não conta: o follow-up segue o relógio da nossa última mensagem
     const ultima = c.mensagens.filter((m) => !m.auto).at(-1)
     if (!ultima || ultima.de === 'lead') continue
@@ -647,7 +681,11 @@ async function prospectar(t: Date): Promise<boolean> {
   const lead = { empresa: item.empresa, nicho: item.nicho, cidade: item.cidade, uf: item.uf, endereco: item.endereco, site: item.site, instagram: item.instagram }
   const teste = item.testeId ? db.testes.find((x) => x.id === item.testeId && x.estado === 'rodando') : undefined
   const variante = teste ? proximaVariante(teste) : undefined
-  const r = await comIA(() => ia.abordagem(ctx(), { ...lead, detalhes: detalhesDoBruto(item.bruto) }, t, variante?.angulo), `Abordagem de ${item.empresa}`)
+  // Do jeito do dono: primeiro só o cumprimento (sem IA); a apresentação vem depois da resposta
+  const doisPassos = p.cumprimentarPrimeiro
+  const r = doisPassos
+    ? { mensagens: [cumprimento(item.empresa, t)] }
+    : await comIA(() => ia.abordagem(ctx(), { ...lead, detalhes: detalhesDoBruto(item.bruto) }, t, variante?.angulo), `Abordagem de ${item.empresa}`)
   if (!r?.mensagens.length) {
     db.fila.unshift(item)
     proximaAbordagem = Date.now() + 5 * 60_000
@@ -662,6 +700,7 @@ async function prospectar(t: Date): Promise<boolean> {
     bruto: item.bruto,
     testeId: teste?.id ?? null,
     variante: variante?.id ?? null,
+    ...(doisPassos ? { apresentar: true } : {}),
   })
   db.conversas.push(c)
   try {
@@ -773,6 +812,7 @@ async function ciclo() {
       }
       return
     }
+    apresentarSemResposta(t)
     if (await responderPendente(t)) return
     if (await fazerFollowup(t)) return
     if (await prospectar(t)) return
@@ -890,6 +930,7 @@ export function salvarConfig(body: Partial<AgenteConfig>): AgenteConfig {
       porDiaMax: Math.round(num(p.porDiaMax, 1, 300, 50)),
       aumentoSemana: Math.round(num(p.aumentoSemana, 0, 50, 5)),
       soSemSite: p.soSemSite !== false,
+      cumprimentarPrimeiro: p.cumprimentarPrimeiro !== false,
       criterios: txt(p.criterios, 2000),
       dias: [...new Set((Array.isArray(p.dias) ? p.dias : []).map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort(),
       inicio: horas(p.inicio, 9),

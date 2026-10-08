@@ -218,6 +218,34 @@ ${angulo.trim() ? `\nÂngulo desta abordagem (é um teste: siga este ângulo à 
   return chamar(ctx.chave, ctx.cfg.modelo, instrucoes(ctx.cfg, ctx.licoes), pedido, Mensagens)
 }
 
+/**
+ * Segundo passo da abordagem: já foi só um cumprimento ("Oi, boa tarde!"); agora vem a apresentação,
+ * depois da resposta automática, da resposta da pessoa, ou de um tempo sem resposta.
+ */
+export async function apresentacao(ctx: Contexto, c: Pick<Conversa, 'mensagens'> & LeadInfo, agora = new Date(), angulo = '') {
+  const real = c.mensagens.filter((m) => m.de === 'lead' && !m.auto)
+  const situacao = real.length
+    ? 'A pessoa respondeu ao cumprimento. Responda com naturalidade ao que ela disse (se perguntou quem é, se apresente) e siga para a apresentação.'
+    : c.mensagens.some((m) => m.auto)
+      ? 'Só veio a resposta automática do WhatsApp da empresa: a pessoa ainda não leu de verdade. Não responda ao robô; mande a apresentação.'
+      : 'Ninguém respondeu ao cumprimento ainda. Mande a apresentação de forma leve, sem cobrar resposta.'
+  const pedido = `${agoraTexto(agora)}
+
+${ficha(c)}
+
+Conversa até aqui:
+${transcricao(c, agora)}
+
+Você já mandou só um cumprimento curto para esta empresa. ${situacao}
+${angulo.trim() ? `\nÂngulo desta abordagem (é um teste: siga este ângulo à risca, mesmo que as lições digam outra coisa sobre a primeira mensagem):\n${angulo.trim()}\n` : ''}
+- Não repita o cumprimento. Diga quem você é em poucas palavras.
+- Mostre que você olhou a empresa: algo concreto (ex.: viu no Google Maps, o ramo, o bairro, a nota no Google). Se não tem site, use isso com tato, como oportunidade.
+- Termine com UMA pergunta simples, fácil de responder.
+- Nada de preço, link ou lista de serviços. Até uns 400 caracteres, em 1 ou 2 balões.
+- Escreva do zero para esta empresa. Se a pessoa recusou ou pediu para parar, use a ação certa e não insista.`
+  return chamar(ctx.chave, ctx.cfg.modelo, instrucoes(ctx.cfg, ctx.licoes), pedido, Resposta)
+}
+
 /** Próximo passo da conversa. */
 export async function responder(ctx: Contexto, c: Pick<Conversa, 'mensagens' | 'resumo'> & LeadInfo, agora = new Date()) {
   const pedido = `${agoraTexto(agora)}

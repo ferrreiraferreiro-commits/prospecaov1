@@ -239,6 +239,10 @@ function StepsEditor({ steps, onChange }: { steps: FunnelStep[]; onChange: (s: F
                     <option value="minutos">minutos</option>
                     <option value="horas">horas</option>
                   </select>
+                  <label className="flex cursor-pointer items-center gap-1.5 text-2xs text-fg-2" title="Ex.: manda “Oi, boa tarde”, espera a resposta automática da empresa (ou o “boa tarde” dela) e só então manda a mensagem de verdade.">
+                    <input type="checkbox" className="accent-[var(--color-go)]" checked={!!step.ateResposta} onChange={(e) => update(step.id, { ateResposta: e.target.checked })} />
+                    ou até responder
+                  </label>
                 </div>
               )}
               <div className="ml-auto flex items-center">
@@ -353,7 +357,7 @@ function Preview({ funnel }: { funnel: Funnel }) {
           if (s.tipo === 'espera')
             return (
               <p key={s.id} className="py-0.5 text-center text-[10px] text-[#8696a0]">
-                ⏱ {s.valor} {s.unidade}
+                ⏱ {s.ateResposta ? `até responder (no máximo ${s.valor} ${s.unidade})` : `${s.valor} ${s.unidade}`}
               </p>
             )
           const vs = s.variacoes.filter((v) => v.trim())

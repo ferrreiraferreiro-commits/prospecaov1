@@ -58,6 +58,8 @@ export interface AgenteConfig {
     porDiaMax: number
     aumentoSemana: number
     soSemSite: boolean
+    /** Primeiro só "Oi, boa tarde!"; a apresentação vem depois da resposta (motor mais novo) */
+    cumprimentarPrimeiro?: boolean
     criterios: string
     dias: number[]
     inicio: number

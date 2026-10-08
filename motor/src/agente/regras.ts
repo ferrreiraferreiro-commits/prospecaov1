@@ -80,6 +80,14 @@ export function pediuParaParar(texto: string): boolean {
   return PARAR.test(texto)
 }
 
+/** "Não tenho interesse", "não quero", "já tenho site": recusa clara (não é pedido para parar, mas encerra o funil). */
+const RECUSA =
+  /n[ãa]o\s+(tenho|temos|tem)\s+interesse|sem\s+interesse|n[ãa]o\s+(quero|queremos|preciso|precisamos)\b|j[áa]\s+(tenho|temos|possuo|possu[íi]mos)\s+(um\s+)?site|n[ãa]o\s+[ée]\s+(do\s+)?(meu|nosso)\s+interesse/i
+
+export function recusou(texto: string): boolean {
+  return RECUSA.test(String(texto ?? ''))
+}
+
 /** Já respondeu alguma vez (de verdade: resposta automática do WhatsApp Business não conta)? */
 export const respondeu = (c: Pick<Conversa, 'mensagens'>) => c.mensagens.some((m) => m.de === 'lead' && !m.auto)
 
@@ -188,6 +196,19 @@ export function custoUSD(modelo: Modelo, u: { input_tokens: number; output_token
   const p = MODELOS[modelo]
   const entrada = u.input_tokens + (u.cache_read_input_tokens ?? 0) * 0.1 + (u.cache_creation_input_tokens ?? 0) * 1.25
   return (entrada * p.entrada + u.output_tokens * p.saida) / 1_000_000
+}
+
+/**
+ * O cumprimento do primeiro passo, sem IA e sem gasto. Varia a frase (mensagens idênticas para muita
+ * gente levam a bloqueio) e às vezes confirma o nome da empresa, quando ele é curto.
+ */
+export function cumprimento(empresa: string, agora = new Date(), sorteio = Math.random()): string {
+  const s = saudacao(agora)
+  const m = s.toLowerCase()
+  const nome = String(empresa ?? '').trim()
+  const opcoes = [`${s}! Tudo bem?`, `Oi, ${m}! Tudo bem?`, `Olá, ${m}! Tudo certo?`, `${s}, tudo bem?`, `Oi, ${m}!`]
+  if (nome && nome.length <= 28) opcoes.push(`Oi, ${m}! É da ${nome}?`, `${s}! Falo com a ${nome}?`)
+  return opcoes[Math.min(opcoes.length - 1, Math.floor(sorteio * opcoes.length))]
 }
 
 export function saudacao(agora = new Date()): string {
