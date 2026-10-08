@@ -1,4 +1,5 @@
 import type { PricingSettings } from './biz'
+import type { ContratoPadrao } from './contrato'
 
 export type StatusId =
   | 'novo'
@@ -179,6 +180,8 @@ export interface Settings {
   precificacao: PricingSettings | null
   /** Nomes, cores e visibilidade personalizados do Status 1 */
   status1: Partial<Record<StatusId, StatusCustom>> | null
+  /** Seus dados de contratada e as preferências do contrato em PDF (Projetos) */
+  contrato: ContratoPadrao | null
 }
 
 /** Personalização de um status principal (os ids e as regras continuam fixos). */
@@ -215,4 +218,5 @@ export const DEFAULT_SETTINGS: Settings = {
   max_tentativas: 5,
   precificacao: null,
   status1: null,
+  contrato: null,
 }
