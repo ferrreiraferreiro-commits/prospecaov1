@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { LogoMark, Wordmark } from '../components/Brand'
 import { Button } from '../components/ui'
 import { authErrorPt, isLegacyEmail, normalizarUsuario, signIn, USUARIO_REGRA, usuarioValido } from '../lib/auth'
+import { GRATIS_ATE_TEXTO, semanaGratis } from '../lib/promo'
 import { suporteUrl, useSuporteWhatsApp } from '../lib/suporte'
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
@@ -101,7 +102,7 @@ export function LoginPage({ client }: { client: SupabaseClient }) {
         <>
           Ainda não tem conta?{' '}
           <Link to="/criar-conta" className="font-medium text-blue-300 hover:text-blue-200">
-            Teste 1 dia grátis
+            {semanaGratis() ? `Use grátis até ${GRATIS_ATE_TEXTO}` : 'Teste 1 dia grátis'}
           </Link>
         </>
       }
@@ -184,7 +185,7 @@ export function SignupPage({ client }: { client: SupabaseClient }) {
   return (
     <AuthShell
       title="Criar sua conta"
-      subtitle="1 dia grátis com tudo liberado. Sem cartão."
+      subtitle={semanaGratis() ? `Grátis até ${GRATIS_ATE_TEXTO} com tudo liberado. Sem cartão.` : '1 dia grátis com tudo liberado. Sem cartão.'}
       footer={
         <>
           Já tem conta?{' '}

@@ -18,6 +18,7 @@ XS Web ──HTTPS──▶ Caddy /whatsapp ──▶ gateway (login) ──▶ 
 - O gateway liga a sessão de cada conta pelo systemd. Uma regra do polkit deixa ele mexer só em `xs-whatsapp-motor@*`.
   - Sessão sem WhatsApp conectado e sem uso há 30 min é desligada.
   - Sessão com WhatsApp conectado volta sozinha quando a VPS reinicia.
+  - Conta que fica mais de 24 h sem abrir a XS tem a sessão desligada para liberar vaga (menos se um disparo estiver rodando). O WhatsApp fica salvo: quando a pessoa entra de novo, liga e reconecta sem QR Code. As agendadas que venceram nesse tempo saem quando ela volta, marcadas com o atraso. `XS_CLOUD_AUSENTE_HORAS` muda as 24 h (0 = nunca desliga).
 - O vigia reconecta o WhatsApp que cair com sessão salva. Também para o QR Code que ninguém está olhando.
 - Sessões, campanhas e agendamentos ficam em `/var/lib/xs-whatsapp/<sessão>`. Tudo roda com `TZ=America/Sao_Paulo`.
 

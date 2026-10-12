@@ -43,6 +43,7 @@ const contas: Record<string, Conta> = {
 type Recebido = { porta: number; method: string; url: string; body: string; origin?: string; auth?: string }
 const recebidos: Recebido[] = []
 let waStatus = 'disconnected'
+let disparando = 0
 const motores = new Map<number, http.Server>()
 
 function abrirMotor(porta: number): Promise<void> {
@@ -52,7 +53,7 @@ function abrirMotor(porta: number): Promise<void> {
     recebidos.push({ porta, method: req.method!, url: req.url!, body: Buffer.concat(chunks).toString(), origin: req.headers.origin, auth: req.headers.authorization })
     if (req.url === '/mcp') return res.writeHead(req.headers.authorization === 'Bearer xs_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ? 200 : 401, { 'content-type': 'application/json' }).end('{"jsonrpc":"2.0"}')
     res.setHeader('Content-Type', 'application/json')
-    if (req.url === '/health') return res.end(JSON.stringify({ ok: true, versao: '1.4.0', computador: 'vps-123', acordado: false, whatsapp: { status: waStatus, user: null } }))
+    if (req.url === '/health') return res.end(JSON.stringify({ ok: true, versao: '1.4.0', computador: 'vps-123', acordado: false, whatsapp: { status: waStatus, user: null }, disparo: { running: disparando } }))
     if (req.url === '/whatsapp/status') return res.end(JSON.stringify({ status: waStatus, qrCodeUrl: null, user: waStatus === 'connected' ? { id: '5543999129525:7@s.whatsapp.net', name: 'Ana' } : null, lastError: 'connect ECONNREFUSED 127.0.0.1:443' }))
     if (req.url === '/whatsapp/teste') return res.writeHead(400).end(JSON.stringify({ error: 'Este número não tem WhatsApp ativo.' }))
     res.end(JSON.stringify({ ok: true, porta }))
@@ -275,6 +276,34 @@ test('vigia: reconecta sessão salva caída; não mexe sem sessão; para QR sem 
   waStatus = 'qrcode'
   assert.equal(await vigiar(principal, Date.now() + 10 * 60_000), 'parar-qr')
   assert.equal(recebidos.at(-1)!.url, '/whatsapp/desconectar')
+  waStatus = 'disconnected'
+})
+
+test('conta sem abrir a XS há mais de 24 h: Motor desligado (sessão salva fica) e volta ao entrar', async () => {
+  const reg = JSON.parse(fs.readFileSync(path.join(dados, 'sessoes.json'), 'utf8')) as Record<string, { nome: string; porta: number }>
+  const bruno: Sessao = { nome: reg[BRUNO].nome, motor: `http://127.0.0.1:${reg[BRUNO].porta}`, dados: path.join(dados, reg[BRUNO].nome), fixa: false }
+  const creds = path.join(bruno.dados, 'whatsapp_auth', 'creds.json')
+  fs.mkdirSync(path.dirname(creds), { recursive: true })
+  fs.writeFileSync(creds, '{}')
+  waStatus = 'connected'
+  assert.equal((await pedir('token-bruno-aaaaaaaaaaaaaaa', '/motor/health')).status, 200) // abriu a XS agora
+  assert.ok(JSON.parse(fs.readFileSync(path.join(dados, 'acessos.json'), 'utf8'))[bruno.nome] > 0)
+  assert.equal(await vigiar(bruno, Date.now() + 23 * 3_600_000), null) // menos de 24 h: fica
+  // Disparo rodando: não corta no meio
+  disparando = 1
+  assert.equal(await vigiar(bruno, Date.now() + 25 * 3_600_000), null)
+  disparando = 0
+  assert.equal(await vigiar(bruno, Date.now() + 25 * 3_600_000), 'ausente')
+  assert.equal(desligadosPeloControle.at(-1), bruno.nome)
+  assert.ok(fs.existsSync(creds)) // não precisa ler o QR Code de novo
+  // Voltou: o Motor liga sozinho
+  const ligadosAntes = ligadosPeloControle.length
+  assert.equal((await pedir('token-bruno-aaaaaaaaaaaaaaa', '/motor/health')).status, 200)
+  assert.equal(ligadosPeloControle.length, ligadosAntes + 1)
+  assert.equal(await vigiar(bruno), null)
+  // O dono (fixa) nunca é desligado por ausência
+  assert.equal(await vigiar(principal, Date.now() + 99 * 3_600_000), null)
+  fs.rmSync(path.dirname(creds), { recursive: true, force: true })
   waStatus = 'disconnected'
 })
 

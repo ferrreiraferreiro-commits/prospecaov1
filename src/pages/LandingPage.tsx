@@ -7,6 +7,7 @@ import { CallDemo } from '../components/site/CallDemo'
 import { ProductShowcase } from '../components/site/ProductShowcase'
 import { SiteFooter } from '../components/site/SiteFooter'
 import { formatPreco, linkCheckout, useAssinatura } from '../lib/assinatura'
+import { GRATIS_ATE_TEXTO, semanaGratis } from '../lib/promo'
 import '@fontsource-variable/manrope'
 
 /** Atraso da animação de entrada (classe land-in / reveal). */
@@ -195,7 +196,7 @@ function PrimaryCta({ className }: { className?: string }) {
         className,
       )}
     >
-      Testar 1 dia grátis
+      {semanaGratis() ? `Usar grátis até ${GRATIS_ATE_TEXTO}` : 'Testar 1 dia grátis'}
       <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
     </Link>
   )
@@ -215,6 +216,11 @@ function Hero() {
       <div className="land-grain" aria-hidden />
       <div className={clsx(WRAP, 'grid items-center gap-14 pt-12 pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,548px)] lg:gap-12 lg:pt-28 lg:pb-32')}>
         <div className="max-w-[600px]">
+          {semanaGratis() && (
+            <p className="land-in mb-5 inline-flex items-center rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-[13px] font-medium text-blue-200" style={delay(0)}>
+              Semana grátis: tudo liberado até {GRATIS_ATE_TEXTO}
+            </p>
+          )}
           <p className="land-in text-[13px] text-fg-2/80" style={delay(0)}>
             Para quem vende sites e serviços digitais
           </p>
@@ -239,7 +245,7 @@ function Hero() {
             </a>
           </div>
           <p className="land-in mt-5 text-xs text-fg-2/70" style={delay(360)}>
-            1 dia com tudo liberado. Sem cartão de crédito.
+            {semanaGratis() ? `Totalmente grátis até ${GRATIS_ATE_TEXTO}, com tudo liberado. Sem cartão de crédito.` : '1 dia com tudo liberado. Sem cartão de crédito.'}
           </p>
         </div>
         <div className="land-in min-w-0" style={delay(200)}>
@@ -400,7 +406,9 @@ function Faq() {
     },
     {
       q: 'Como funciona o teste grátis?',
-      a: 'Você tem 1 dia com tudo liberado, inclusive a busca de empresas e o WhatsApp, sem cartão de crédito. Quando o teste termina, seus leads continuam guardados e você decide se quer continuar.',
+      a: semanaGratis()
+        ? `Até ${GRATIS_ATE_TEXTO} a XS é totalmente grátis para todo mundo, com tudo liberado, inclusive a busca de empresas e o WhatsApp, sem cartão de crédito. Quando a semana grátis termina, seus leads continuam guardados e você decide se quer continuar.`
+        : 'Você tem 1 dia com tudo liberado, inclusive a busca de empresas e o WhatsApp, sem cartão de crédito. Quando o teste termina, seus leads continuam guardados e você decide se quer continuar.',
     },
     {
       q: 'Funciona para outros serviços além de sites?',
@@ -477,7 +485,9 @@ function FinalCta() {
           Seu próximo cliente está a uma busca de distância.
         </h2>
         <p className="reveal mt-5 max-w-[440px] text-base leading-7 text-pretty text-fg-2" style={delay(120)}>
-          Crie sua conta, encontre empresas, organize sua prospecção e teste a XS durante 1 dia.
+          {semanaGratis()
+            ? `Crie sua conta, encontre empresas, organize sua prospecção e use a XS de graça até ${GRATIS_ATE_TEXTO}.`
+            : 'Crie sua conta, encontre empresas, organize sua prospecção e teste a XS durante 1 dia.'}
         </p>
         <div className="reveal mt-9 flex w-full flex-col items-center gap-4 sm:w-auto" style={delay(180)}>
           <PrimaryCta className="w-full sm:w-auto" />
@@ -508,7 +518,7 @@ function Pricing() {
             <br className="hidden sm:block" /> Tudo liberado.
           </h2>
           <p className="mt-5 max-w-[440px] text-base leading-7 text-fg-2">
-            Teste 1 dia de graça, sem cartão. Gostou, assina o Mensal e o acesso continua na hora em que o pagamento é aprovado.
+            {semanaGratis() ? `Use de graça até ${GRATIS_ATE_TEXTO}, sem cartão.` : 'Teste 1 dia de graça, sem cartão.'} Gostou, assina o Mensal e o acesso continua na hora em que o pagamento é aprovado.
           </p>
         </div>
         <div className="reveal rounded-2xl border border-line bg-panel p-6 sm:p-8" style={delay(100)}>

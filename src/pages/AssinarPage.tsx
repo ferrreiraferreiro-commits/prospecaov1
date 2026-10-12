@@ -6,6 +6,7 @@ import { LogoMark, Wordmark } from '../components/Brand'
 import { SiteFooter } from '../components/site/SiteFooter'
 import { Spinner } from '../components/ui'
 import { formatPreco, linkCheckout, useAssinatura } from '../lib/assinatura'
+import { GRATIS_ATE_TEXTO, semanaGratis } from '../lib/promo'
 import { useAccount } from '../store/useAccount'
 import '@fontsource-variable/manrope'
 
@@ -157,7 +158,7 @@ function AssinarPublico({ plano, temCheckout }: { plano: ReactNode; temCheckout:
               <p>
                 Prefere ver antes?{' '}
                 <Link to="/criar-conta" className="text-blue-300 underline decoration-blue-300/40 underline-offset-4 hover:text-blue-200">
-                  Teste 1 dia grátis
+                  {semanaGratis() ? `Use grátis até ${GRATIS_ATE_TEXTO}` : 'Teste 1 dia grátis'}
                 </Link>
                 , sem cartão.
               </p>

@@ -17,6 +17,8 @@
  *     Só "Conectar" (ou disparo, agenda, teste) liga o Motor; olhar o status não liga. "Desconectar"
  *     desliga na hora. Motor sem WhatsApp salvo e sem uso há 5 min é desligado (libera a vaga); com WhatsApp
  *     conectado fica ligado e volta sozinho quando a VPS reinicia.
+ *     Conta que passa XS_CLOUD_AUSENTE_HORAS (24 h) sem abrir a XS tem o Motor desligado para liberar a vaga,
+ *     mas a sessão do WhatsApp fica salva: quando ela volta, o Motor liga e reconecta sem QR Code.
  *
  * GET  /saude                aberto: o gateway e os Motores estão de pé?
  * GET  /acesso               esta conta usa o WhatsApp na nuvem?
@@ -30,6 +32,7 @@
  *   XS_CLOUD_SESSOES=principal:3077,…        sessões fixas (nome:porta)
  *   XS_CLOUD_TODOS=1                         as outras contas ganham uma sessão automática
  *   XS_CLOUD_MAX=5                           máximo de Motores automáticos ligados ao mesmo tempo
+ *   XS_CLOUD_AUSENTE_HORAS=24                sem abrir a XS por esse tempo: desliga o Motor (0 = nunca)
  *   XS_CLOUD_PORTA_INICIAL=3100              portas das sessões automáticas
  *   XS_CLOUD_DADOS=/var/lib/xs-whatsapp      pasta de dados (uma subpasta por sessão)
  *   XS_ORIGINS=https://outro-dominio         origens extras do site (opcional)
@@ -52,6 +55,8 @@ const MAX_CORPO = 8 * 1024 * 1024
 const TEMPO_MOTOR_MS = 60_000
 /** Motor automático sem WhatsApp salvo e sem uso por esse tempo é desligado (ex.: abriu o QR Code e saiu) */
 const OCIOSO_MS = 5 * 60_000
+/** Conta sem abrir a XS por esse tempo tem o Motor automático desligado (mesmo com WhatsApp conectado) */
+let AUSENTE_MS = Math.max(0, Number(process.env.XS_CLOUD_AUSENTE_HORAS ?? 24) || 0) * 3_600_000
 
 export const MSG_INDISPONIVEL = 'O serviço de WhatsApp está temporariamente indisponível. Tente novamente em alguns instantes.'
 const MSG_GENERICA = 'Não foi possível concluir agora. Tente novamente em alguns instantes.'
@@ -153,6 +158,50 @@ function salvarRegistro() {
 
 let registro: Registro = lerRegistro()
 
+// ---------------------------------------------------------------- último acesso de cada conta
+
+/**
+ * Última vez que a conta abriu a XS, por sessão. Enquanto a XS está aberta e visível, o app consulta o
+ * WhatsApp a cada 6 s, então qualquer pedido repassado conta como acesso. Fica num arquivo para valer
+ * depois de reiniciar o gateway; grava no máximo a cada 5 min por sessão.
+ */
+const arqAcessos = () => path.join(DADOS, 'acessos.json')
+const GRAVAR_ACESSO_MS = 5 * 60_000
+
+function lerAcessos(): Record<string, number> {
+  try {
+    const bruto = JSON.parse(fs.readFileSync(arqAcessos(), 'utf8')) as Record<string, unknown>
+    return Object.fromEntries(Object.entries(bruto).filter((e): e is [string, number] => typeof e[1] === 'number'))
+  } catch {
+    return {}
+  }
+}
+
+let acessos = lerAcessos()
+/** Quem não tem acesso registrado (ex.: antes desta regra existir) conta a partir de quando o gateway abriu */
+let abertoEm = Date.now()
+
+function salvarAcessos() {
+  try {
+    const tmp = `${arqAcessos()}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify(acessos))
+    fs.renameSync(tmp, arqAcessos())
+  } catch (err) {
+    log(`não consegui gravar os acessos: ${(err as Error).message}`)
+  }
+}
+
+export function marcarAcesso(nome: string, agora = Date.now()) {
+  const antes = acessos[nome]
+  acessos[nome] = agora
+  if (antes === undefined || agora - antes >= GRAVAR_ACESSO_MS) salvarAcessos()
+}
+
+/** Faz mais de AUSENTE_MS que a conta não abre a XS? */
+export function ausente(s: Sessao, agora = Date.now()): boolean {
+  return !s.fixa && AUSENTE_MS > 0 && agora - (acessos[s.nome] ?? abertoEm) > AUSENTE_MS
+}
+
 /** Liga e desliga um Motor automático (systemd na VPS; outra coisa nos testes) */
 export interface Controle {
   ligar(nome: string): Promise<void>
@@ -189,12 +238,23 @@ function emFila<T>(fn: () => Promise<T> | T): Promise<T> {
 }
 
 /** Para os testes */
-export function configurar(c: { sessoes?: Map<string, Sessao>; usuarios?: Map<string, string>; dados?: string; todos?: boolean; max?: number; controle?: Controle }) {
+export function configurar(c: {
+  sessoes?: Map<string, Sessao>
+  usuarios?: Map<string, string>
+  dados?: string
+  todos?: boolean
+  max?: number
+  controle?: Controle
+  ausenteMs?: number
+}) {
   if (c.dados) {
     DADOS = c.dados
     registro = lerRegistro()
+    acessos = lerAcessos()
+    abertoEm = Date.now()
     ligados.clear()
   }
+  if (c.ausenteMs !== undefined) AUSENTE_MS = c.ausenteMs
   if (c.sessoes) fixas = c.sessoes
   if (c.usuarios) usuarios = c.usuarios
   if (c.todos !== undefined) TODOS = c.todos
@@ -275,7 +335,8 @@ export async function retomarSessoes() {
   registro = lerRegistro()
   for (const r of Object.values(registro)) {
     const s = sessao(r.nome, r.porta, false)
-    if (credsSalvas(s)) await garantirMotor(s).catch((err) => log(`não consegui ligar ${s.nome}: ${(err as Error).message}`))
+    // Quem sumiu há mais de 24 h não é religado; se já estiver ligado, o vigia desliga
+    if (credsSalvas(s) && !ausente(s)) await garantirMotor(s).catch((err) => log(`não consegui ligar ${s.nome}: ${(err as Error).message}`))
     else if (await motorRespondendo(s)) {
       ligados.add(s.nome)
       ultimoUso.set(s.nome, Date.now())
@@ -450,6 +511,8 @@ async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: 
   // O Agente IA só existe no WhatsApp do dono (sessão fixa)
   if (caminho.startsWith('/agente/') && !s.fixa) return send(res, 404, { error: 'Não encontrado.' })
   const corpo = method === 'GET' ? undefined : await lerCorpo(req)
+  // Qualquer pedido do app (até o status que ele confere sozinho com a XS aberta) conta como "abriu a XS"
+  marcarAcesso(s.nome)
   const leitura = method === 'GET' && Object.hasOwn(SEM_WHATSAPP, caminho)
   // Só olhar o status não liga o Motor de ninguém: quem nunca conectou (ou desconectou) não ocupa vaga
   if (leitura && !s.fixa && !ligados.has(s.nome) && !credsSalvas(s)) return send(res, 200, SEM_WHATSAPP[caminho])
@@ -585,13 +648,23 @@ const QR_SEM_VER_MS = 4 * 60_000
  * A cada 30 s, para cada sessão: se há sessão salva e o WhatsApp está desconectado (ex.: a internet da
  * VPS caiu na hora de abrir), manda reconectar. QR Code girando sem ninguém na tela é desligado.
  * Motor automático sem WhatsApp salvo e sem uso há 5 min é desligado (volta quando a pessoa conectar).
+ * Conta que não abre a XS há mais de 24 h tem o Motor desligado (a sessão salva fica), a não ser que
+ * um disparo esteja rodando.
  * "Desconectar" na tela apaga a sessão salva, então o vigia não reconecta o que a pessoa desligou.
  */
-export async function vigiar(s: Sessao, agora = Date.now()): Promise<'reconectar' | 'parar-qr' | 'desligar' | null> {
+export async function vigiar(s: Sessao, agora = Date.now()): Promise<'reconectar' | 'parar-qr' | 'desligar' | 'ausente' | null> {
   const salva = credsSalvas(s)
   if (!s.fixa && !salva && agora - (ultimoUso.get(s.nome) ?? 0) > OCIOSO_MS) {
     await desligarMotor(s, 'vigia: sem WhatsApp salvo e sem uso')
     return 'desligar'
+  }
+  if (ausente(s, agora)) {
+    const health = await chamarMotor(s, 'GET', '/health', undefined, 5000).catch(() => null)
+    const disparando = Number((health?.body as { disparo?: { running?: unknown } } | null)?.disparo?.running ?? 0) > 0
+    if (!disparando) {
+      await desligarMotor(s, `vigia: conta sem abrir a XS há mais de ${Math.round(AUSENTE_MS / 3_600_000)} h (a sessão fica salva)`)
+      return 'ausente'
+    }
   }
   let wa: { status?: string }
   try {
