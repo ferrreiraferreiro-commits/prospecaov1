@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "XS Prospecção · Instagram",
+  "version": "1.0.0",
+  "description": "Busca perfis de negócios no Instagram e manda direto para os leads da XS Prospecção.",
+  "icons": { "128": "icone.png" },
+  "permissions": ["scripting"],
+  "host_permissions": ["https://www.instagram.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "XS · Instagram", "default_popup": "popup.html", "default_icon": { "128": "icone.png" } },
+  "content_scripts": [
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["instagram.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://xs-prospeccao.vercel.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["ponte-xs.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

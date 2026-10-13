@@ -60,6 +60,7 @@ const ClientesPage = lazyPage(() => import('./pages/ClientesPage').then((m) => (
 const ConversasPage = lazyPage(() => import('./pages/ConversasPage').then((m) => ({ default: m.ConversasPage })))
 const DisparoPage = lazyPage(() => import('./pages/DisparoPage').then((m) => ({ default: m.DisparoPage })))
 const FinanceiroPage = lazyPage(() => import('./pages/FinanceiroPage').then((m) => ({ default: m.FinanceiroPage })))
+const InstagramPage = lazyPage(() => import('./pages/InstagramPage').then((m) => ({ default: m.InstagramPage })))
 const FunisPage = lazyPage(() => import('./pages/FunisPage').then((m) => ({ default: m.FunisPage })))
 const MensagensPage = lazyPage(() => import('./pages/MensagensPage').then((m) => ({ default: m.MensagensPage })))
 const MapsPage = lazyPage(() => import('./pages/MapsPage').then((m) => ({ default: m.MapsPage })))
@@ -108,6 +109,7 @@ function Routed() {
           <Route path="ligacao/:id" element={<CallModePage />} />
           <Route path="roteiros" element={<RoteirosPage />} />
           <Route path="maps" element={<MapsPage />} />
+          <Route path="instagram" element={<InstagramPage />} />
           <Route path="mensagens" element={<MensagensPage />} />
           <Route path="conversas" element={m(<ConversasPage />)} />
           <Route path="funis" element={m(<FunisPage />)} />

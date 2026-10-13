@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:whatsapp": "node --test whatsapp-cloud/gateway.test.ts && npm --prefix motor test"
+    "test:whatsapp": "node --test whatsapp-cloud/gateway.test.ts && npm --prefix motor test",
+    "predev": "node scripts/empacotar-extensao.mjs",
+    "prebuild": "node scripts/empacotar-extensao.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
