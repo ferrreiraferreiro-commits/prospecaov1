@@ -6,10 +6,12 @@ import {
   coletarHashtags,
   coletarPerfis,
   conferirResposta,
+  contarMeta,
   FILTROS_PADRAO,
   IgErro,
   lerLista,
   lerPerfil,
+  lerPerfilPagina,
   motivoDescarte,
   perfilParaLead,
   siteProprio,
@@ -141,7 +143,9 @@ describe('perfil → lead', () => {
     expect(motivo({ telefone: null })).toBe('sem_contato')
     expect(motivo({ site: 'https://loja.com' })).toBe('tem_site')
     expect(motivo({ ultimoPost: new Date(AGORA - 200 * 86_400_000).toISOString() })).toBe('parado')
-    expect(motivo({ ultimoPost: null })).toBe('parado')
+    expect(motivo({ ultimoPost: null, posts: 0 })).toBe('parado')
+    expect(motivo({ ultimoPost: null, posts: null })).toBeNull()
+    expect(motivo({ comercial: null })).toBeNull()
     expect(motivo({ seguidores: 50 }, { ...f, seguidoresMin: 100 })).toBe('seguidores')
     expect(motivo({}, { ...f, soCidade: true }, 'Maringá')).toBe('fora_cidade')
     expect(motivo({}, { ...f, soCidade: true }, 'Londrina, PR')).toBeNull()
@@ -216,5 +220,44 @@ describe('extensão', () => {
     expect(navegador(chrome, true).nome).toBe('Brave')
     expect(navegador('Mozilla/5.0 (Windows NT 10.0; rv:131.0) Gecko/20100101 Firefox/131.0', false).suportado).toBe(false)
     expect(navegador('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36', false).suportado).toBe(false)
+  })
+})
+
+describe('perfil pela página', () => {
+  it('lê os números do resumo da página', () => {
+    expect(contarMeta('268M seguidores, seguindo 195, 32K posts — Veja…', /seguidores|followers/)).toBe(268_000_000)
+    expect(contarMeta('268M seguidores, seguindo 195, 32K posts', /posts|publica[çc][õo]es/)).toBe(32_000)
+    expect(contarMeta('1,670 seguidores, 269 seguindo, 1,670 posts', /posts/)).toBe(1670)
+    expect(contarMeta('1,5 mil seguidores', /seguidores/)).toBe(1500)
+    expect(contarMeta('sem números', /posts/)).toBeNull()
+  })
+
+  it('monta o perfil com o que vem embutido na página', () => {
+    const p = lerPerfilPagina({
+      user: {
+        pk: '9',
+        username: 'doces.da.maria',
+        full_name: 'Doces da Maria',
+        biography: 'Bolos sob encomenda 🎂 Pedidos no WhatsApp',
+        bio_links: [{ url: 'https://wa.me/5543998001122', link_type: 'external' }],
+        is_private: false,
+        follower_count: 980,
+      },
+      posts: [],
+      meta: '980 seguidores, seguindo 120, 64 posts',
+    })!
+    expect(p).toMatchObject({ usuario: 'doces.da.maria', telefone: '43998001122', whatsapp: true, seguidores: 980, posts: 64, comercial: null, ultimoPost: null, site: null })
+    // Sem saber se é comercial nem a data do último post: não descarta por isso
+    expect(motivoDescarte(p, FILTROS_PADRAO, '', AGORA)).toBeNull()
+    expect(motivoDescarte({ ...p, posts: 0 }, FILTROS_PADRAO, '', AGORA)).toBe('parado')
+    expect(lerPerfilPagina({ user: null })).toBeNull()
+  })
+
+  it('guarda o que o Instagram respondeu no erro', () => {
+    try {
+      conferirResposta({ ok: true, status: 429, json: { message: 'Please wait a few minutes before you try again.', status: 'fail' } })
+    } catch (e) {
+      expect((e as IgErro).detalhe).toBe('429 Please wait a few minutes before you try again.')
+    }
   })
 })

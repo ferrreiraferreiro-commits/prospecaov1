@@ -81,6 +81,13 @@ async function consultar({ metodo = 'GET', caminho, corpo }) {
   return mandarParaAba(tab.id, { cmd: 'pedir', args: { metodo, caminho, corpo } })
 }
 
+/** Perfil pela página dele (quando a consulta rápida é bloqueada). */
+async function perfilPagina({ usuario }) {
+  if (typeof usuario !== 'string' || !/^[a-z0-9._]{1,30}$/i.test(usuario)) return { ok: false, erro: 'Usuário inválido.' }
+  const { tab } = await abaDoInstagram(true)
+  return mandarParaAba(tab.id, { cmd: 'pagina', args: { usuario } })
+}
+
 async function abrirInstagram() {
   const [tab] = await chrome.tabs.query({ url: 'https://www.instagram.com/*' })
   if (tab) {
@@ -101,7 +108,7 @@ chrome.runtime.onMessage.addListener((m, remetente, responder) => {
   const daXs = XS.some((re) => re.test(origem))
   const doPopup = remetente.id === chrome.runtime.id && !remetente.tab
   if (!daXs && !doPopup) return
-  const tarefas = { estado, ig: consultar, abrir: abrirInstagram }
+  const tarefas = { estado, ig: consultar, perfil: perfilPagina, abrir: abrirInstagram }
   const fn = tarefas[m?.cmd]
   if (!fn) return
   fn(m.args || {}).then(responder, (e) => responder({ ok: false, erro: String((e && e.message) || e) }))

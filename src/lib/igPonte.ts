@@ -1,5 +1,5 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
-import { conferirResposta, IgErro, type IgResposta } from './instagram'
+import { conferirResposta, IgErro, type IgPagina, type IgResposta } from './instagram'
 
 /**
  * Conversa com a extensão "XS · Instagram" (extensao-instagram/). A extensão injeta um
@@ -9,7 +9,9 @@ import { conferirResposta, IgErro, type IgResposta } from './instagram'
 
 export const EXTENSAO_ZIP = '/downloads/xs-instagram.zip'
 /** Versão da pasta extensao-instagram/ (o teste confere com o manifest). Mais antiga instalada → aviso para atualizar. */
-export const EXTENSAO_VERSAO = '1.1.0'
+export const EXTENSAO_VERSAO = '1.2.0'
+/** Primeira versão que lê o perfil pela página (quando a leitura rápida é barrada) */
+export const PAGINA_DESDE = '1.2.0'
 /** Link da extensão na Chrome Web Store. Preenchido → o instalador vira um botão "Adicionar ao Chrome". */
 export const EXTENSAO_LOJA_URL = ''
 
@@ -173,4 +175,20 @@ export async function igGet(caminho: string): Promise<unknown> {
 
 export async function igPost(caminho: string, corpo: Record<string, string>): Promise<unknown> {
   return conferirResposta(await pedir('ig', { metodo: 'POST', caminho, corpo }))
+}
+
+/**
+ * Perfil pela página dele (como quando a pessoa abre o perfil). Usado quando o Instagram
+ * barra a leitura rápida. Precisa da extensão 1.2.0 ou mais nova.
+ */
+export async function igPerfilPagina(usuario: string): Promise<IgPagina> {
+  const r = await pedir<{ user?: Record<string, unknown> | null; posts?: number[]; meta?: string; naoExiste?: boolean }>('perfil', { usuario })
+  if (!r.ok) throw new IgErro('extensao', r.erro || 'A extensão não respondeu.')
+  const detalhe = `página ${r.status ?? '?'}`
+  if (/\/accounts\/login/.test(r.url ?? '')) throw new IgErro('login', 'O Instagram pediu login. Entre numa conta na aba do Instagram e continue.', detalhe)
+  if (/\/challenge\//.test(r.url ?? '')) throw new IgErro('verificacao', 'O Instagram pediu uma verificação na conta. Resolva na aba do Instagram e continue.', detalhe)
+  if (r.status === 429) throw new IgErro('limite', 'O Instagram pediu uma pausa (muitas consultas seguidas).', detalhe)
+  if (r.status === 404 || r.naoExiste) throw new IgErro('nao_existe', 'Perfil não encontrado.', detalhe)
+  if (!r.status || r.status >= 400) throw new IgErro('falha', `O Instagram respondeu ${r.status ?? 'sem status'} na página do perfil.`, detalhe)
+  return { user: r.user ?? null, posts: r.posts ?? [], meta: r.meta ?? '' }
 }

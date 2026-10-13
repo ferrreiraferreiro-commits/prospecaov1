@@ -1,7 +1,7 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import { create } from 'zustand'
 import { phoneKey } from '../lib/duplicates'
-import { detectarExtensao, estadoExtensao, igGet, igPost, type EstadoExtensao } from '../lib/igPonte'
+import { detectarExtensao, estadoExtensao, igGet, igPerfilPagina, igPost, PAGINA_DESDE, versaoAntiga, type EstadoExtensao } from '../lib/igPonte'
 import {
   acharChave,
   chavesDosLeads,
@@ -12,6 +12,7 @@ import {
   IgErro,
   lerLista,
   lerPerfil,
+  lerPerfilPagina,
   motivoDescarte,
   perfilParaLead,
   usuarioDe,
@@ -71,6 +72,8 @@ export interface IgEstado {
   logs: string[]
   inicio: string
   fim: string | null
+  /** Como os perfis estão sendo lidos: consulta rápida ou pela página do perfil (quando a rápida é barrada) */
+  modo: 'rapida' | 'pagina'
   /** Pausa automática pedida pelo Instagram: volta sozinha nesse horário */
   esperaAte: number | null
   erro: string | null
@@ -146,7 +149,9 @@ export function lerHistorico(): IgHistorico[] {
 // ---------------------------------------------------------------------------
 
 const MAX_PAGINAS = { palavra: 6, hashtag: 8, seguidores: 60, relacionada: 3 }
-const PAUSAS_MIN = [5, 15, 30]
+const PAUSAS_MIN = [2, 5, 10, 20]
+/** No modo página, tenta a leitura rápida de novo a cada N perfis (ela traz mais dados) */
+const TENTAR_RAPIDA_A_CADA = 30
 const LOTE = 10
 
 interface Controle {
@@ -196,7 +201,7 @@ export const useInstagram = create<IgStore>()((set, get) => {
    * Faz a consulta e cuida dos tropeços: o Instagram pediu pausa → espera e tenta de novo;
    * pediu login ou verificação → pausa até o usuário resolver e clicar em Continuar.
    */
-  async function chamar<T>(runId: string, c: Controle, fn: () => Promise<T>): Promise<T | null> {
+  async function chamar<T>(runId: string, c: Controle, fn: () => Promise<T>, opcoes: { pularSeLimite?: boolean } = {}): Promise<T | null> {
     let pausas = 0
     let falhasExtensao = 0
     for (;;) {
@@ -206,11 +211,12 @@ export const useInstagram = create<IgStore>()((set, get) => {
         return await fn()
       } catch (err) {
         if (!(err instanceof IgErro)) throw err
+        if (err.tipo === 'limite' && opcoes.pularSeLimite) throw err
         if (err.tipo === 'limite') {
           if (pausas >= PAUSAS_MIN.length) throw new IgErro('limite', 'O Instagram continua bloqueando as consultas desta conta. Troque de conta ou tente mais tarde.')
           const min = PAUSAS_MIN[pausas++]
           somarHoje({ pausas: 1 })
-          log(runId, `O Instagram pediu uma pausa. Volto sozinho em ${min} min.`)
+          log(runId, `O Instagram pediu uma pausa${err.detalhe ? ` (${err.detalhe})` : ''}. Volto sozinho em ${min} min.`)
           patch(runId, { fase: 'esperando', esperaAte: Date.now() + min * 60_000, mensagem: `O Instagram pediu uma pausa. A busca volta sozinha em ${min} min.` })
           // "Continuar agora" na tela adianta o horário
           while (!c.parar && Date.now() < (get().estado?.esperaAte ?? 0)) await new Promise((r) => setTimeout(r, 250))
@@ -218,7 +224,7 @@ export const useInstagram = create<IgStore>()((set, get) => {
           continue
         }
         if (err.tipo === 'login' || err.tipo === 'verificacao') {
-          log(runId, err.message)
+          log(runId, `${err.message}${err.detalhe ? ` (${err.detalhe})` : ''}`)
           c.pausado = true
           patch(runId, { fase: 'pausada', mensagem: err.message })
           continue
@@ -233,7 +239,41 @@ export const useInstagram = create<IgStore>()((set, get) => {
   }
 
   /** Perfis que aparecem em cada busca, página por página (só busca a próxima quando precisa). */
-  async function* candidatos(runId: string, c: Controle, input: IgBuscaInput): AsyncGenerator<{ termo: string; perfis: IgCandidato[] }> {
+  /**
+   * Lê um perfil: pela consulta rápida (traz telefone do botão, categoria e posts) e, se o
+   * Instagram barrar, pela página do perfil (como quando a pessoa abre). Volta a tentar a
+   * rápida de tempos em tempos.
+   */
+  function criarLeitor(runId: string, podePagina: boolean) {
+    let modo: 'rapida' | 'pagina' = 'rapida'
+    let naPagina = 0
+    let avisou = false
+    return async function lerUm(u: string): Promise<IgPerfil | null> {
+      if (modo === 'pagina' && ++naPagina % TENTAR_RAPIDA_A_CADA === 0) modo = 'rapida'
+      if (modo === 'rapida') {
+        try {
+          const perfil = lerPerfil(await igGet(`/api/v1/users/web_profile_info/?username=${enc(u)}`))
+          patch(runId, { modo: 'rapida' })
+          return perfil
+        } catch (err) {
+          if (!(err instanceof IgErro) || !podePagina || (err.tipo !== 'limite' && err.tipo !== 'falha')) throw err
+          modo = 'pagina'
+          patch(runId, { modo: 'pagina' })
+          if (!avisou)
+            log(runId, `O Instagram barrou a leitura rápida${err.detalhe ? ` (${err.detalhe})` : ''}. Seguindo pelo modo página: abre cada perfil como uma pessoa.`)
+          avisou = true
+        }
+      }
+      return lerPerfilPagina(await igPerfilPagina(u))
+    }
+  }
+
+  async function* candidatos(
+    runId: string,
+    c: Controle,
+    input: IgBuscaInput,
+    lerUm: (u: string) => Promise<IgPerfil | null>,
+  ): AsyncGenerator<{ termo: string; perfis: IgCandidato[] }> {
     const esperaBusca = () => dormir(c, entre(ESPERA[input.velocidade]) * 1.3)
     const cidade = input.cidade.split(',')[0].trim()
     const termoAtual = (t: string) => patch(runId, { termoAtual: t })
@@ -252,14 +292,18 @@ export const useInstagram = create<IgStore>()((set, get) => {
       let ids = acharChave(recentes, 'next_media_ids')
       for (let p = 1; p < maxPaginas && max && !c.parar; p++) {
         await esperaBusca()
-        const prox = await chamar(runId, c, () =>
-          igPost(`/api/v1/tags/${enc(tag)}/sections/`, {
-            max_id: String(max),
-            page: String(pagina ?? p),
-            surface: 'grid',
-            tab: 'recent',
-            next_media_ids: JSON.stringify(Array.isArray(ids) ? ids : []),
-          }),
+        const prox = await chamar(
+          runId,
+          c,
+          () =>
+            igPost(`/api/v1/tags/${enc(tag)}/sections/`, {
+              max_id: String(max),
+              page: String(pagina ?? p),
+              surface: 'grid',
+              tab: 'recent',
+              next_media_ids: JSON.stringify(Array.isArray(ids) ? ids : []),
+            }),
+          { pularSeLimite: true },
         ).catch(() => null)
         if (!prox) return
         yield { termo, perfis: coletarPerfis(prox) }
@@ -288,7 +332,7 @@ export const useInstagram = create<IgStore>()((set, get) => {
         const u = usuarioDe(termo)
         if (!u) continue
         termoAtual(`@${u}`)
-        const perfil = lerPerfil(await chamar(runId, c, () => igGet(`/api/v1/users/web_profile_info/?username=${enc(u)}`)).catch(() => null))
+        const perfil = await chamar(runId, c, () => lerUm(u)).catch(() => null)
         if (!perfil?.id) {
           log(runId, `Não achei o perfil @${u}.`)
           continue
@@ -299,6 +343,7 @@ export const useInstagram = create<IgStore>()((set, get) => {
           await esperaBusca()
           const j = await chamar(runId, c, () =>
             igGet(`/api/v1/friendships/${perfil.id}/followers/?count=50&search_surface=follow_list_page${max ? `&max_id=${enc(String(max))}` : ''}`),
+            { pularSeLimite: p > 0 },
           ).catch((e: Error) => {
             log(runId, `@${u}: ${e.message}`)
             return null
@@ -325,8 +370,8 @@ export const useInstagram = create<IgStore>()((set, get) => {
       for (let p = 0; p < MAX_PAGINAS.palavra && !c.parar; p++) {
         await esperaBusca()
         const url = `/api/v1/fbsearch/web/top_serp/?enable_metadata=true&query=${enc(q)}${next ? `&next_max_id=${enc(String(next))}` : ''}${rank ? `&rank_token=${enc(String(rank))}` : ''}`
-        const j = await chamar(runId, c, () => igGet(url)).catch((e: Error) => {
-          if (p === 0) log(runId, `Posts de "${q}": ${e.message}`)
+        const j = await chamar(runId, c, () => igGet(url), { pularSeLimite: true }).catch((e: Error) => {
+          log(runId, `Posts de "${q}": ${e instanceof IgErro && e.tipo === 'limite' ? 'o Instagram limitou esta parte da busca; seguindo com o resto' : e.message}`)
           return null
         })
         if (!j) break
@@ -408,6 +453,7 @@ export const useInstagram = create<IgStore>()((set, get) => {
           logs: [],
           inicio: new Date().toISOString(),
           fim: null,
+          modo: 'rapida',
           esperaAte: null,
           erro: null,
         },
@@ -424,6 +470,9 @@ export const useInstagram = create<IgStore>()((set, get) => {
         patch(runId, { fase: 'pausada', mensagem: 'Entre numa conta na aba do Instagram e clique em Continuar.' })
       }
       const minhaConta = ext.conta?.usuario?.toLowerCase() ?? null
+      const podePagina = !!ext.versao && !versaoAntiga(ext.versao, PAGINA_DESDE)
+      if (!podePagina) log(runId, 'A extensão instalada é antiga: atualize para a busca não parar quando o Instagram barrar a leitura rápida.')
+      const lerUm = criarLeitor(runId, podePagina)
 
       const app = useApp.getState()
       const conhecidos = chavesDosLeads(app.leads)
@@ -435,7 +484,7 @@ export const useInstagram = create<IgStore>()((set, get) => {
       let lidosDesdeGravar = 0
 
       try {
-        for await (const lote of candidatos(runId, c, input)) {
+        for await (const lote of candidatos(runId, c, input, lerUm)) {
           const novos = lote.perfis.filter((p) => !naFila.has(p.usuario) && p.usuario !== minhaConta)
           for (const p of novos) naFila.add(p.usuario)
           patch(runId, (e) => ({ achados: e.achados + novos.length }))
@@ -461,9 +510,8 @@ export const useInstagram = create<IgStore>()((set, get) => {
             patch(runId, { mensagem: `Abrindo @${cand.usuario}…` })
             let perfil: IgPerfil | null = null
             try {
-              const j = await chamar(runId, c, () => igGet(`/api/v1/users/web_profile_info/?username=${enc(cand.usuario)}`))
+              perfil = await chamar(runId, c, () => lerUm(cand.usuario))
               if (c.parar) break
-              perfil = lerPerfil(j)
             } catch (err) {
               if (err instanceof IgErro && (err.tipo === 'nao_existe' || err.tipo === 'falha')) {
                 descartar(err.tipo === 'nao_existe' ? 'nao_existe' : 'falha')

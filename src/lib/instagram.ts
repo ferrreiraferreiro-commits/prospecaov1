@@ -37,10 +37,12 @@ export interface IgPerfil {
   categoria: string | null
   seguidores: number
   seguindo: number
-  posts: number
+  /** null = não deu para saber (leitura pela página) */
+  posts: number | null
   /** ISO do post mais recente (null quando não dá para ver) */
   ultimoPost: string | null
-  comercial: boolean
+  /** Conta comercial ou de criador (null = não deu para saber) */
+  comercial: boolean | null
   privado: boolean
   verificado: boolean
   /** Só dígitos, com DDD (sem o 55) */
@@ -106,6 +108,7 @@ type Json = Record<string, unknown>
 const obj = (v: unknown): Json | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : null)
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+const numOuNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 const USUARIO_VALIDO = /^[a-z0-9._]{1,30}$/
 
@@ -338,9 +341,9 @@ export function lerPerfil(resposta: unknown): IgPerfil | null {
     categoria: str(u.business_category_name) ?? str(u.category_name) ?? str(u.category),
     seguidores: num(obj(u.edge_followed_by)?.count) || num(u.follower_count),
     seguindo: num(obj(u.edge_follow)?.count) || num(u.following_count),
-    posts: num(midia?.count) || num(u.media_count),
+    posts: numOuNull(midia?.count) ?? numOuNull(u.media_count) ?? numOuNull(u.all_media_count),
     ultimoPost: ultimo ? new Date(ultimo * 1000).toISOString() : null,
-    comercial: u.is_business_account === true || u.is_professional_account === true,
+    comercial: 'is_business_account' in u || 'is_professional_account' in u ? u.is_business_account === true || u.is_professional_account === true : null,
     privado: u.is_private === true,
     verificado: u.is_verified === true,
     telefone,
@@ -354,17 +357,44 @@ export function lerPerfil(resposta: unknown): IgPerfil | null {
   }
 }
 
+/** "268M seguidores, seguindo 195, 32K posts" → números (meta da página do perfil). */
+export function contarMeta(meta: string, palavra: RegExp): number | null {
+  const m = meta.match(new RegExp(`([\\d.,]+)\\s*(mil|[KkMm])?\\s*(?:${palavra.source})`, 'i'))
+  if (!m) return null
+  const mult = !m[2] ? 1 : /^(k|mil)$/i.test(m[2]) ? 1000 : 1_000_000
+  // "1,670" e "1.670" são milhar; "1.5" ou "1,5" com K/M são decimais
+  const n = m[2] ? Number(m[1].replace(',', '.')) : Number(m[1].replace(/[.,]/g, ''))
+  return Number.isFinite(n) ? Math.round(n * mult) : null
+}
+
+export interface IgPagina {
+  user: Record<string, unknown> | null
+  posts?: number[]
+  meta?: string
+}
+
+/** Perfil lido pela página dele (extensão, comando "perfil") → mesmo formato da consulta rápida. */
+export function lerPerfilPagina(r: IgPagina): IgPerfil | null {
+  if (!r.user) return null
+  const meta = r.meta ?? ''
+  const user: Json = { ...r.user }
+  if (numOuNull(user.follower_count) == null) user.follower_count = contarMeta(meta, /seguidores|followers/) ?? 0
+  if (numOuNull(user.media_count) == null && numOuNull(user.all_media_count) == null) user.media_count = contarMeta(meta, /posts|publica[çc][õo]es/)
+  const posts = r.posts ?? []
+  if (posts.length) user.edge_owner_to_timeline_media = { count: user.media_count ?? posts.length, edges: posts.map((t) => ({ node: { taken_at_timestamp: t } })) }
+  return lerPerfil({ data: { user } })
+}
+
 /** Por que o perfil não serve (null = serve). */
 export function motivoDescarte(p: IgPerfil, f: IgFiltros, cidade: string, agora = Date.now()): Motivo | null {
   if (p.privado) return 'privado'
-  if (f.comercial && !p.comercial) return 'pessoal'
+  if (f.comercial && p.comercial === false) return 'pessoal'
   if (f.contato && !p.telefone) return 'sem_contato'
   if (f.site === -1 && p.site) return 'tem_site'
   if (f.site === 1 && !p.site) return 'sem_site'
   if (f.ativoDias > 0) {
-    // Perfil sem post nenhum também conta como parado
-    const desde = p.ultimoPost ? (agora - Date.parse(p.ultimoPost)) / 86_400_000 : Infinity
-    if (desde > f.ativoDias) return 'parado'
+    // Sem post nenhum também conta como parado; sem a data (leitura pela página), deixa passar
+    if (p.ultimoPost ? (agora - Date.parse(p.ultimoPost)) / 86_400_000 > f.ativoDias : p.posts === 0) return 'parado'
   }
   if (p.seguidores < f.seguidoresMin || (f.seguidoresMax > 0 && p.seguidores > f.seguidoresMax)) return 'seguidores'
   if (f.soCidade && cidade.trim()) {
@@ -457,6 +487,8 @@ export class IgErro extends Error {
   constructor(
     readonly tipo: IgErroTipo,
     message: string,
+    /** O que o Instagram respondeu de fato (para o registro) */
+    readonly detalhe = '',
   ) {
     super(message)
   }
@@ -476,14 +508,15 @@ export function conferirResposta(r: IgResposta): unknown {
   if (!r.ok) throw new IgErro('extensao', r.erro || 'A extensão não respondeu.')
   const j = obj(r.json)
   const msg = String(j?.message ?? '')
-  if (/\/accounts\/login|\/challenge\//.test(r.url ?? '') && !j) throw new IgErro('login', 'O Instagram desta aba não está logado. Entre numa conta e continue.')
-  if (j?.require_login === true || (r.status === 401 && /login/i.test(msg))) throw new IgErro('login', 'O Instagram pediu login. Entre numa conta na aba do Instagram e continue.')
-  if (/checkpoint|challenge/i.test(msg) || j?.checkpoint_url || j?.challenge) throw new IgErro('verificacao', 'O Instagram pediu uma verificação na conta. Resolva na aba do Instagram e continue.')
+  const detalhe = `${r.status ?? '?'}${msg ? ` ${msg}` : ''}`.slice(0, 160)
+  if (/\/accounts\/login|\/challenge\//.test(r.url ?? '') && !j) throw new IgErro('login', 'O Instagram desta aba não está logado. Entre numa conta e continue.', detalhe)
+  if (j?.require_login === true || (r.status === 401 && /login/i.test(msg))) throw new IgErro('login', 'O Instagram pediu login. Entre numa conta na aba do Instagram e continue.', detalhe)
+  if (/checkpoint|challenge/i.test(msg) || j?.checkpoint_url || j?.challenge) throw new IgErro('verificacao', 'O Instagram pediu uma verificação na conta. Resolva na aba do Instagram e continue.', detalhe)
   if (r.status === 429 || /wait a few minutes|aguarde alguns minutos|try again later|tente novamente mais tarde|feedback_required|rate.?limit|spam/i.test(msg))
-    throw new IgErro('limite', 'O Instagram pediu uma pausa (muitas consultas seguidas).')
+    throw new IgErro('limite', 'O Instagram pediu uma pausa (muitas consultas seguidas).', detalhe)
   if (r.status === 404) throw new IgErro('nao_existe', 'Perfil não encontrado.')
-  if (!r.status || r.status >= 400 || !j) throw new IgErro('falha', `O Instagram respondeu ${r.status ?? 'sem status'}${msg ? `: ${msg}` : ''}.`)
-  if (j.status === 'fail') throw new IgErro('falha', msg || 'O Instagram recusou a consulta.')
+  if (!r.status || r.status >= 400 || !j) throw new IgErro('falha', `O Instagram respondeu ${r.status ?? 'sem status'}${msg ? `: ${msg}` : ''}.`, detalhe)
+  if (j.status === 'fail') throw new IgErro('falha', msg || 'O Instagram recusou a consulta.', detalhe)
   return j
 }
 

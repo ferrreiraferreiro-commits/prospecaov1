@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "XS Prospecção · Instagram",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Busca perfis de negócios no Instagram e manda direto para os leads da XS Prospecção.",
   "icons": {
     "128": "icone.png"

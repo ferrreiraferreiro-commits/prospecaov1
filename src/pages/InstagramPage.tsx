@@ -94,7 +94,7 @@ const FASE_LABEL: Record<IgFase, string> = {
 const CONVERSA = new Set(['falei_responsavel', 'pediu_whatsapp', 'follow_up', 'cliente_potencial', 'agendou_reuniao'])
 
 function haQuanto(iso: string | null): string {
-  if (!iso) return 'sem posts'
+  if (!iso) return '—'
   const d = Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)
   if (d < 1) return 'hoje'
   if (d < 30) return `há ${d} d`
@@ -396,6 +396,11 @@ export function InstagramPage() {
                   {estado.fase === 'buscando' && <LoaderCircle className="size-3.5 animate-spin text-blue-400" />}
                   {FASE_LABEL[estado.fase]}
                   {estado.termoAtual && rodando && <span className="font-normal text-fg-3">· {estado.termoAtual}</span>}
+                  {estado.modo === 'pagina' && (
+                    <span className="rounded bg-blue-500/10 px-1.5 text-2xs leading-5 font-medium text-blue-300" title="O Instagram barrou a leitura rápida: a XS abre cada perfil pela página, como uma pessoa.">
+                      lendo pela página
+                    </span>
+                  )}
                 </span>
               }
               description={`${FONTE_LABEL[estado.input.fonte]} · ${estado.input.termos.slice(0, 4).join(', ')}${estado.input.termos.length > 4 ? '…' : ''}${estado.input.cidade ? ` · ${estado.input.cidade}` : ''} · meta ${estado.input.meta}`}
