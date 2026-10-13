@@ -29,7 +29,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { Suspense, useEffect, useState, type ComponentType } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAvisos } from '../lib/avisos'
 import { useComunidade } from '../lib/comunidade'
@@ -47,14 +47,14 @@ import { MessageModal } from './MessageModal'
 import { OutcomeModal } from './OutcomeModal'
 import { EscolherPlano } from './Planos'
 import { TopBar } from './TopBar'
-import { InstagramIcon, Spinner } from './ui'
+import { Spinner } from './ui'
 import { useReminders } from './useReminders'
 import { usePrivacyMode } from '../lib/privacy'
 
 interface NavItem {
   to: string
   label: string
-  icon: LucideIcon | ComponentType<{ className?: string; strokeWidth?: number }>
+  icon: LucideIcon
   end?: boolean
   /** Só aparece para contas com o WhatsApp da XS (recurso "motor") */
   whatsapp?: boolean
@@ -87,7 +87,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
       { to: '/maps', label: 'Buscar empresas', icon: MapPinned },
-      { to: '/instagram', label: 'Instagram', icon: InstagramIcon },
       { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
     ],
   },
