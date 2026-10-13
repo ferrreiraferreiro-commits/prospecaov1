@@ -21,24 +21,70 @@ export function versaoAntiga(instalada: string, atual = EXTENSAO_VERSAO): boolea
   return false
 }
 
+export type NavegadorId = 'brave' | 'chrome' | 'edge' | 'opera'
+
 export interface Navegador {
+  id: NavegadorId
   nome: string
   /** Endereço da página de extensões (não dá para abrir por link: o usuário cola na barra) */
   extensoes: string
+  /** Caminho pelo menu do navegador até a página de extensões */
+  menu: string
   modoDev: string
+  ondeModoDev: string
   carregar: string
   suportado: boolean
 }
 
+/** Nomes e caminhos da página de extensões de cada navegador. */
+export const NAVEGADORES: Record<NavegadorId, Omit<Navegador, 'suportado'>> = {
+  brave: {
+    id: 'brave',
+    nome: 'Brave',
+    extensoes: 'brave://extensions',
+    menu: '☰ (três risquinhos, no canto de cima à direita) → Extensões',
+    modoDev: 'Modo do desenvolvedor',
+    ondeModoDev: 'no canto de cima, à direita',
+    carregar: 'Carregar sem compactação',
+  },
+  chrome: {
+    id: 'chrome',
+    nome: 'Chrome',
+    extensoes: 'chrome://extensions',
+    menu: '⋮ (três pontinhos, no canto de cima à direita) → Extensões → Gerenciar extensões',
+    modoDev: 'Modo do desenvolvedor',
+    ondeModoDev: 'no canto de cima, à direita',
+    carregar: 'Carregar sem compactação',
+  },
+  edge: {
+    id: 'edge',
+    nome: 'Edge',
+    extensoes: 'edge://extensions',
+    menu: '··· (três pontinhos, no canto de cima à direita) → Extensões → Gerenciar extensões',
+    modoDev: 'Modo de desenvolvedor',
+    ondeModoDev: 'no menu da esquerda, embaixo',
+    carregar: 'Carregar sem pacote',
+  },
+  opera: {
+    id: 'opera',
+    nome: 'Opera',
+    extensoes: 'opera://extensions',
+    menu: 'atalho Ctrl + Shift + E',
+    modoDev: 'Modo de desenvolvedor',
+    ondeModoDev: 'no canto de cima, à direita',
+    carregar: 'Carregar sem compactação',
+  },
+}
+
 /** Navegador atual e os nomes dos botões na página de extensões dele. */
 export function navegador(ua = typeof navigator === 'undefined' ? '' : navigator.userAgent, brave = typeof navigator !== 'undefined' && 'brave' in navigator): Navegador {
-  const chrome = { nome: 'Chrome', extensoes: 'chrome://extensions', modoDev: 'Modo do desenvolvedor', carregar: 'Carregar sem compactação', suportado: true }
-  if (/Android|iPhone|iPad|Mobile/i.test(ua)) return { ...chrome, nome: 'celular', suportado: false }
-  if (/Firefox\//.test(ua) || (/Safari\//.test(ua) && !/Chrome\//.test(ua))) return { ...chrome, nome: /Firefox/.test(ua) ? 'Firefox' : 'Safari', suportado: false }
-  if (/OPR\/|Opera/.test(ua)) return { ...chrome, nome: 'Opera', extensoes: 'opera://extensions' }
-  if (/Edg\//.test(ua)) return { ...chrome, nome: 'Edge', extensoes: 'edge://extensions', modoDev: 'Modo de desenvolvedor', carregar: 'Carregar sem pacote' }
-  if (brave) return { ...chrome, nome: 'Brave', extensoes: 'brave://extensions' }
-  return chrome
+  const ok = (id: NavegadorId): Navegador => ({ ...NAVEGADORES[id], suportado: true })
+  if (/Android|iPhone|iPad|Mobile/i.test(ua)) return { ...ok('chrome'), nome: 'celular', suportado: false }
+  if (/Firefox\//.test(ua) || (/Safari\//.test(ua) && !/Chrome\//.test(ua))) return { ...ok('chrome'), nome: /Firefox/.test(ua) ? 'Firefox' : 'Safari', suportado: false }
+  if (/OPR\/|Opera/.test(ua)) return ok('opera')
+  if (/Edg\//.test(ua)) return ok('edge')
+  if (brave) return ok('brave')
+  return ok('chrome')
 }
 
 export interface EstadoExtensao {

@@ -1,6 +1,7 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
 // Gera public/downloads/xs-instagram.zip (a extensão do Instagram) a cada dev/build,
-// então o download do site sempre bate com a pasta extensao-instagram/.
+// então o download do site sempre bate com a pasta extensao-instagram/. Os arquivos ficam na raiz
+// do zip: o "Extrair tudo" do Windows já cria a pasta xs-instagram (sem pasta dentro de pasta).
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,8 +25,8 @@ function crc32(buf) {
 const arquivos = readdirSync(pasta)
   .filter((n) => !n.startsWith('.'))
   .sort()
-  .map((nome) => ({ nome: `xs-instagram/${nome}`, dados: readFileSync(join(pasta, nome)) }))
-arquivos.push({ nome: 'xs-instagram/icone.png', dados: readFileSync(join(raiz, 'public', 'icons', 'icon-192.png')) })
+  .map((nome) => ({ nome, dados: readFileSync(join(pasta, nome)) }))
+arquivos.push({ nome: 'icone.png', dados: readFileSync(join(raiz, 'public', 'icons', 'icon-192.png')) })
 
 // Data fixa: o zip só muda quando os arquivos mudam
 const DOS_HORA = 0
