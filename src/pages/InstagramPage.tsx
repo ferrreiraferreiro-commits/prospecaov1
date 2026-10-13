@@ -4,10 +4,11 @@ import { Check, CircleStop, Download, Globe, Hash, ListPlus, LoaderCircle, Pause
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/kit'
+import { ComoUsarInstagram, InstalarExtensao } from '../components/ExtensaoInstagram'
 import { PageHeader } from '../components/PageHeader'
 import { Button, InstagramIcon, Progress, WhatsAppIcon } from '../components/ui'
 import { formatPhone } from '../lib/contact'
-import { abrirInstagram, EXTENSAO_ZIP } from '../lib/igPonte'
+import { abrirInstagram, EXTENSAO_VERSAO, EXTENSAO_ZIP, versaoAntiga } from '../lib/igPonte'
 import {
   buscaDoLead,
   FILTROS_PADRAO,
@@ -184,6 +185,8 @@ export function InstagramPage() {
       />
 
       <Conexao />
+      <AvisoAtualizar />
+      <ComoUsarInstagram />
 
       <div className="grid gap-3 xl:grid-cols-[23rem_1fr]">
         {/* Formulário */}
@@ -543,37 +546,13 @@ function Conexao() {
   const hoje = useInstagram((s) => s.hoje)
 
   if (!versao) {
-    return (
-      <section className="panel p-4">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="min-w-0 flex-1 space-y-1">
-            <h2 className="flex items-center gap-2 text-[13px] font-semibold">
-              {verificando ? <LoaderCircle className="size-3.5 animate-spin text-blue-400" /> : <span className="size-2 rounded-full bg-red-400" />}
-              {verificando ? 'Procurando a extensão…' : 'Instale a extensão XS · Instagram'}
-            </h2>
-            <p className="text-2xs text-fg-3">É ela que usa o Instagram logado no seu Chrome. Instala uma vez, leva 1 minuto. Funciona no Chrome, Edge, Brave e Opera do computador.</p>
-          </div>
-          <a href={EXTENSAO_ZIP} download className="inline-flex h-8 items-center gap-2 rounded-md bg-blue-600 px-3 text-[13px] font-semibold text-white hover:bg-[#3b7bf6]">
-            <Download className="size-4" /> Baixar a extensão
-          </a>
-        </div>
-        <ol className="mt-3 grid gap-2 text-xs text-fg-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Passo n={1}>Baixe e extraia o arquivo (botão direito → Extrair tudo).</Passo>
-          <Passo n={2}>
-            Abra <span className="font-mono text-fg">chrome://extensions</span> e ligue o <b>Modo do desenvolvedor</b> (canto de cima).
-          </Passo>
-          <Passo n={3}>
-            Clique em <b>Carregar sem compactação</b> e escolha a pasta <span className="font-mono text-fg">xs-instagram</span>.
-          </Passo>
-          <Passo n={4}>Entre numa conta do Instagram nesse navegador e recarregue esta página.</Passo>
-        </ol>
-        <div className="mt-3 flex justify-end">
-          <Button size="sm" icon={<RefreshCw className="size-3.5" />} onClick={() => window.location.reload()}>
-            Já instalei, recarregar
-          </Button>
-        </div>
-      </section>
-    )
+    if (verificando)
+      return (
+        <section className="panel flex items-center gap-2 px-4 py-3 text-xs text-fg-3">
+          <LoaderCircle className="size-3.5 animate-spin text-blue-400" /> Procurando a extensão…
+        </section>
+      )
+    return <InstalarExtensao />
   }
 
   return (
@@ -618,6 +597,23 @@ function Conexao() {
       <Button size="xs" variant="ghost" icon={<RefreshCw className="size-3" />} loading={verificando} onClick={() => void useInstagram.getState().verificar()}>
         Conferir
       </Button>
+    </section>
+  )
+}
+
+/** Extensão instalada é de uma versão antiga: baixar de novo e recarregar. */
+function AvisoAtualizar() {
+  const versao = useInstagram((s) => s.extensao.versao)
+  if (!versao || !versaoAntiga(versao)) return null
+  return (
+    <section className="flex flex-wrap items-center gap-3 rounded-lg border border-gold/30 bg-gold/[0.06] px-4 py-3 text-xs">
+      <span className="min-w-0 flex-1 text-fg-2">
+        <b className="text-gold">Saiu uma versão nova da extensão (v{EXTENSAO_VERSAO}).</b> Baixe de novo, extraia por cima da pasta <span className="font-mono">xs-instagram</span>{' '}
+        e clique no botão de recarregar (↻) da extensão na página de extensões do navegador.
+      </span>
+      <a href={EXTENSAO_ZIP} download="xs-instagram.zip" className="inline-flex h-7 items-center gap-1.5 rounded-md bg-gold px-2.5 text-xs font-semibold text-on-gold hover:bg-gold/85">
+        <Download className="size-3.5" /> Baixar a versão nova
+      </a>
     </section>
   )
 }
@@ -738,15 +734,6 @@ function Acompanhamento() {
         )}
       </Card>
     </div>
-  )
-}
-
-function Passo({ n, children }: { n: number; children: ReactNode }) {
-  return (
-    <li className="flex gap-2 rounded-md border border-line-soft bg-ink px-2.5 py-2">
-      <span className="num flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-2xs font-semibold text-blue-200">{n}</span>
-      <span>{children}</span>
-    </li>
   )
 }
 

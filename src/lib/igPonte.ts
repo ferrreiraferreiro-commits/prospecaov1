@@ -8,6 +8,38 @@ import { conferirResposta, IgErro, type IgResposta } from './instagram'
  */
 
 export const EXTENSAO_ZIP = '/downloads/xs-instagram.zip'
+/** Versão da pasta extensao-instagram/ (o teste confere com o manifest). Mais antiga instalada → aviso para atualizar. */
+export const EXTENSAO_VERSAO = '1.1.0'
+/** Link da extensão na Chrome Web Store. Preenchido → o instalador vira um botão "Adicionar ao Chrome". */
+export const EXTENSAO_LOJA_URL = ''
+
+/** "1.0.0" < "1.1.0" */
+export function versaoAntiga(instalada: string, atual = EXTENSAO_VERSAO): boolean {
+  const a = instalada.split('.').map(Number)
+  const b = atual.split('.').map(Number)
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+  return false
+}
+
+export interface Navegador {
+  nome: string
+  /** Endereço da página de extensões (não dá para abrir por link: o usuário cola na barra) */
+  extensoes: string
+  modoDev: string
+  carregar: string
+  suportado: boolean
+}
+
+/** Navegador atual e os nomes dos botões na página de extensões dele. */
+export function navegador(ua = typeof navigator === 'undefined' ? '' : navigator.userAgent, brave = typeof navigator !== 'undefined' && 'brave' in navigator): Navegador {
+  const chrome = { nome: 'Chrome', extensoes: 'chrome://extensions', modoDev: 'Modo do desenvolvedor', carregar: 'Carregar sem compactação', suportado: true }
+  if (/Android|iPhone|iPad|Mobile/i.test(ua)) return { ...chrome, nome: 'celular', suportado: false }
+  if (/Firefox\//.test(ua) || (/Safari\//.test(ua) && !/Chrome\//.test(ua))) return { ...chrome, nome: /Firefox/.test(ua) ? 'Firefox' : 'Safari', suportado: false }
+  if (/OPR\/|Opera/.test(ua)) return { ...chrome, nome: 'Opera', extensoes: 'opera://extensions' }
+  if (/Edg\//.test(ua)) return { ...chrome, nome: 'Edge', extensoes: 'edge://extensions', modoDev: 'Modo de desenvolvedor', carregar: 'Carregar sem pacote' }
+  if (brave) return { ...chrome, nome: 'Brave', extensoes: 'brave://extensions' }
+  return chrome
+}
 
 export interface EstadoExtensao {
   versao: string

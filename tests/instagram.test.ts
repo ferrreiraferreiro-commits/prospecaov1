@@ -19,6 +19,7 @@ import {
   usuarioDe,
   type IgPerfil,
 } from '../src/lib/instagram'
+import { EXTENSAO_VERSAO, navegador, versaoAntiga } from '../src/lib/igPonte'
 
 const AGORA = Date.parse('2026-10-13T12:00:00Z')
 const diasAtras = (d: number) => Math.floor((AGORA - d * 86_400_000) / 1000)
@@ -191,5 +192,29 @@ describe('erros do Instagram', () => {
     expect(tipo({ ok: true, status: 200, json: null, texto: '<html>', url: 'https://www.instagram.com/accounts/login/' })).toBe('login')
     expect(tipo({ ok: false, erro: 'sem aba' })).toBe('extensao')
     expect(tipo({ ok: true, status: 200, json: { data: {}, status: 'ok' } })).toBe('ok')
+  })
+})
+
+describe('extensão', () => {
+  it('a versão da tela é a mesma da pasta da extensão', async () => {
+    const { readFileSync } = await import('node:fs')
+    const manifest = JSON.parse(readFileSync('extensao-instagram/manifest.json', 'utf8')) as { version: string }
+    expect(manifest.version).toBe(EXTENSAO_VERSAO)
+  })
+
+  it('avisa quando a instalada é mais antiga', () => {
+    expect(versaoAntiga('1.0.0', '1.1.0')).toBe(true)
+    expect(versaoAntiga('1.1.0', '1.1.0')).toBe(false)
+    expect(versaoAntiga('1.10.0', '1.9.3')).toBe(false)
+  })
+
+  it('reconhece o navegador e os nomes dos botões', () => {
+    const chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+    expect(navegador(chrome, false)).toMatchObject({ nome: 'Chrome', extensoes: 'chrome://extensions', suportado: true })
+    expect(navegador(`${chrome} OPR/123.0.0.0`, false)).toMatchObject({ nome: 'Opera', extensoes: 'opera://extensions' })
+    expect(navegador(`${chrome} Edg/141.0.0.0`, false)).toMatchObject({ nome: 'Edge', carregar: 'Carregar sem pacote' })
+    expect(navegador(chrome, true).nome).toBe('Brave')
+    expect(navegador('Mozilla/5.0 (Windows NT 10.0; rv:131.0) Gecko/20100101 Firefox/131.0', false).suportado).toBe(false)
+    expect(navegador('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36', false).suportado).toBe(false)
   })
 })

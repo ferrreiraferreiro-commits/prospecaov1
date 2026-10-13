@@ -90,6 +90,12 @@ async function abrirInstagram() {
   return { ok: true }
 }
 
+// Instalou ou atualizou: a tela da XS que já estava aberta reconhece a extensão na hora, sem F5
+chrome.runtime.onInstalled.addListener(async () => {
+  const abas = await chrome.tabs.query({ url: ['https://xs-prospeccao.vercel.app/*', 'http://localhost/*', 'http://127.0.0.1/*'] })
+  for (const aba of abas) await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ['ponte-xs.js'] }).catch(() => undefined)
+})
+
 chrome.runtime.onMessage.addListener((m, remetente, responder) => {
   const origem = remetente.origin || (remetente.url ? new URL(remetente.url).origin : '')
   const daXs = XS.some((re) => re.test(origem))
