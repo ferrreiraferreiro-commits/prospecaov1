@@ -87,10 +87,8 @@ const sections: LegalSection[] = [
             <strong>Por você</strong>: no cadastro, no perfil e em tudo o que você digita, cola ou importa por planilha.
           </>,
           <>
-            <strong>Pela busca de empresas</strong>: a busca grátis usa a base aberta de lugares da Overture Maps Foundation (dados públicos de
-            comércios reunidos de fontes como Meta, Microsoft e Foursquare), guardada no servidor de busca da XS: nome, categoria, endereço,
-            telefone, site e redes sociais dos comércios. Se você colocar a sua chave do Google, a busca também consulta o Google Maps (Places
-            API) em seu nome, com a sua cota. Para achar o Instagram, o servidor abre a página pública do site da empresa, quando ela tem um.
+            <strong>Pela busca de empresas</strong>: a busca consulta o Google Maps (Places API) em seu nome, com a sua chave do Google e a sua
+            cota: nome, categoria, endereço, telefone, site, nota e avaliações dos comércios. Para achar o Instagram, o servidor abre a página pública do site da empresa, quando ela tem um.
           </>,
           <>
             <strong>Pela consulta pública de CNPJ</strong>: quando há um CNPJ (digitado por você ou achado no site da empresa), os dados cadastrais
@@ -184,19 +182,12 @@ const sections: LegalSection[] = [
               <strong>Vercel</strong>: hospedagem do site.
             </>,
             <>
-              <strong>Servidor de busca da XS (VPS)</strong>: guarda a base aberta de comércios. Ele recebe a cidade, os tipos de negócio e os filtros
-              da busca e, para pular quem você já tem, os telefones da sua lista, que são usados só durante a busca e não ficam guardados.
-            </>,
-            <>
               <strong>Servidor de WhatsApp da XS (o mesmo VPS, no Canadá)</strong>: mantém o WhatsApp que você conectar, com as campanhas, os
               agendamentos, os nomes e telefones dos destinatários, os textos enviados e as respostas recebidas, para fazer os envios e mostrar os resultados.
             </>,
             <>
               <strong>Google (Places API)</strong>: só se você colocar a sua chave do Google. A busca envia ao Google o tipo de negócio e a cidade,
               usando a sua chave, que fica guardada na sua conta da XS e só é usada nas suas buscas.
-            </>,
-            <>
-              <strong>Overture Maps Foundation</strong>: origem da base aberta de comércios (dados abertos, licença CDLA Permissive 2.0).
             </>,
             <>
               <strong>WhatsApp</strong>: no disparo automático, as mensagens enviadas pela XS saem da sua própria conta de WhatsApp, conectada por QR Code.
@@ -378,7 +369,7 @@ export function PrivacyPage() {
             Esta página explica, em linguagem simples, quais dados a XS Prospecção usa, por que usa, onde eles ficam e o que você pode fazer com eles.
           </p>
           <p className="border-l border-line-strong pl-4 text-fg-3">
-            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; a busca de empresas usa uma base aberta de comércios ou o Google, com a sua chave; não vendemos
+            Em resumo: seus dados ficam num banco de dados em São Paulo, separados por conta; a busca de empresas usa o Google Maps, com a sua chave; não vendemos
             dados e não usamos rastreamento de publicidade.
           </p>
         </>

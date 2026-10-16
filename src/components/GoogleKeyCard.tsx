@@ -64,7 +64,7 @@ export function GoogleKeyCard() {
       <header className="border-b border-line-soft px-5 py-3.5">
         <h2 className="text-[13px] font-semibold">Busca do Google</h2>
         <p className="mt-0.5 text-xs text-fg-3">
-          Além da base aberta, a busca pode usar o Google Maps (com nota e avaliações) pela sua própria chave do Google. Dá para criar uma sem cartão em 2 minutos, e a XS nunca
+          A busca de empresas usa o Google Maps (com nota e avaliações) pela sua própria chave do Google. Dá para criar uma sem cartão em 2 minutos, e a XS nunca
           deixa você ser cobrado.
         </p>
       </header>
@@ -83,7 +83,7 @@ export function GoogleKeyCard() {
               variant="ghost"
               icon={<Trash2 className="size-3.5" />}
               onClick={async () => {
-                if (!confirmAction('Tirar a chave do Google desta conta? A busca continua funcionando pela base aberta.')) return
+                if (!confirmAction('Tirar a chave do Google desta conta? Sem ela, a busca de empresas fica parada até você colocar outra.')) return
                 await gk.save({ chave: null }).catch((err: Error) => toast(err.message, 'error'))
               }}
             >
@@ -168,11 +168,11 @@ export function GoogleKeyCard() {
               .
             </Step>
             <Step n={4}>
-              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Salvar</b>. Pronto: a busca do Google já aparece em Buscar empresas.
+              Cole a chave no campo acima e clique em <b className="font-medium text-fg">Salvar</b>. Pronto: a busca já funciona em Buscar empresas.
             </Step>
             <li className="rounded-md bg-tint/[0.04] px-2.5 py-2 text-2xs leading-4 text-fg-3">
               Essa chave é grátis de verdade: não tem cartão, então nunca cobra. O Google dá um limite de consultas por dia (ele não diz quanto); quando acaba, a busca do Google
-              pausa até o dia seguinte e a base aberta continua funcionando. Se a chave sumir, ela pode ser vista de novo no{' '}
+              pausa até o dia seguinte. Se a chave sumir, ela pode ser vista de novo no{' '}
               <a href={LINKS.credenciais} target="_blank" rel="noreferrer" className="text-blue-300 hover:text-blue-200">
                 Google Cloud
               </a>

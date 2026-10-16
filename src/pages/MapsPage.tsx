@@ -33,7 +33,7 @@ interface Form {
 }
 
 const DEFAULT_FORM: Form = {
-  source: 'base',
+  source: 'google',
   location: '',
   point: null,
   bairros: [],
@@ -54,7 +54,8 @@ function loadForm(): Form {
     }
     // Ponto salvo sem a área da cidade: localiza de novo na hora de buscar
     if (form.point && !Array.isArray(form.point.caixa)) form.point = null
-    if (form.source !== 'google') form.source = 'base'
+    // A base aberta saiu: toda busca é no Google Maps
+    form.source = 'google'
     return form
   } catch {
     return DEFAULT_FORM
@@ -136,7 +137,6 @@ export function MapsPage() {
   const hasKey = !!gk.config.chave
   const usadas = usadasNoMes(gk.config)
   const sobra = restantes(gk.config)
-  const google = form.source === 'google'
   const custo = estimateCalls(form)
 
   /** Acha a cidade digitada. Devolve o ponto (ou null se não achou). */
@@ -222,8 +222,8 @@ export function MapsPage() {
   async function start() {
     if (!form.niches.length) return toast('Escolha ao menos um tipo de negócio.', 'error')
     if (!form.point && !form.location.trim()) return toast('Informe a cidade.', 'error')
-    if (google && !hasKey) return toast('Coloque a sua chave do Google em Ajustes ou use a busca grátis da base aberta.', 'error')
-    if (google && sobra <= 0) return toast('As consultas grátis do Google deste mês acabaram. Use a base aberta até o mês virar.', 'error')
+    if (!hasKey) return toast('Coloque a sua chave grátis do Google para buscar empresas.', 'error')
+    if (sobra <= 0) return toast('As consultas grátis do Google deste mês acabaram. Elas voltam quando o mês virar.', 'error')
     // Cidade digitada sem localizar: localiza agora (padroniza "Cidade, UF") e já busca
     const point = form.point?.label === form.location ? form.point : await locate()
     if (!point) return
@@ -291,71 +291,43 @@ export function MapsPage() {
         <section className="panel h-fit divide-y divide-line-soft">
           {/* Fonte */}
           <div className="space-y-2.5 p-4">
-            <p className="label">Onde buscar</p>
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-ink p-0.5">
-              {(
-                [
-                  { id: 'base', label: 'Base aberta', hint: 'Grátis, sem limite' },
-                  { id: 'google', label: 'Google Maps', hint: 'Com nota e avaliações' },
-                ] as const
-              ).map((s) => (
-                <button
-                  key={s.id}
-                  disabled={active}
-                  onClick={() => setForm({ ...form, source: s.id })}
-                  className={clsx(
-                    'rounded-md px-2 py-1.5 text-left transition-colors disabled:opacity-60',
-                    form.source === s.id ? 'bg-raised ring-1 ring-line-strong ring-inset' : 'hover:bg-hover',
-                  )}
-                >
-                  <span className={clsx('block text-xs font-semibold', form.source === s.id ? 'text-fg' : 'text-fg-2')}>{s.label}</span>
-                  <span className="block text-2xs text-fg-4">{s.hint}</span>
-                </button>
-              ))}
-            </div>
-            {google ? (
-              hasKey ? (
-                semTeto(gk.config) ? (
-                  <p className="text-2xs text-fg-4">
-                    Chave sem cartão: nunca cobra. Esta busca usa até <span className="num text-fg-3">{custo}</span> consulta(s), cada uma com até 20 empresas. O Google limita por
-                    dia; se acabar, volta amanhã ({usadas} usadas neste mês).
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    <div className="flex items-baseline justify-between text-2xs">
-                      <span className="text-fg-3">Consultas grátis do mês</span>
-                      <span className="num text-fg-2">
-                        {usadas} / {gk.config.limite}
-                      </span>
-                    </div>
-                    <Progress value={usadas} max={gk.config.limite || 1} tone={sobra < 50 ? 'gold' : 'accent'} className="h-1" />
-                    <p className="text-2xs text-fg-4">
-                      Esta busca usa até <span className="num text-fg-3">{custo}</span>. Cada consulta traz até 20 empresas. A XS para antes da cota grátis do Google, então você
-                      nunca paga.
-                    </p>
-                  </div>
-                )
+            <p className="label">Google Maps</p>
+            {hasKey ? (
+              semTeto(gk.config) ? (
+                <p className="text-2xs text-fg-4">
+                  Chave sem cartão: nunca cobra. Esta busca usa até <span className="num text-fg-3">{custo}</span> consulta(s), cada uma com até 20 empresas. O Google limita por
+                  dia; se acabar, volta amanhã ({usadas} usadas neste mês).
+                </p>
               ) : (
-                <div className="space-y-2.5 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-3 text-xs">
-                  <p className="flex items-start gap-2">
-                    <KeyRound className="mt-0.5 size-4 shrink-0 text-blue-300" />
-                    <span>
-                      <span className="block font-semibold text-fg">Pegue a sua chave grátis do Google</span>
-                      <span className="block text-2xs text-fg-3">Sem cartão. Entre com o Gmail, clique em "Copiar chave" e cole aqui embaixo.</span>
+                <div className="space-y-1">
+                  <div className="flex items-baseline justify-between text-2xs">
+                    <span className="text-fg-3">Consultas grátis do mês</span>
+                    <span className="num text-fg-2">
+                      {usadas} / {gk.config.limite}
                     </span>
+                  </div>
+                  <Progress value={usadas} max={gk.config.limite || 1} tone={sobra < 50 ? 'gold' : 'accent'} className="h-1" />
+                  <p className="text-2xs text-fg-4">
+                    Esta busca usa até <span className="num text-fg-3">{custo}</span>. Cada consulta traz até 20 empresas. A XS para antes da cota grátis do Google, então você
+                    nunca paga.
                   </p>
-                  <GetDemoKeyButton className="w-full" />
-                  <GoogleKeyPaste />
-                  <Link to="/configuracoes#google" className="block text-2xs text-fg-3 underline underline-offset-2 hover:text-fg">
-                    Ver o passo a passo em Ajustes
-                  </Link>
                 </div>
               )
             ) : (
-              <p className="text-2xs text-fg-4">
-                Milhões de comércios do Brasil, quase todos com telefone, de uma base pública e gratuita (Overture Maps: dados do Facebook, Microsoft e outros). Sem chave e
-                sem limite. O Google é mais atualizado e traz nota e avaliações.
-              </p>
+              <div className="space-y-2.5 rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-3 text-xs">
+                <p className="flex items-start gap-2">
+                  <KeyRound className="mt-0.5 size-4 shrink-0 text-blue-300" />
+                  <span>
+                    <span className="block font-semibold text-fg">Pegue a sua chave grátis do Google</span>
+                    <span className="block text-2xs text-fg-3">Sem cartão. Entre com o Gmail, clique em "Copiar chave" e cole aqui embaixo.</span>
+                  </span>
+                </p>
+                <GetDemoKeyButton className="w-full" />
+                <GoogleKeyPaste />
+                <Link to="/configuracoes#google" className="block text-2xs text-fg-3 underline underline-offset-2 hover:text-fg">
+                  Ver o passo a passo em Ajustes
+                </Link>
+              </div>
             )}
           </div>
 
@@ -596,7 +568,7 @@ export function MapsPage() {
               </Button>
             ) : (
               <Button variant="primary" size="lg" className="w-full" icon={<Radar className="size-4" />} loading={locating} onClick={() => void start()}>
-                {google ? 'Buscar no Google Maps' : 'Buscar empresas'}
+                Buscar no Google Maps
               </Button>
             )}
           </div>
@@ -633,7 +605,7 @@ export function MapsPage() {
               }
               description={
                 state.input
-                  ? `${state.input.source === 'google' ? 'Google Maps' : 'Base aberta'} · ${state.input.niches.join(', ')}${state.input.bairros.length ? ` · ${state.input.bairros.join(', ')}` : ''} · meta ${state.input.targetLeads}`
+                  ? `${state.input.source === 'base' ? 'Base aberta' : 'Google Maps'} · ${state.input.niches.join(', ')}${state.input.bairros.length ? ` · ${state.input.bairros.join(', ')}` : ''} · meta ${state.input.targetLeads}`
                   : undefined
               }
               actions={
@@ -644,12 +616,11 @@ export function MapsPage() {
             >
               <Progress value={state.progress} max={100} tone={state.phase === 'error' ? 'gold' : 'accent'} className="h-1.5" />
               <p className={clsx('mt-2 text-xs', state.phase === 'error' ? 'text-red-300' : 'text-fg-2')}>{state.error ?? state.message}</p>
-              {state.phase === 'error' && state.input?.source === 'google' && (
+              {state.phase === 'error' && state.input?.source !== 'base' && (
                 <p className="mt-1 text-2xs text-fg-3">
                   <Link to="/configuracoes#google" className="underline underline-offset-2 hover:text-fg">
                     Abrir Ajustes → Busca do Google
-                  </Link>{' '}
-                  ou troque para a base aberta.
+                  </Link>
                 </p>
               )}
               <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">

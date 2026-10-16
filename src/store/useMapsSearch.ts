@@ -9,8 +9,7 @@ import { restantes, useGoogleKey } from './useGoogleKey'
 import { useApp } from './useApp'
 
 /**
- * Busca de empresas pela função /api/maps: base aberta de comércios (grátis, no servidor da XS)
- * ou Google Maps (com a chave do próprio usuário). Fica fora da tela: trocar de página no
+ * Busca de empresas pela função /api/maps, no Google Maps (com a chave do próprio usuário). Fica fora da tela: trocar de página no
  * meio não perde a busca, e o resultado vai direto para os leads quando termina.
  */
 
@@ -72,46 +71,6 @@ interface MapsSearchStore {
 }
 
 let ctrl: AbortController | null = null
-
-/** Caixa de cada bairro no mapa (Nominatim). Bairro que o mapa não conhece fica de fora, com aviso. */
-async function bairroBoxes(bairros: string[], location: string, signal: AbortSignal, log: (l: string) => void): Promise<[number, number, number, number][]> {
-  const out: [number, number, number, number][] = []
-  for (const b of bairros.slice(0, 10)) {
-    const rows = await nominatim<{ boundingbox: string[] }[]>(`search?q=${encodeURIComponent(`${b}, ${location}`)}&countrycodes=br&limit=1`, signal).catch(() => [])
-    const bb = rows[0]?.boundingbox?.map(Number)
-    if (bb?.length === 4 && bb.every(Number.isFinite)) out.push([bb[0], bb[1], bb[2], bb[3]])
-    else log(`Não achei o bairro "${b}" no mapa; ele ficou de fora.`)
-  }
-  return out
-}
-
-/** Busca na base aberta de comércios (servidor da XS): grátis, sem chave e sem limite. */
-async function searchBase(input: MapsSearchInput & { area: SearchArea }, signal: AbortSignal, log: (l: string) => void): Promise<{ results: MapsResult[]; stats: Stats }> {
-  const caixas = input.bairros.length ? await bairroBoxes(input.bairros, input.location, signal, log) : []
-  if (input.bairros.length && !caixas.length) throw new Error('Não achei esses bairros no mapa. Confira o nome ou busque a cidade toda.')
-  const known = knownKeys(useApp.getState().leads)
-  return mapsApi<{ results: MapsResult[]; stats: Stats }>(
-    {
-      acao: 'base',
-      uf: input.area.uf,
-      cidade: input.location.split(',')[0].trim(),
-      nichos: input.niches.map((n) => {
-        const c = categoriaDe(n)
-        return { nome: c.nome, tax: c.base, nomes: c.nomes }
-      }),
-      caixas,
-      filtros: {
-        telefone: input.qualification.phone,
-        celular: input.qualification.mobile,
-        site: input.qualification.website,
-      },
-      meta: input.targetLeads,
-      conhecidos: { telefones: known.phones },
-      pular: input.existingPolicy === 'block',
-    },
-    signal,
-  )
-}
 
 export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
   // Só mexe na busca certa: uma busca antiga que ainda está terminando não escreve por cima da nova
@@ -239,13 +198,12 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
       ctrl = c
       const startedAt = new Date().toISOString()
       const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-      const google = input.source === 'google'
       set({
         state: {
           runId,
           active: true,
           phase: 'connecting',
-          message: google ? 'Buscando no Google Maps…' : 'Buscando na base aberta…',
+          message: 'Buscando no Google Maps…',
           progress: 20,
           cardsFound: 0,
           approvedCount: 0,
@@ -270,49 +228,44 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
         },
       })
       const where = input.bairros.length ? `${input.bairros.join(', ')} · ${input.location}` : input.location
-      log(runId, `Busca (${google ? 'Google Maps' : 'base aberta'}): ${input.niches.join(', ')} · ${where}`)
+      log(runId, `Busca (Google Maps): ${input.niches.join(', ')} · ${where}`)
 
       let results: MapsResult[] = []
       try {
-        let data: { results: MapsResult[]; stats: Stats }
-        if (google) {
-          const gk = useGoogleKey.getState()
-          if (!gk.loaded) await gk.load()
-          const cfg = useGoogleKey.getState().config
-          if (!cfg.chave) throw new Error('Coloque a sua chave do Google em Ajustes → Busca do Google (ou use a busca grátis da base aberta).')
-          const known = knownKeys(useApp.getState().leads)
-          data = await mapsApi<{ results: MapsResult[]; stats: Stats }>(
-            {
-              acao: 'google',
-              chave: cfg.chave,
-              nichos: input.niches.map((n) => ({
-                nome: categoriaDe(n).nome,
-                busca: categoriaDe(n).google,
-              })),
-              cidade: input.location,
-              caixa: input.area.caixa,
-              bairros: input.bairros,
-              meta: input.targetLeads,
-              filtros: {
-                telefone: input.qualification.phone,
-                celular: input.qualification.mobile,
-                site: input.qualification.website,
-              },
-              conhecidos: { telefones: known.phones, maps: known.maps },
-              pular: input.existingPolicy === 'block',
-              restante: restantes(cfg),
+        const gk = useGoogleKey.getState()
+        if (!gk.loaded) await gk.load()
+        const cfg = useGoogleKey.getState().config
+        if (!cfg.chave) throw new Error('Coloque a sua chave do Google em Ajustes → Busca do Google.')
+        const known = knownKeys(useApp.getState().leads)
+        const data = await mapsApi<{ results: MapsResult[]; stats: Stats }>(
+          {
+            acao: 'google',
+            chave: cfg.chave,
+            nichos: input.niches.map((n) => ({
+              nome: categoriaDe(n).nome,
+              busca: categoriaDe(n).google,
+            })),
+            cidade: input.location,
+            caixa: input.area.caixa,
+            bairros: input.bairros,
+            meta: input.targetLeads,
+            filtros: {
+              telefone: input.qualification.phone,
+              celular: input.qualification.mobile,
+              site: input.qualification.website,
             },
-            c.signal,
-          )
-          if (data.stats.calls) {
-            await useGoogleKey
-              .getState()
-              .addUso(data.stats.calls)
-              .catch(() => undefined)
-            log(runId, `${data.stats.calls} consulta(s) do Google usadas · ${restantes(useGoogleKey.getState().config)} ainda grátis neste mês.`)
-          }
-        } else {
-          data = await searchBase(input, c.signal, (l) => log(runId, l))
+            conhecidos: { telefones: known.phones, maps: known.maps },
+            pular: input.existingPolicy === 'block',
+            restante: restantes(cfg),
+          },
+          c.signal,
+        )
+        if (data.stats.calls) {
+          await useGoogleKey
+            .getState()
+            .addUso(data.stats.calls)
+            .catch(() => undefined)
+          log(runId, `${data.stats.calls} consulta(s) do Google usadas · ${restantes(useGoogleKey.getState().config)} ainda grátis neste mês.`)
         }
         results = data.results
         const fresh = results.filter((r) => !r.recurring).length
@@ -341,7 +294,7 @@ export const useMapsSearch = create<MapsSearchStore>()((set, get) => {
       const fresh = results.filter((r) => !r.recurring)
       const secs = (Date.now() - Date.parse(startedAt)) / 1000
       const toCheck = input.analyzeSites ? fresh.filter((r) => r.website && !r.instagram) : []
-      const vazio = !fresh.length && (google ? ' Tente outro tipo de negócio ou tire filtros.' : ' Tente outro tipo de negócio, tire filtros ou use a busca do Google.')
+      const vazio = !fresh.length && ' Tente outro tipo de negócio ou tire filtros.'
       await finish(runId, 'completed', {
         results,
         approvedCount: fresh.length,
