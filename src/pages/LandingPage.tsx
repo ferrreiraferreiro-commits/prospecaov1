@@ -368,7 +368,7 @@ function Faq() {
     },
     {
       q: 'De onde vêm os leads?',
-      a: 'Da busca da própria XS: uma base aberta com milhões de comércios do Brasil, quase todos com telefone, ou o Google Maps com a sua própria chave grátis do Google. Escolha a cidade, o bairro e o tipo de negócio, e as empresas entram na sua lista. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
+      a: 'Da busca da própria XS no Google Maps, com a sua própria chave grátis do Google. Escolha a cidade, o bairro e o tipo de negócio, e as empresas entram na sua lista. Ou de onde você já tem: planilha (CSV), linhas coladas do Excel ou do Google Planilhas, ou cadastro à mão.',
     },
     {
       q: 'Meus dados ficam guardados?',
