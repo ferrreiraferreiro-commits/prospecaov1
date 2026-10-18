@@ -49,6 +49,7 @@ import {
   type Licao,
   type Mensagem,
   type Modelo,
+  type NichoBusca,
   type Teste,
   type Variante,
 } from './tipos.js'
@@ -580,6 +581,59 @@ async function reabastecer(alvoEscolhido?: Alvo, testeId?: string): Promise<{ ac
   const nomes = alvo.nichos.map((n) => n.nome).join(', ')
   registrar('busca', `Buscou ${nomes} em ${alvo.cidade}: ${itens.length} empresa(s) nova(s) na fila${achadas > itens.length ? ` (${achadas - itens.length} fora dos seus critérios)` : ''}`)
   return { achadas, mantidas: itens }
+}
+
+export interface EmpresaAchada {
+  empresa: string
+  nicho: string
+  telefone: string
+  site: string
+  instagram: string
+  endereco: string
+  cidade: string
+  uf: string
+}
+
+/**
+ * Busca empresas na base aberta para o dono escolher (conector do Claude/Jarvis).
+ * Não mexe na fila do vendedor; pula quem já foi abordado ou descartado.
+ */
+export async function buscarEmpresas(p: { uf: string; cidade: string; nichos: NichoBusca[]; quantidade: number; soSemSite: boolean }): Promise<EmpresaAchada[]> {
+  if (!BUSCA_TOKEN) throw new Error('A busca de empresas não está configurada neste servidor.')
+  let res: Response
+  try {
+    res = await fetch(`${BUSCA_URL}/buscar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${BUSCA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uf: p.uf,
+        cidade: p.cidade,
+        nichos: p.nichos,
+        filtros: { celular: 1, site: p.soSemSite ? -1 : 0 },
+        meta: p.quantidade,
+        conhecidos: { telefones: [...bloqueados()] },
+        pular: true,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    })
+  } catch {
+    throw new Error('A busca de empresas não respondeu agora.')
+  }
+  const data = (await res.json().catch(() => ({}))) as { results?: ResultadoBase[]; error?: string }
+  if (!res.ok) throw new Error(data.error || 'A busca de empresas falhou.')
+  return (data.results ?? [])
+    .map((r) => ({
+      empresa: r.name,
+      nicho: r.niche,
+      telefone: formatBrazilPhone(r.phone),
+      site: r.website ?? '',
+      instagram: r.instagram ?? '',
+      endereco: r.address ?? '',
+      cidade: r.city || p.cidade,
+      uf: r.state || p.uf,
+    }))
+    .filter((e) => isValidBrazilWhatsApp(e.telefone))
+    .slice(0, p.quantidade)
 }
 
 /** Teste que ainda precisa abordar empresas (o mais antigo primeiro). */
