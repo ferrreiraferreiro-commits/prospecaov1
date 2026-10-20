@@ -657,9 +657,9 @@ function blocosDoDono(textoDono: string): BetaContentBlockParam[] {
 const COM_RESERVA = (m: Modelo) => m === 'claude-opus-5-5' || m === 'claude-sonnet-5-5'
 
 async function chamarIA(max = 8000) {
-  const chave = agente.chaveDaApi()
+  const chave = agente.chaveAnthropic()
   if (!chave) throw new ErroIA('Coloque a chave da API (Vendedor no WhatsApp → Ajustes) para o Xico funcionar.', true)
-  const modelo = agente.lerConfig().modelo
+  const modelo = agente.modeloClaude()
   try {
     const res = await api(chave).beta.messages.create({
       model: modelo,
@@ -777,8 +777,8 @@ async function resumirSeGrande(forcar = false) {
     .slice(-80)
     .map((v) => `${v.de === 'voce' ? 'DONO' : 'XICO'}: ${v.texto}`)
     .join('\n')
-  const chave = agente.chaveDaApi()
-  const modelo = agente.lerConfig().modelo
+  const chave = agente.chaveAnthropic()
+  const modelo = agente.modeloClaude()
   try {
     const res = await api(chave).messages.create({
       model: modelo,
@@ -811,7 +811,7 @@ export async function mensagem(textoDono: string) {
   const t = texto(textoDono, 8000)
   if (!t) throw new Error('Escreva a mensagem.')
   if (estado !== 'livre') throw new Error('O Xico ainda está respondendo. Espere um instante.')
-  if (!agente.chaveDaApi()) throw new Error('Coloque a chave da API (Vendedor no WhatsApp → Ajustes) para o Xico funcionar.')
+  if (!agente.chaveAnthropic()) throw new Error('O Xico da XS usa o Claude: coloque a chave sk-ant- (Vendedor no WhatsApp → Ajustes). O vendedor pode continuar no Gemini.')
   estado = 'pensando'
   nova('voce', t)
   d.ultimaConversaEm = iso()
@@ -829,7 +829,7 @@ export async function mensagem(textoDono: string) {
  * assunto sozinho. No máximo uma vez a cada 3 horas.
  */
 export function abrir() {
-  if (estado !== 'livre' || !agente.chaveDaApi()) return ver()
+  if (estado !== 'livre' || !agente.chaveAnthropic()) return ver()
   const ultima = d.ultimaConversaEm ? Date.parse(d.ultimaConversaEm) : 0
   if (ultima && Date.now() - ultima < 3 * 3_600_000) return ver()
   const novidades = agente.atividade().filter((a) => Date.parse(a.em) > ultima && a.tipo !== 'busca')
@@ -936,7 +936,7 @@ export function ver() {
     propostas: d.propostas.filter((p) => p.estado === 'pendente'),
     memoria: d.memoria,
     prompts: listarPrompts().slice(0, 30),
-    temChave: !!agente.chaveDaApi(),
+    temChave: !!agente.chaveAnthropic(),
   }
 }
 
@@ -973,7 +973,7 @@ export async function recomecar() {
   if (estado !== 'livre') throw new Error('Espere o Xico terminar de responder.')
   estado = 'pensando'
   try {
-    if (agente.chaveDaApi()) await resumirSeGrande(true)
+    if (agente.chaveAnthropic()) await resumirSeGrande(true)
   } finally {
     estado = 'livre'
     fazendo = ''

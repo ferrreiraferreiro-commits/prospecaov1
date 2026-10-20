@@ -147,7 +147,7 @@ function ChaveApi({ ctx }: { ctx: AgenteCtx }) {
           if (valor.trim()) void conectar()
         }}
       >
-        <input className="input flex-1" type="password" autoComplete="off" value={valor} onChange={(ev) => setValor(ev.target.value)} placeholder={e.temChave ? 'Trocar por outra chave (sk-ant-…)' : 'Cole a chave aqui (sk-ant-…)'} />
+        <input className="input flex-1" type="password" autoComplete="off" value={valor} onChange={(ev) => setValor(ev.target.value)} placeholder={e.temChave ? 'Trocar por outra chave (Claude sk-ant-…, Gemini ou Grok xai-…)' : 'Cole a chave aqui (Claude sk-ant-…, Gemini ou Grok xai-…)'} />
         <Button type="submit" variant="primary" loading={busy} disabled={!valor.trim()}>
           {e.temChave ? 'Trocar' : 'Conectar'}
         </Button>

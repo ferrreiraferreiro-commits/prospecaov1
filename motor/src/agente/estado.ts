@@ -81,14 +81,25 @@ export function salvar(agora = false) {
 
 // ---------------------------------------------------------------- chave da API
 
-export function lerChave(): string {
-  return readJson<{ chave?: string }>(ARQ.chave, {}).chave ?? ''
+export interface Chaves {
+  /** Claude (sk-ant-…) */
+  anthropic: string
+  /** Gemini (Google AI Studio) */
+  gemini: string
+  /** Grok (xai-…) e o modelo dele */
+  xai: string
+  xaiModelo: string
 }
 
-export function gravarChave(chave: string) {
+export function lerChaves(): Chaves {
+  const j = readJson<Partial<Chaves> & { chave?: string }>(ARQ.chave, {})
+  return { anthropic: j.anthropic ?? j.chave ?? '', gemini: j.gemini ?? '', xai: j.xai ?? '', xaiModelo: j.xaiModelo ?? '' }
+}
+
+export function gravarChaves(c: Chaves) {
   const alvo = path.join(storageDir, ARQ.chave)
   const tmp = `${alvo}.tmp`
-  fs.writeFileSync(tmp, JSON.stringify({ chave }), { mode: 0o600 })
+  fs.writeFileSync(tmp, JSON.stringify({ ...c, chave: c.anthropic }), { mode: 0o600 })
   fs.renameSync(tmp, alvo)
 }
 

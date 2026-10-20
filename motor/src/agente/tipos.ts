@@ -3,14 +3,20 @@
  * Agente IA de vendas: o que ele guarda (configuração, conversas, lições, fila de empresas, números do dia).
  */
 
-export type Modelo = 'claude-haiku-5-5' | 'claude-sonnet-5-5' | 'claude-opus-5-5'
+export type Modelo = 'claude-haiku-5-5' | 'claude-sonnet-5-5' | 'claude-opus-5-5' | 'gemini-2.5-flash' | 'gemini-3.5-flash' | 'grok'
 
-/** Preço por milhão de tokens (US$), para mostrar o gasto. */
+/** Preço por milhão de tokens (US$), para mostrar o gasto. Gemini com chave grátis não cobra. */
 export const MODELOS: Record<Modelo, { nome: string; entrada: number; saida: number }> = {
   'claude-haiku-5-5': { nome: 'Haiku 5.5', entrada: 0.1, saida: 0.5 },
   'claude-sonnet-5-5': { nome: 'Sonnet 5.5', entrada: 2, saida: 10 },
   'claude-opus-5-5': { nome: 'Opus 5.5', entrada: 4, saida: 20 },
+  'gemini-2.5-flash': { nome: 'Gemini 2.5 Flash (grátis)', entrada: 0, saida: 0 },
+  'gemini-3.5-flash': { nome: 'Gemini 3.5 Flash (grátis)', entrada: 0, saida: 0 },
+  grok: { nome: 'Grok (xAI)', entrada: 0.2, saida: 0.5 },
 }
+
+export type Provedor = 'anthropic' | 'gemini' | 'xai'
+export const provedorDe = (m: Modelo): Provedor => (m.startsWith('gemini') ? 'gemini' : m === 'grok' ? 'xai' : 'anthropic')
 
 /** Tipo de negócio como a base aberta entende (o app manda pronto, do catálogo de categorias). */
 export interface NichoBusca {

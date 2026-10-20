@@ -17,6 +17,7 @@ import * as disparo from '../disparo.js'
 import * as agente from './agente.js'
 import { BASE } from './categoriasBase.js'
 import { EXEMPLOS_PROMPT_SITE } from './modelosSite.js'
+import { MODELOS, type Modelo } from './tipos.js'
 import * as xico from './xico.js'
 
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').replace(/\/+$/, '')
@@ -271,6 +272,17 @@ function servidor(chave: string): McpServer {
     agente.salvarConfig({ ativo: false })
     return 'Vendedor desligado.'
   }, false)
+  ferramenta(
+    'vendedor_ia',
+    'Mostra ou troca a IA (o cérebro) do vendedor de WhatsApp: Claude (pago), Gemini (chave grátis do Google AI Studio) ou Grok (chave xai-). Sem argumentos só mostra. `modelo` troca a IA; `chave` conecta uma chave (a XS descobre de quem ela é pelo começo). Nunca repita a chave na conversa.',
+    { modelo: z.enum(Object.keys(MODELOS) as [Modelo, ...Modelo[]]).optional(), chave: z.string().optional() },
+    async (a) => {
+      if (a.chave) await agente.trocarChave(a.chave)
+      if (a.modelo) agente.salvarConfig({ modelo: a.modelo })
+      return agente.infoIA()
+    },
+    false,
+  )
   ferramenta(
     'site_salvar',
     'Salva na XS um prompt de site (novo, ou versão nova de um existente com `base`). Ele aparece para o dono em "Levar para o Claude".',

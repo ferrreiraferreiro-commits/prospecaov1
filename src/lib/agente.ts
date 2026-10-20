@@ -12,12 +12,15 @@ import { useApp } from '../store/useApp'
  * os leads (histórico e status) enquanto está aberto.
  */
 
-export type Modelo = 'claude-haiku-5-5' | 'claude-sonnet-5-5' | 'claude-opus-5-5'
+export type Modelo = 'claude-haiku-5-5' | 'claude-sonnet-5-5' | 'claude-opus-5-5' | 'gemini-2.5-flash' | 'gemini-3.5-flash' | 'grok'
 
 export const MODELOS: { id: Modelo; nome: string; nota: string; custo: string }[] = [
   { id: 'claude-haiku-5-5', nome: 'Haiku 5.5', nota: 'O mais barato. Bom para atender e qualificar.', custo: '~US$ 1 por 1.000 respostas' },
   { id: 'claude-sonnet-5-5', nome: 'Sonnet 5.5', nota: 'Vende melhor: negocia e contorna objeções.', custo: '~US$ 13 por 1.000 respostas' },
   { id: 'claude-opus-5-5', nome: 'Opus 5.5', nota: 'O mais capaz, e o mais caro.', custo: '~US$ 26 por 1.000 respostas' },
+  { id: 'gemini-2.5-flash', nome: 'Gemini 2.5 Flash', nota: 'Chave grátis do Google AI Studio. Quando a cota de um modelo acaba, usa outro.', custo: 'Grátis (com limite por dia)' },
+  { id: 'gemini-3.5-flash', nome: 'Gemini 3.5 Flash', nota: 'Gemini mais novo, mesma chave grátis.', custo: 'Grátis (com limite por dia)' },
+  { id: 'grok', nome: 'Grok', nota: 'Chave xai- do console.x.ai. Também é a reserva quando o Gemini esgota.', custo: '~US$ 1 por 1.000 respostas' },
 ]
 
 export interface NichoBusca {

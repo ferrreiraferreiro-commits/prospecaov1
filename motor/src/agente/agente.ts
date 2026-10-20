@@ -14,8 +14,9 @@ import { randomUUID } from 'node:crypto'
 import type { WAMessageKey } from '@whiskeysockets/baileys'
 import { recipientByPhone, sentPhones } from '../disparo.js'
 import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, registerSent, samePhone, sendText, sentByThisMotor, waEvents, withTimeout } from '../whatsapp.js'
-import { apagarChave, completarConfig, db, gravarChave, lerChave, salvar } from './estado.js'
+import { completarConfig, db, gravarChaves, lerChaves, salvar } from './estado.js'
 import * as ia from './ia.js'
+import { testarGemini, testarXai, usarChaves } from './outras-ias.js'
 import {
   analisarTeste,
   boaHoraPara,
@@ -52,6 +53,8 @@ import {
   type NichoBusca,
   type Teste,
   type Variante,
+  provedorDe,
+  type Provedor,
 } from './tipos.js'
 
 /** Só a sessão do dono liga o agente (no systemd: /etc/xs-whatsapp/motor-principal.env). */
@@ -64,7 +67,19 @@ const MAX_POR_CONVERSA_DIA = 30
 /** Lições automáticas ativas de cada tipo (as suas não entram na conta) */
 const MAX_LICOES_AUTO = 40
 
-let chave = lerChave()
+const chaves = lerChaves()
+usarChaves(() => chaves)
+/** A chave da IA do modelo escolhido (Claude, Gemini ou Grok) */
+let chave = ''
+function chaveDe(modelo: Modelo) {
+  const p = provedorDe(modelo)
+  // Gemini sem chave mas com Grok: o Grok responde sozinho
+  return p === 'gemini' ? chaves.gemini || chaves.xai : p === 'xai' ? chaves.xai : chaves.anthropic
+}
+function atualizarChave() {
+  chave = chaveDe(db.config.modelo)
+}
+atualizarChave()
 /** A IA recusou a chave (ou acabou o crédito): para até você trocar a chave */
 let chaveRecusada = false
 let proximaAbordagem = 0
@@ -90,6 +105,9 @@ const ctx = (): ia.Contexto => ({ chave, cfg: db.config, licoes: db.licoes })
 
 /** Para o Xico (o assistente do dono): a mesma chave e o mesmo caixa de gasto do dia. */
 export const chaveDaApi = () => chave
+/** O chat do Xico da XS usa ferramentas do Claude: precisa da chave da Anthropic mesmo com o vendedor no Gemini. */
+export const chaveAnthropic = () => chaves.anthropic
+export const modeloClaude = (): Modelo => (provedorDe(db.config.modelo) === 'anthropic' ? db.config.modelo : 'claude-opus-5-5')
 export function registrarGasto(custo: number) {
   hoje().custoUSD += custo
   salvar()
@@ -911,6 +929,7 @@ export function estado() {
     ativo: db.config.ativo,
     temChave: !!chave,
     chaveFinal: chave ? chave.slice(-4) : null,
+    provedor: provedorDe(db.config.modelo),
     chaveRecusada,
     pausadoPorRisco: db.extra.pausadoPorRisco,
     ultimoErro: db.extra.ultimoErro,
@@ -1000,31 +1019,69 @@ export function salvarConfig(body: Partial<AgenteConfig>): AgenteConfig {
   }
   if (nova.avisos.telefone && !isValidBrazilWhatsApp(nova.avisos.telefone)) throw new Error('O número para avisos precisa ter DDD + número.')
   if (nova.prospeccao.fim <= nova.prospeccao.inicio || nova.respostas.fim <= nova.respostas.inicio) throw new Error('O horário de fim precisa ser depois do início.')
-  if (nova.ativo && !chave) throw new Error('Coloque a chave da API antes de ligar o agente.')
+  if (nova.ativo && !chaveDe(nova.modelo)) throw new Error(`Coloque a chave da API (${MODELOS[nova.modelo].nome}) antes de ligar o agente.`)
   if (nova.ativo && !nova.negocio.oferta) throw new Error('Preencha "O que você vende" no Treino antes de ligar o agente.')
   if (nova.ativo && !atual.ativo) registrar('aviso', 'Agente ligado')
   if (!nova.ativo && atual.ativo) registrar('aviso', 'Agente desligado')
+  if (nova.modelo !== atual.modelo) registrar('aviso', `IA do agente: ${MODELOS[nova.modelo].nome}`)
   db.config = nova
+  atualizarChave()
   salvar(true)
   return nova
 }
 
-export async function trocarChave(nova: string) {
+const NOME_PROVEDOR: Record<Provedor, string> = { anthropic: 'do Claude', gemini: 'do Gemini', xai: 'do Grok' }
+
+/** Conecta uma chave. Descobre de quem ela é pelo começo (sk-ant- = Claude, xai- = Grok, outra = Gemini). */
+export async function trocarChave(nova: string, provedor?: Provedor) {
   const k = txt(nova, 300)
-  if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) throw new Error('Isso não parece uma chave da API (ela começa com "sk-ant-").')
-  await ia.testarChave(k, db.config.modelo)
-  gravarChave(k)
-  chave = k
+  const p: Provedor = provedor ?? (k.startsWith('sk-ant-') ? 'anthropic' : k.startsWith('xai-') ? 'xai' : 'gemini')
+  try {
+    if (p === 'anthropic') {
+      if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) throw new Error('Isso não parece uma chave do Claude (ela começa com "sk-ant-").')
+      await ia.testarChave(k, provedorDe(db.config.modelo) === 'anthropic' ? db.config.modelo : 'claude-haiku-5-5')
+      chaves.anthropic = k
+    } else if (p === 'xai') {
+      if (!/^xai-[A-Za-z0-9_-]{20,}$/.test(k)) throw new Error('A chave do Grok começa com "xai-" (console.x.ai → API Keys).')
+      chaves.xaiModelo = await testarXai(k)
+      chaves.xai = k
+    } else {
+      if (!/^[A-Za-z0-9_.-]{30,}$/.test(k)) throw new Error('Isso não parece uma chave do Gemini (aistudio.google.com/apikey).')
+      await testarGemini(k)
+      chaves.gemini = k
+    }
+  } catch (err) {
+    throw new Error((err as Error).message)
+  }
+  gravarChaves(chaves)
+  atualizarChave()
   chaveRecusada = false
   db.extra.ultimoErro = null
-  registrar('aviso', 'Chave da API conectada')
+  registrar('aviso', `Chave ${NOME_PROVEDOR[p]} conectada`)
 }
 
-export function removerChave() {
-  apagarChave()
-  chave = ''
-  db.config.ativo = false
-  registrar('aviso', 'Chave da API removida: agente desligado')
+/** Tira a chave da IA escolhida agora (ou a de um provedor). Sem chave para o modelo, o agente desliga. */
+export function removerChave(provedor: Provedor = provedorDe(db.config.modelo)) {
+  if (provedor === 'anthropic') chaves.anthropic = ''
+  else if (provedor === 'xai') chaves.xai = chaves.xaiModelo = ''
+  else chaves.gemini = ''
+  gravarChaves(chaves)
+  atualizarChave()
+  if (!chave) db.config.ativo = false
+  registrar('aviso', `Chave ${NOME_PROVEDOR[provedor]} removida${chave ? '' : ': agente desligado'}`)
+}
+
+/** Qual IA o agente usa e quais chaves estão conectadas (sem mostrar as chaves). */
+export function infoIA() {
+  const fim = (k: string) => (k ? `…${k.slice(-4)}` : null)
+  return {
+    modelo: db.config.modelo,
+    nome: MODELOS[db.config.modelo].nome,
+    provedor: provedorDe(db.config.modelo),
+    chaves: { claude: fim(chaves.anthropic), gemini: fim(chaves.gemini), grok: fim(chaves.xai) },
+    modeloDoGrok: chaves.xai ? chaves.xaiModelo : null,
+    opcoes: Object.entries(MODELOS).map(([id, m]) => ({ id, nome: m.nome })),
+  }
 }
 
 export function retomar() {

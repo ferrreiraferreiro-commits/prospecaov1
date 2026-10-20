@@ -6,8 +6,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import { z } from 'zod'
+import { chamarOutra, FalhaIA } from './outras-ias.js'
 import { custoUSD, saudacao } from './regras.js'
-import type { AgenteConfig, Conversa, FilaItem, Licao, Modelo } from './tipos.js'
+import { provedorDe, type AgenteConfig, type Conversa, type FilaItem, type Licao, type Modelo } from './tipos.js'
 
 export class ErroIA extends Error {
   constructor(
@@ -42,6 +43,7 @@ export async function testarChave(chave: string, modelo: Modelo): Promise<void> 
 
 export function traduzir(err: unknown): ErroIA {
   if (err instanceof ErroIA) return err
+  if (err instanceof FalhaIA) return new ErroIA(err.message, err.bloqueante)
   if (err instanceof Anthropic.AuthenticationError) return new ErroIA('A chave da API foi recusada. Confira se copiou a chave inteira.', true)
   if (err instanceof Anthropic.PermissionDeniedError) return new ErroIA('A chave da API não tem permissão para este modelo.', true)
   if (err instanceof Anthropic.RateLimitError) return new ErroIA('A IA está recebendo pedidos demais agora. O agente tenta de novo em instantes.')
@@ -60,6 +62,14 @@ export interface Uso {
 
 /** Uma chamada: instruções fixas (com cache) + o pedido, resposta no formato do schema. */
 async function chamar<S extends z.ZodType>(chave: string, modelo: Modelo, sistema: string, pedido: string, schema: S, maxTokens = 4000): Promise<{ dados: z.infer<S>; uso: Uso }> {
+  if (provedorDe(modelo) !== 'anthropic') {
+    try {
+      const r = await chamarOutra(modelo, sistema, pedido, schema, maxTokens)
+      return { dados: r.dados, uso: { custo: r.custo } }
+    } catch (err) {
+      throw Object.assign(traduzir(err), { uso: (err as { uso?: Uso }).uso })
+    }
+  }
   // Opus e Sonnet: se a IA recusar por segurança, a própria API tenta outro modelo
   const reserva = modelo === 'claude-opus-5-5' || modelo === 'claude-sonnet-5-5'
   let res
@@ -294,7 +304,9 @@ export async function filtrarEmpresas(ctx: Contexto, itens: Pick<FilaItem, 'empr
     .map((e, i) => `${i}. ${e.empresa} (${e.nicho}${e.cidade ? `, ${e.cidade}` : ''}${e.endereco ? ` — ${e.endereco}` : ''})`)
     .join('\n')}\n\nDevolva os números das que atendem aos critérios.`
   // Tarefa simples e repetitiva: o modelo mais barato dá conta (custa ~1/40 do Opus)
-  return chamar(ctx.chave, MODELO_ECONOMICO, sistema, pedido, Escolha, 3000)
+  // Com Gemini ou Grok o filtro usa o mesmo modelo (a chave é de lá)
+  const modelo = provedorDe(ctx.cfg.modelo) === 'anthropic' ? MODELO_ECONOMICO : ctx.cfg.modelo
+  return chamar(ctx.chave, modelo, sistema, pedido, Escolha, 3000)
 }
 
 /** Para tarefas simples (filtrar a fila): rápido e barato. */
