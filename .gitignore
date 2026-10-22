@@ -18,3 +18,12 @@ motor/storage/
 
 # Instalador do Motor XS (gerado por npm run motor:exe; vai para a Vercel, não para o git)
 public/downloads/
+
+# Ruflo local secrets and runtime data
+.env
+.env.local
+.env.*.local
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/
+.swarm/

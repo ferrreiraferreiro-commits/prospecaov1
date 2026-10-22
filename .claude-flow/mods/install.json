@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "installedAt": "2026-10-22T22:27:51.833Z",
+  "files": {
+    "C:\\Users\\PC\\Desktop\\CLAUD\\pastas do claude\\prospeccao\\.claude\\worktrees\\ruflo-setup\\.claude\\settings.json": {
+      "plugins": [
+        "ruflo-mods@ruflo",
+        "ruflo-swarm@ruflo",
+        "ruflo-console@ruflo"
+      ],
+      "marketplace": true,
+      "env": true,
+      "claudeInstalled": []
+    }
+  }
+}
