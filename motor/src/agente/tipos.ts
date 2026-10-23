@@ -166,7 +166,7 @@ export const CONFIG_PADRAO: AgenteConfig = {
   followup: { ativo: true, dias: [2, 5] },
   responderDisparos: true,
   limiteDiaUSD: 3,
-  piloto: 4,
+  piloto: 2,
   persona: { nome: 'Atendente IA', tom: 'caloroso', regrasCasa: '' },
   estiloResposta: { variasBolhas: true, maxBolha: 600 },
   capacidades: {},

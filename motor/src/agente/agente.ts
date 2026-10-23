@@ -17,7 +17,7 @@ import { recipientByPhone, sentPhones } from '../disparo.js'
 import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, registerSent, samePhone, sendText, sentByThisMotor, waEvents, withTimeout } from '../whatsapp.js'
 import { buscarTrechos, materiaisComTreino, textoDoMaterial } from './base.js'
 import { limparCapacidades, pode } from './capacidades.js'
-import { CONFERENCIAS, conferir, linksDe, parecenca, pareceManipulacao, precisaAprovacao, type ContextoConferencia } from './conferente.js'
+import { CONFERENCIAS, conferir, conferirLegal, linksDe, parecenca, pareceManipulacao, precisaAprovacao, requisitosNivel, type ContextoConferencia } from './conferente.js'
 import { completarConfig, db, gravarChaves, lerChaves, salvar } from './estado.js'
 import { buscarNoGoogle, caixaDaCidade, ErroGoogle, notaEncaixe, type ResultadoGoogle } from './google.js'
 import * as ia from './ia.js'
@@ -399,9 +399,9 @@ async function sair(
     const p = novaPendencia({ tipo: r.id === 'robo_robo' ? 'pessoa' : 'barrada', texto: r.id === 'robo_robo' ? 'O outro lado parece um robô. Dê uma olhada.' : 'A mensagem foi barrada pela conferência e não saiu.', conversaId: c.id, empresa: c.empresa, motivo: `${r.titulo}: ${r.motivo}`, rascunho: rascunho(r.final, r.trace) })
     c.aguardandoVoce = p.id
     c.pendente = false
-    // A conversa fica com você (aparece como "Com você" nas Conversas) até você responder ou devolver
-    if (c.mensagens.length) c.estado = 'humano'
-    void avisarDono(`🛑 Barrei uma mensagem para ${c.empresa}: ${r.titulo}. ${r.motivo}\nA conversa ficou com você.\n${link(c)}`)
+    // Vai para "Precisa de você" (você aprova, edita ou descarta); robô do outro lado: a conversa fica com você
+    if (r.id === 'robo_robo' && c.mensagens.length) c.estado = 'humano'
+    void avisarDono(`🛑 Barrei uma mensagem para ${c.empresa}: ${r.titulo}. ${r.motivo}\nEstá em Precisa de você.\n${link(c)}`)
     verificarDescida()
     salvar()
     return { tipo: 'barrada', motivo: r.motivo, id: r.id, pendencia: p }
@@ -1477,7 +1477,8 @@ export function salvarConfig(body: Partial<AgenteConfig>): AgenteConfig {
     },
     responderDisparos: b.responderDisparos !== false,
     limiteDiaUSD: num(b.limiteDiaUSD, 0.1, 100, 3),
-    piloto: ([1, 2, 3, 4].includes(Number(b.piloto)) ? Number(b.piloto) : atual.piloto) as Piloto,
+    // O nível só muda por mudarNivel (confere o que falta para subir)
+    piloto: atual.piloto,
     persona: { nome: txt(b.persona.nome, 60) || 'Atendente IA', tom: (['caloroso', 'objetivo', 'curto'] as const).includes(b.persona.tom) ? b.persona.tom : 'caloroso', regrasCasa: txt(b.persona.regrasCasa, 3000) },
     estiloResposta: { variasBolhas: b.estiloResposta.variasBolhas !== false, maxBolha: Math.round(num(b.estiloResposta.maxBolha, 80, 4000, 600)) },
     capacidades: limparCapacidades(b.capacidades),
@@ -2020,5 +2021,126 @@ export function assumirPorTelefone(telefone: string) {
   return conversaPorTelefone(c.telefone)
 }
 
-/** Lista técnica para a tela: as conferências na ordem (a tela de Segurança chega na fase 1). */
-export const conferencias = () => CONFERENCIAS
+// ---------------------------------------------------------------------------
+// "Precisa de você", Segurança e nível de piloto (telas da fase 1)
+// ---------------------------------------------------------------------------
+
+const recente = (a: Pendencia, b: Pendencia) => b.criadaEm.localeCompare(a.criadaEm)
+
+/** A fila: abertas (mais novas primeiro) com o fim da conversa, e as últimas resolvidas. */
+export function listarPendencias() {
+  const comConversa = (p: Pendencia) => {
+    const c = p.conversaId ? db.conversas.find((x) => x.id === p.conversaId) : undefined
+    return {
+      ...p,
+      telefone: c?.telefone ?? null,
+      estado: c?.estado ?? null,
+      ultimas: (c?.mensagens ?? []).slice(-4).map((m) => ({ de: m.de, texto: m.texto.slice(0, 600), em: m.em })),
+    }
+  }
+  return {
+    abertas: db.pendencias.filter((p) => !p.resolvidaEm).sort(recente).map(comConversa),
+    resolvidas: db.pendencias
+      .filter((p) => p.resolvidaEm)
+      .sort((a, b) => String(b.resolvidaEm).localeCompare(String(a.resolvidaEm)))
+      .slice(0, 30),
+  }
+}
+
+const resolvendo = new Set<string>()
+
+/**
+ * Você resolve um item: aprovar (sai como está), editar (sai o seu texto), descartar (não sai) ou
+ * feita (aviso lido). Antes de sair, as conferências legais rodam de novo (parar, LGPD, horário).
+ */
+export async function resolverPendencia(pid: string, acao: string, textos?: unknown) {
+  const p = db.pendencias.find((x) => x.id === pid)
+  if (!p) throw new Error('Item não encontrado.')
+  if (p.resolvidaEm) throw new Error('Este item já foi resolvido.')
+  if (resolvendo.has(pid)) throw new Error('Este item já está sendo enviado.')
+  const c = p.conversaId ? db.conversas.find((x) => x.id === p.conversaId) : undefined
+  const fechar = (resultado: NonNullable<Pendencia['resultado']>) => {
+    Object.assign(p, { resolvidaEm: iso(), resultado })
+    if (c?.aguardandoVoce === p.id) c.aguardandoVoce = null
+  }
+  if (acao === 'descartar' || acao === 'feita') {
+    fechar(acao === 'descartar' ? 'descartada' : 'feita')
+    if (c && acao === 'descartar' && p.rascunho) {
+      // Abordagem que nem saiu: a conversa some; resposta descartada: o cliente fica esperando você
+      if (!c.mensagens.length) db.conversas.splice(db.conversas.indexOf(c), 1)
+      else if (c.mensagens.at(-1)?.de === 'lead' && ESTADOS_ATIVOS.includes(c.estado)) c.estado = 'humano'
+      registrar('aviso', `Você descartou a mensagem para ${c.empresa}`, c.id)
+    }
+    salvar()
+    return { ok: true }
+  }
+  if (acao !== 'aprovar' && acao !== 'editar') throw new Error('Ação inválida.')
+  if (!p.rascunho || !c) throw new Error('Este item não tem mensagem para enviar.')
+  if (c.estado === 'optout') throw new Error('Esta pessoa pediu para não receber mensagens.')
+  const editada = acao === 'editar'
+  const mensagens = editada
+    ? (Array.isArray(textos) ? textos : [textos]).map((t) => String(t ?? '').trim().slice(0, 4000)).filter(Boolean).slice(0, 3)
+    : p.rascunho.mensagens
+  if (!mensagens.length) throw new Error('Escreva a mensagem.')
+  const r = conferirLegal({ mensagens, acao: p.rascunho.acao }, contextoConferencia(c, false))
+  if (!r.ok) throw new Error(`${r.titulo}: ${r.motivo}`)
+  resolvendo.add(pid)
+  try {
+    const primeira = !c.mensagens.some((m) => m.de !== 'lead')
+    const { agente, fontes, reescritas, barradas } = p.rascunho
+    await enviar(c, mensagens, 'agente', { agente, fontes, conferencias: r.passou.length, reescritas, barradas })
+    fechar(editada ? 'editada' : 'aprovada')
+    registrar('aviso', `Você ${editada ? 'editou e enviou' : 'aprovou'} a mensagem para ${c.empresa}`, c.id)
+    if (primeira && c.origem === 'agente') hoje().abordados++
+    const apresentou = agente === 'abridor' && !!c.apresentar
+    if (apresentou) c.apresentar = false
+    await aplicarAcao(c, { mensagens, acao: p.rascunho.acao, dados: p.rascunho.dados }, apresentou)
+    salvar()
+  } finally {
+    resolvendo.delete(pid)
+  }
+  return { ok: true }
+}
+
+/** O que a tela de Segurança mostra: as conferências, os opcionais e o nível com o que falta para subir. */
+export function seguranca() {
+  const cfg = db.config
+  const notaProva = db.lab.provas.filter((x) => x.estado === 'pronta' && x.nota !== null).at(-1)?.nota ?? null
+  const barradas = new Set(db.pendencias.filter((p) => p.tipo === 'barrada').map((p) => p.conversaId))
+  const dados = {
+    notaProva,
+    conversasSemBarrar: db.conversas.filter((c) => c.mensagens.some((m) => m.de === 'agente') && !barradas.has(c.id)).length,
+    vendasOuReunioes: Object.values(db.dias).reduce((s, d) => s + (d.vendas ?? 0) + (d.reunioes ?? 0), 0),
+    podeFechar: pode(cfg, 'mandar_pix') || pode(cfg, 'pedir_contrato'),
+  }
+  const dia = diaDe()
+  return {
+    conferencias: CONFERENCIAS,
+    opcionais: cfg.conferencias,
+    piloto: cfg.piloto,
+    desceuNivel: db.extra.desceuNivel,
+    paradoEm: db.extra.paradoEm,
+    ativo: cfg.ativo,
+    barradasHoje: db.pendencias.filter((p) => p.tipo === 'barrada' && diaDe(new Date(p.criadaEm)) === dia).length,
+    niveis: ([1, 2, 3, 4] as Piloto[]).map((n) => ({ nivel: n, faltam: requisitosNivel(n, dados) })),
+  }
+}
+
+/** Muda o nível de piloto: descer sempre pode; subir só com os requisitos cumpridos. */
+export function mudarNivel(valor: unknown) {
+  const n = Number(valor)
+  if (![1, 2, 3, 4].includes(n)) throw new Error('Nível inválido.')
+  const nivel = n as Piloto
+  if (nivel > db.config.piloto) {
+    const faltam = seguranca().niveis.find((x) => x.nivel === nivel)?.faltam ?? []
+    if (faltam.length) throw new Error(`Para subir ao nível ${nivel}, falta: ${faltam.join(' ')}`)
+  }
+  if (nivel !== db.config.piloto) {
+    db.config.piloto = nivel
+    db.extra.desceuNivel = null
+    registrar('nivel', `Você mudou o nível de piloto para ${nivel}`)
+    salvar(true)
+  }
+  return seguranca()
+}
+

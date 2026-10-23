@@ -1,24 +1,30 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import clsx from 'clsx'
-import { Bot, Power } from 'lucide-react'
+import { Bot, OctagonX, Power } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Ajustes } from '../components/agente/Ajustes'
-import { useAgente, type AgenteCtx } from '../components/agente/comum'
+import { erroTexto, useAgente, type AgenteCtx } from '../components/agente/comum'
 import { Conversas } from '../components/agente/Conversas'
 import { Painel } from '../components/agente/Painel'
+import { PrecisaDeVoce } from '../components/agente/PrecisaDeVoce'
 import { Prospeccao } from '../components/agente/Prospeccao'
+import { Seguranca } from '../components/agente/Seguranca'
 import { Testes } from '../components/agente/Testes'
 import { Treino } from '../components/agente/Treino'
+import { ag, type EstadoAgente } from '../lib/agente'
+import { useApp } from '../store/useApp'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Segmented, Spinner } from '../components/ui'
 
-type Aba = 'painel' | 'conversas' | 'treino' | 'prospeccao' | 'testes' | 'ajustes'
+type Aba = 'painel' | 'precisa' | 'conversas' | 'treino' | 'seguranca' | 'prospeccao' | 'testes' | 'ajustes'
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: 'painel', label: 'Painel' },
+  { id: 'precisa', label: 'Precisa de você' },
   { id: 'conversas', label: 'Conversas' },
   { id: 'treino', label: 'Treino' },
+  { id: 'seguranca', label: 'Segurança' },
   { id: 'prospeccao', label: 'Prospecção' },
   { id: 'testes', label: 'Testes' },
   { id: 'ajustes', label: 'Ajustes' },
@@ -57,10 +63,18 @@ export function AgentePage() {
   const ctx = dados as AgenteCtx
   const { estado: e } = ctx
 
+  // Parar tudo é na hora (nada sai até você ligar de novo); ligar volta a trabalhar
   async function alternar() {
     setLigando(true)
-    await ctx.salvar({ ativo: !e.ativo }, e.ativo ? 'Agente desligado.' : 'Agente ligado. Ele já começa a trabalhar.')
-    setLigando(false)
+    try {
+      ctx.setEstado(await ag<EstadoAgente>(e.ativo ? '/parar' : '/voltar', { method: 'POST' }))
+      useApp.getState().toast(e.ativo ? 'Parei tudo. Nada sai até você ligar de novo.' : 'Agente ligado. Ele já começa a trabalhar.')
+      void ctx.recarregar()
+    } catch (err) {
+      useApp.getState().toast(erroTexto(err), 'error')
+    } finally {
+      setLigando(false)
+    }
   }
 
   const trabalhando = e.ativo && e.whatsapp === 'connected' && !e.pausadoPorRisco && !e.chaveRecusada
@@ -77,21 +91,23 @@ export function AgentePage() {
             </span>
           </span>
         }
-        subtitle="Busca empresas, aborda, conversa e vende pelo seu WhatsApp, 24 horas, do jeito que você ensinar."
+        subtitle="Conversa e vende com os leads que você traz, pelo seu WhatsApp, do jeito que você ensinar. Nenhuma mensagem sai sem passar pelas conferências."
         actions={
-          <Button variant={e.ativo ? 'danger' : 'go'} icon={<Power className="size-3.5" />} loading={ligando} onClick={() => void alternar()}>
-            {e.ativo ? 'Desligar' : 'Ligar agente'}
+          <Button variant={e.ativo ? 'danger' : 'go'} icon={e.ativo ? <OctagonX className="size-3.5" /> : <Power className="size-3.5" />} loading={ligando} onClick={() => void alternar()}>
+            {e.ativo ? 'Parar tudo' : 'Ligar agente'}
           </Button>
         }
       />
 
       <div className="overflow-x-auto">
-        <Segmented value={aba} onChange={(v) => ir(v)} options={ABAS.map((a) => ({ id: a.id, label: <span className="whitespace-nowrap">{a.id === 'conversas' && e.contagem.humano ? `${a.label} (${e.contagem.humano})` : a.label}</span> }))} />
+        <Segmented value={aba} onChange={(v) => ir(v)} options={ABAS.map((a) => ({ id: a.id, label: <span className="whitespace-nowrap">{a.id === 'conversas' && e.contagem.humano ? `${a.label} (${e.contagem.humano})` : a.id === 'precisa' && e.pendencias ? `${a.label} (${e.pendencias})` : a.label}</span> }))} />
       </div>
 
       {aba === 'painel' && <Painel ctx={ctx} irPara={(a) => ir(a)} abrirConversa={(id) => ir('conversas', { conversa: id })} />}
       {aba === 'conversas' && <Conversas abrir={conversa} setAbrir={(id) => ir('conversas', id ? { conversa: id } : {})} />}
+      {aba === 'precisa' && <PrecisaDeVoce onMudou={() => void ctx.recarregar()} abrirConversa={(id) => ir('conversas', { conversa: id })} />}
       {aba === 'treino' && <Treino ctx={ctx} />}
+      {aba === 'seguranca' && <Seguranca ctx={ctx} />}
       {aba === 'prospeccao' && <Prospeccao ctx={ctx} />}
       {aba === 'testes' && <Testes />}
       {aba === 'ajustes' && <Ajustes ctx={ctx} />}

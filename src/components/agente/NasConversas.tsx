@@ -9,6 +9,7 @@ import { useWaServico } from '../../lib/waServico'
 import { useIsAdmin } from '../../store/useAccount'
 import { useApp } from '../../store/useApp'
 import { erroTexto } from './comum'
+import { RascunhoPendente } from './PrecisaDeVoce'
 
 /**
  * O vendedor IA dentro da tela Conversas: selo na lista, quem está com a conversa, a ficha do cliente
@@ -135,13 +136,29 @@ export function FaixaAgente({ telefone, nome, versao, onDoAgente, onMudou }: { t
         </Link>
       </div>
       {c?.pendencia && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-md border border-red-500/25 bg-red-500/[0.06] px-2 py-1.5 text-2xs text-red-200">
-          <ShieldAlert className="mt-px size-3 shrink-0" />
-          <span>
-            {c.pendencia.texto}
-            {c.pendencia.motivo && <span className="text-red-200/80"> {c.pendencia.motivo}</span>}
-          </span>
-        </p>
+        <div className="mt-1.5 rounded-md border border-red-500/25 bg-red-500/[0.06] px-2 py-1.5">
+          <p className="flex items-start gap-1.5 text-2xs text-red-200">
+            <ShieldAlert className="mt-px size-3 shrink-0" />
+            <span>
+              {c.pendencia.texto}
+              {c.pendencia.motivo && <span className="text-red-200/80"> {c.pendencia.motivo}</span>}
+            </span>
+          </p>
+          {c.pendencia.mensagens.length > 0 && (
+            <div className="mt-2">
+              <RascunhoPendente
+                key={c.pendencia.id}
+                id={c.pendencia.id}
+                mensagens={c.pendencia.mensagens}
+                compacto
+                onFeito={() => {
+                  void carregar()
+                  onMudou()
+                }}
+              />
+            </div>
+          )}
+        </div>
       )}
       {c && (c.resumo || c.fatos.length > 0) && (
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-fg-3">

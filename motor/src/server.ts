@@ -142,6 +142,11 @@ app.post('/agente/sinc', wrap(soAgente((req) => agente.marcarSinc(req.body?.iten
 app.post('/agente/conhecidos', wrap(soAgente((req) => agente.definirConhecidos(req.body?.telefones))))
 app.post('/agente/google', wrap(soAgente((req) => agente.definirGoogle(req.body ?? {}))))
 app.post('/agente/parar', wrap(comEstado(() => agente.pararTudo())))
+app.get('/agente/pendencias', wrap(soAgente(() => agente.listarPendencias())))
+app.post('/agente/pendencias/:id', wrap(soAgente((req) => agente.resolverPendencia(id(req), String(req.body?.acao ?? ''), req.body?.mensagens))))
+app.get('/agente/seguranca', wrap(soAgente(() => agente.seguranca())))
+// POST (o gateway da nuvem só deixa passar GET, POST e DELETE)
+app.post('/agente/nivel', wrap(soAgente((req) => agente.mudarNivel(req.body?.nivel))))
 app.post('/agente/voltar', wrap(comEstado(() => agente.voltarATrabalhar())))
 // A tela Conversas da XS: quem está com o vendedor, a conversa de um número, assumir e entregar
 app.get('/agente/mapa', wrap(soAgente(() => agente.mapaConversas())))

@@ -76,7 +76,50 @@ export interface AgenteConfig {
   followup: { ativo: boolean; dias: number[] }
   responderDisparos: boolean
   limiteDiaUSD: number
+  conferencias?: OpcionaisConferencia
 }
+
+/** Conferências opcionais (motor da fase 0 em diante) */
+export interface OpcionaisConferencia {
+  revisorTom: boolean
+  assuntosProibidos: boolean
+  proibidos: string
+  manipulacao: boolean
+  transcreverAudio: boolean
+}
+
+/** Item da fila "Precisa de você". */
+export interface Pendencia {
+  id: string
+  tipo: 'aprovar' | 'barrada' | 'pessoa' | 'contrato' | 'lacuna' | 'licao' | 'teste' | 'nivel' | 'reuniao'
+  texto: string
+  conversaId?: string | null
+  empresa?: string
+  motivo?: string
+  rascunho?: { mensagens: string[]; acao: string; agente: string; fontes: string[]; reescritas: number; barradas: string[] }
+  criadaEm: string
+  prazo?: string | null
+  resolvidaEm?: string | null
+  resultado?: 'aprovada' | 'editada' | 'descartada' | 'substituida' | 'feita'
+  telefone?: string | null
+  estado?: Estado | null
+  ultimas?: { de: 'lead' | 'agente' | 'voce'; texto: string; em: string }[]
+}
+
+export interface Seguranca {
+  conferencias: { id: string; titulo: string; oQueFaz: string; porque: string; fixa: boolean; tipo: 'regra' | 'ia' }[]
+  opcionais: OpcionaisConferencia
+  piloto: number
+  desceuNivel: { em: string; motivo: string } | null
+  paradoEm: string | null
+  ativo: boolean
+  barradasHoje: number
+  niveis: { nivel: number; faltam: string[] }[]
+}
+
+/** Aprovar, editar e enviar, descartar ou dar por feito um item de "Precisa de você". */
+export const resolverPendencia = (id: string, acao: 'aprovar' | 'editar' | 'descartar' | 'feita', mensagens?: string[]) =>
+  ag<{ ok: boolean }>(`/pendencias/${id}`, { method: 'POST', json: { acao, mensagens } })
 
 /** A conversa do vendedor com um número, para a tela Conversas. */
 export interface ConversaDoAgente {

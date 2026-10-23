@@ -294,3 +294,38 @@ test('agente: cumprimento primeiro, apresentação depois da resposta automátic
   assert.equal(agente.lerConfig().prospeccao.cumprimentarPrimeiro, true)
   db.config.ativo = false
 })
+
+test('nível de piloto: padrão 2, descer pode, subir pede a prova; descartar fecha o item', async () => {
+  const ag = await import('./agente/agente.js')
+  const { db } = await import('./agente/estado.js')
+  assert.equal(db.config.piloto, 2)
+  assert.throws(() => ag.mudarNivel(3), /prova do Laboratório/)
+  assert.equal(ag.mudarNivel(1).piloto, 1)
+  assert.equal(ag.mudarNivel(2).piloto, 2)
+  // O site não muda o nível pela configuração
+  ag.salvarConfig({ piloto: 4 } as never)
+  assert.equal(db.config.piloto, 2)
+  db.pendencias.push({ id: 'p-teste', tipo: 'lacuna', texto: 'Pergunta sem resposta', criadaEm: new Date().toISOString() })
+  assert.equal(ag.listarPendencias().abertas.some((p) => p.id === 'p-teste'), true)
+  await ag.resolverPendencia('p-teste', 'feita')
+  assert.equal(ag.listarPendencias().abertas.some((p) => p.id === 'p-teste'), false)
+  await assert.rejects(ag.resolverPendencia('p-teste', 'feita'), /já foi resolvido/)
+})
+
+test('aprovar passa de novo pelas conferências legais e só fecha o item se enviou', async () => {
+  const ag = await import('./agente/agente.js')
+  const { db } = await import('./agente/estado.js')
+  const agora = new Date().toISOString()
+  db.conversas.push({ id: 'c-teste', telefone: '5543999129525', empresa: 'Padaria Teste', nicho: 'padaria', cidade: '', origem: 'manual', estado: 'conversando', temperatura: 'morno', resumo: '', mensagens: [{ id: 'm1', de: 'lead', texto: 'Quanto custa?', em: agora }], criadaEm: agora, atualizadaEm: agora, aguardandoVoce: 'p-ap', sinc: { mensagens: 0 } } as never)
+  db.pendencias.push({ id: 'p-ap', tipo: 'aprovar', texto: 'Copiloto: preço espera você.', conversaId: 'c-teste', empresa: 'Padaria Teste', rascunho: { mensagens: ['Fica R$ 900.'], acao: 'continuar', agente: 'vendedor', fontes: [], reescritas: 0, barradas: [] }, criadaEm: agora })
+  // Contato apagado a pedido (LGPD): não sai nem aprovado
+  db.extra.apagados.push('4399129525')
+  await assert.rejects(ag.resolverPendencia('p-ap', 'aprovar'), /Dados apagados/)
+  db.extra.apagados.pop()
+  // Sem WhatsApp conectado: não envia e o item continua esperando você
+  await assert.rejects(ag.resolverPendencia('p-ap', 'editar', ['Fica R$ 850.']), /desconectado|Fora do horário|hor/i)
+  assert.equal(db.pendencias.find((p) => p.id === 'p-ap')?.resolvidaEm ?? null, null)
+  // Descartar: nada sai e o cliente fica esperando você
+  await ag.resolverPendencia('p-ap', 'descartar')
+  assert.equal(db.conversas.find((c) => c.id === 'c-teste')?.estado, 'humano')
+})
