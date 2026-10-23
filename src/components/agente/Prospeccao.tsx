@@ -1,7 +1,8 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import clsx from 'clsx'
-import { MapPin, Plus, Search, Trash2, X } from 'lucide-react'
+import { MapPin, Plus, Search, Trash2, TriangleAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ag, type AgenteConfig, type Alvo, type FilaItem } from '../../lib/agente'
 import { CATEGORIAS, POPULARES } from '../../lib/categorias'
 import { formatPhone } from '../../lib/contact'
@@ -12,8 +13,8 @@ import { Chave, DIAS_SEMANA, erroTexto, Texto, type AgenteCtx } from './comum'
 
 const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO']
 
-/** Tipos de negócio que a base aberta sabe procurar (os mais pedidos primeiro). */
-const TIPOS = CATEGORIAS.filter((c) => c.base.length || c.nomes.length).sort((a, b) => Number(POPULARES.includes(b.id)) - Number(POPULARES.includes(a.id)))
+/** Tipos de negócio da busca no Google Maps (os mais pedidos primeiro). */
+const TIPOS = CATEGORIAS.slice().sort((a, b) => Number(POPULARES.includes(b.id)) - Number(POPULARES.includes(a.id)))
 
 type Rascunho = Pick<AgenteConfig, 'prospeccao' | 'followup'>
 
@@ -36,7 +37,7 @@ export function Prospeccao({ ctx }: { ctx: AgenteCtx }) {
     <div className="space-y-4">
       <Card
         title="Buscar e abordar sozinho"
-        description="Todo dia, no horário escolhido, ele procura empresas novas na base aberta (grátis), filtra pelos seus critérios e manda a primeira mensagem, devagar, para não queimar o número."
+        description="Todo dia, no horário escolhido, ele procura empresas novas no Google Maps (com a sua chave e a sua cota grátis), dá uma nota de encaixe, filtra pelos seus critérios e manda a primeira mensagem, devagar, para não queimar o número."
         actions={
           <Button variant="primary" size="sm" loading={busy} disabled={!mudou} onClick={() => void salvar()}>
             Salvar
@@ -45,6 +46,15 @@ export function Prospeccao({ ctx }: { ctx: AgenteCtx }) {
         bodyClass="px-4 py-4 space-y-5"
       >
         <Chave ligado={p.ativa} onChange={(v) => setP({ ativa: v })} label={p.ativa ? 'Prospecção ligada' : 'Prospecção desligada (ele só responde quem escrever)'} />
+        {ctx.estado.google && !ctx.estado.google.temChave && (
+          <p className="flex items-start gap-2 rounded-lg border border-amber-400/25 bg-amber-400/[0.06] px-3 py-2 text-xs text-amber-200">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              Para buscar sozinho ele usa a sua chave do Google. <Link to="/configuracoes" className="font-medium text-blue-300 hover:text-blue-200">Coloque a chave em Configurações → Busca do Google</Link> e deixe a XS aberta um minuto para ele receber.
+            </span>
+          </p>
+        )}
+        {ctx.estado.google?.temChave && <p className="text-2xs text-fg-4">Chave do Google conectada · {ctx.estado.google.restante >= 100000 ? 'sem teto no mês' : `${ctx.estado.google.restante} consultas ainda cabem na cota do mês`}</p>}
 
         <section>
           <h3 className="label">Cidades e tipos de negócio</h3>
@@ -164,7 +174,7 @@ function Alvos({ alvos, onChange }: { alvos: Alvo[]; onChange: (a: Alvo[]) => vo
   }, [busca])
 
   function adicionar() {
-    const nichos = TIPOS.filter((t) => escolhidos.includes(t.id)).map((t) => ({ nome: t.nome, tax: t.base, nomes: t.nomes }))
+    const nichos = TIPOS.filter((t) => escolhidos.includes(t.id)).map((t) => ({ nome: t.nome, busca: t.google, tax: t.base, nomes: t.nomes }))
     if (!cidade.trim() || !nichos.length) return
     onChange([...alvos, { id: crypto.randomUUID(), uf, cidade: cidade.trim(), nichos, ativo: true }])
     setCidade('')
@@ -273,7 +283,7 @@ function Fila({ alvos }: { alvos: Alvo[] }) {
   return (
     <Card
       title="Próximas empresas"
-      description="Quem ele vai abordar, na ordem. Tire quem não combina: ele aprende com o motivo."
+      description="Quem ele vai abordar, na ordem da nota de encaixe. Tire quem não combina: ele aprende com o motivo."
       actions={
         <div className="flex items-center gap-1.5">
           {alvos.length > 1 && (
@@ -303,9 +313,18 @@ function Fila({ alvos }: { alvos: Alvo[] }) {
         <ul className="max-h-[420px] divide-y divide-line-soft overflow-y-auto">
           {fila.map((f) => (
             <li key={f.id} className="flex items-center gap-3 px-2 py-2">
+              {typeof f.encaixe === 'number' && (
+                <span
+                  title={f.encaixeMotivos?.length ? `Nota de encaixe: ${f.encaixeMotivos.join(', ')}` : 'Nota de encaixe'}
+                  className={clsx('num grid h-7 w-9 shrink-0 place-items-center rounded-md text-xs font-semibold ring-1 ring-inset', f.encaixe >= 75 ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/25' : f.encaixe >= 50 ? 'bg-amber-400/10 text-amber-300 ring-amber-400/25' : 'text-fg-3 ring-line')}
+                >
+                  {f.encaixe}
+                </span>
+              )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-fg">{f.empresa}</p>
-                <p className="truncate text-xs text-fg-3">{[f.nicho, f.endereco || `${f.cidade} - ${f.uf}`, formatPhone(f.telefone)].filter(Boolean).join(' · ')}</p>
+                <p className="pv truncate text-[13px] font-medium text-fg">{f.empresa}</p>
+                <p className="pv truncate text-xs text-fg-3">{[f.nicho, f.endereco || `${f.cidade} - ${f.uf}`, formatPhone(f.telefone)].filter(Boolean).join(' · ')}</p>
+                {!!f.encaixeMotivos?.length && <p className="truncate text-2xs text-fg-4">{f.encaixeMotivos.join(' · ')}</p>}
               </div>
               <Button size="xs" variant="ghost" onClick={() => void tirar(f)}>
                 Tirar

@@ -2,6 +2,7 @@
 import clsx from 'clsx'
 import {
   ArrowLeft,
+  Bot,
   Check,
   CheckCheck,
   Clock,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { FaixaAgente, SeloAgente, useAgenteNasConversas, useMapaAgente } from '../components/agente/NasConversas'
 import { Popover, Segmented, Spinner, StatusBadge, WhatsAppIcon } from '../components/ui'
 import { WhatsAppIndisponivel } from '../components/WhatsAppIndisponivel'
 import { formatPhone } from '../lib/contact'
@@ -39,6 +41,7 @@ import {
 import { leadPhone, phoneKeyBr } from '../lib/disparo'
 import { fillMessage, getMessages, pickVariation, saudacao } from '../lib/messages'
 import { normalizeKey } from '../lib/statuses'
+import type { MapaAgente } from '../lib/agente'
 import type { Lead } from '../lib/types'
 import { useWaServico } from '../lib/waServico'
 import { useApp } from '../store/useApp'
@@ -63,6 +66,9 @@ export function ConversasPage() {
   const versaoRef = useRef<number | null>(null)
   const selRef = useRef<string | null>(null)
   selRef.current = selecionada
+  const agenteOn = useAgenteNasConversas()
+  const { mapa, recarregar: recarregarMapa } = useMapaAgente(agenteOn)
+  const agenteDe = useCallback((tel: string) => mapa.get(phoneKeyBr(tel)), [mapa])
 
   useEffect(() => {
     void conversasApi().then(setApi)
@@ -190,7 +196,7 @@ export function ConversasPage() {
               ]}
             />
           </div>
-          <ListaConversas lista={lista} filtro={filtro} busca={busca} selecionada={selecionada} leadDe={leadDe} leads={leads} onAbrir={abrir} />
+          <ListaConversas lista={lista} filtro={filtro} busca={busca} selecionada={selecionada} leadDe={leadDe} agenteDe={agenteDe} leads={leads} onAbrir={abrir} />
         </aside>
 
         {/* Conversa aberta */}
@@ -204,10 +210,14 @@ export function ConversasPage() {
               nomeLista={lista?.find((c) => c.telefone === selecionada)?.nome ?? null}
               lead={leadDe(selecionada)}
               podeEnviar={conectado}
+              agenteOn={agenteOn && !demo}
+              onAgenteMudou={() => void recarregarMapa()}
               onVoltar={() => setSelecionada(null)}
               onEnviou={(msg) => {
                 setAberta((a) => (a && a.telefone === selecionada ? { ...a, msgs: [...a.msgs.filter((x) => x.id !== msg.id), msg] } : a))
                 void atualizar()
+                // Você respondeu: o vendedor para nessa conversa
+                if (agenteOn) setTimeout(() => void recarregarMapa(), 800)
               }}
             />
           ) : (
@@ -227,6 +237,7 @@ function ListaConversas({
   busca,
   selecionada,
   leadDe,
+  agenteDe,
   leads,
   onAbrir,
 }: {
@@ -235,6 +246,7 @@ function ListaConversas({
   busca: string
   selecionada: string | null
   leadDe: (tel: string) => Lead | null
+  agenteDe: (tel: string) => MapaAgente | undefined
   leads: Lead[]
   onAbrir: (tel: string) => void
 }) {
@@ -290,7 +302,7 @@ function ListaConversas({
       )}
       <ul className="space-y-px">
         {visiveis.map((c) => (
-          <ItemConversa key={c.telefone} c={c} lead={leadDe(c.telefone)} ativa={c.telefone === selecionada} onClick={() => onAbrir(c.telefone)} />
+          <ItemConversa key={c.telefone} c={c} lead={leadDe(c.telefone)} agente={agenteDe(c.telefone)} ativa={c.telefone === selecionada} onClick={() => onAbrir(c.telefone)} />
         ))}
       </ul>
       {novos.length > 0 && (
@@ -327,7 +339,7 @@ function ListaConversas({
   )
 }
 
-function ItemConversa({ c, lead, ativa, onClick }: { c: ResumoConversa; lead: Lead | null; ativa: boolean; onClick: () => void }) {
+function ItemConversa({ c, lead, agente, ativa, onClick }: { c: ResumoConversa; lead: Lead | null; agente?: MapaAgente; ativa: boolean; onClick: () => void }) {
   const titulo = lead?.empresa ?? c.nome ?? formatPhone(c.telefone)
   const novo = c.naoLidas > 0
   return (
@@ -344,6 +356,7 @@ function ItemConversa({ c, lead, ativa, onClick }: { c: ResumoConversa; lead: Le
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span className={clsx('pv min-w-0 flex-1 truncate text-[13px]', novo ? 'font-semibold text-fg' : 'font-medium text-fg')}>{titulo}</span>
+            <SeloAgente m={agente} />
             <span className={clsx('num shrink-0 text-[10px]', novo ? 'font-semibold text-emerald-300' : 'text-fg-4')}>{horaCurta(c.atualizadaEm)}</span>
           </span>
           <span className="mt-0.5 flex items-center gap-1.5">
@@ -373,6 +386,8 @@ function Chat({
   nomeLista,
   lead,
   podeEnviar,
+  agenteOn,
+  onAgenteMudou,
   onVoltar,
   onEnviou,
 }: {
@@ -382,10 +397,13 @@ function Chat({
   nomeLista: string | null
   lead: Lead | null
   podeEnviar: boolean
+  agenteOn: boolean
+  onAgenteMudou: () => void
   onVoltar: () => void
   onEnviou: (msg: MensagemConversa) => void
 }) {
   const openLead = useUi((s) => s.openLead)
+  const [doAgente, setDoAgente] = useState<Set<string>>(new Set())
   const nome = conversa?.nome ?? nomeLista
   const titulo = lead?.empresa ?? nome ?? formatPhone(telefone)
   const subtitulo = [lead ? nome : null, formatPhone(telefone)].filter(Boolean).join(' · ')
@@ -426,14 +444,16 @@ function Chat({
         </a>
       </header>
 
-      <Mensagens conversa={conversa} />
+      {agenteOn && <FaixaAgente telefone={telefone} nome={lead?.empresa ?? nome} versao={conversa?.versao ?? 0} onDoAgente={setDoAgente} onMudou={onAgenteMudou} />}
+
+      <Mensagens conversa={conversa} doAgente={doAgente} />
 
       <Composer api={api} telefone={telefone} lead={lead} podeEnviar={podeEnviar} onEnviou={onEnviou} />
     </>
   )
 }
 
-function Mensagens({ conversa }: { conversa: ConversaAberta | null }) {
+function Mensagens({ conversa, doAgente }: { conversa: ConversaAberta | null; doAgente: Set<string> }) {
   const ref = useRef<HTMLDivElement>(null)
   const noFim = useRef(true)
   const total = conversa?.msgs.length ?? 0
@@ -487,7 +507,7 @@ function Mensagens({ conversa }: { conversa: ConversaAberta | null }) {
               {g.msgs.map((m, i) => {
                 const anterior = g.msgs[i - 1]
                 const junto = !!anterior && anterior.deMim === m.deMim && Date.parse(m.em) - Date.parse(anterior.em) < 5 * 60_000
-                return <Bolha key={m.id} m={m} junto={junto} />
+                return <Bolha key={m.id} m={m} junto={junto} ia={doAgente.has(m.id)} />
               })}
             </div>
           ))}
@@ -497,7 +517,7 @@ function Mensagens({ conversa }: { conversa: ConversaAberta | null }) {
   )
 }
 
-function Bolha({ m, junto }: { m: MensagemConversa; junto: boolean }) {
+function Bolha({ m, junto, ia }: { m: MensagemConversa; junto: boolean; ia?: boolean }) {
   const hora = new Date(m.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   return (
     <div className={clsx('flex', m.deMim ? 'justify-end' : 'justify-start', junto ? 'mt-0.5' : 'mt-2.5')}>
@@ -517,6 +537,11 @@ function Bolha({ m, junto }: { m: MensagemConversa; junto: boolean }) {
         )}
         {m.texto && <span className="pv break-words whitespace-pre-wrap">{m.texto}</span>}
         <span className={clsx('float-right ml-3 inline-flex translate-y-1 items-center gap-1 text-[10px] leading-4', m.deMim ? 'text-fg-3' : 'text-fg-4')}>
+          {ia && (
+            <span className="inline-flex items-center gap-0.5 font-semibold text-blue-300" title="Escrita pelo vendedor IA">
+              <Bot className="size-2.5" /> IA
+            </span>
+          )}
           <span className="num">{hora}</span>
           {m.deMim && <Tiques status={m.status} className="size-3.5" />}
         </span>

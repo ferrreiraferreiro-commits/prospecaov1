@@ -16,8 +16,7 @@ const BOA = 'xs_chave_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 const chamadas: { acao: string; args: unknown; apikey: unknown }[] = []
 let supabase: http.Server
 let motor: http.Server
-let busca: http.Server
-const buscaPedidos: { corpo: { cidade: string; uf: string; nichos: { nome: string; tax: string[] }[]; filtros: { site: number }; meta: number }; auth: unknown }[] = []
+const buscaPedidos: { corpo: { textQuery: string }; chave: unknown }[] = []
 let url = ''
 
 before(async () => {
@@ -40,26 +39,28 @@ before(async () => {
   process.env.SUPABASE_URL = `http://127.0.0.1:${(supabase.address() as AddressInfo).port}`
   process.env.SUPABASE_ANON_KEY = 'anon-publica'
 
-  // busca de empresas de mentira (a de verdade roda na VPS)
-  busca = http.createServer(async (req, res) => {
-    let b = ''
-    for await (const c of req) b += c
-    buscaPedidos.push({ corpo: JSON.parse(b), auth: req.headers.authorization })
-    res.setHeader('content-type', 'application/json')
-    res.end(
-      JSON.stringify({
-        results: [
-          { name: 'Academia Força', niche: 'Academia', phone: '11987654321', website: '', instagram: '@forca', address: 'Rua B, 2', city: 'Suzano', state: 'SP' },
-          { name: 'Fixo Sem Celular', niche: 'Academia', phone: '1133334444', website: '', instagram: '', address: '', city: 'Suzano', state: 'SP' },
-        ],
-      }),
-    )
-  })
-  await new Promise<void>((r) => busca.listen(0, '127.0.0.1', r))
-  process.env.XS_BUSCA_URL = `http://127.0.0.1:${(busca.address() as AddressInfo).port}`
-  process.env.XS_BUSCA_TOKEN = 'token-busca'
+  // Google Maps e mapa de mentira (a busca de verdade usa a chave do dono)
+  const fetchReal = globalThis.fetch
+  const cidade = [{ longText: 'Suzano', types: ['administrative_area_level_2'] }, { shortText: 'SP', types: ['administrative_area_level_1'] }]
+  globalThis.fetch = (async (entrada: RequestInfo | URL, init?: RequestInit) => {
+    const u = String(entrada)
+    if (u.startsWith('https://nominatim.openstreetmap.org/')) return new Response(JSON.stringify([{ boundingbox: ['-23.6', '-23.4', '-46.4', '-46.2'] }]))
+    if (u.startsWith('https://places.googleapis.com/')) {
+      buscaPedidos.push({ corpo: JSON.parse(String(init?.body)), chave: (init?.headers as Record<string, string>)['X-Goog-Api-Key'] })
+      return new Response(
+        JSON.stringify({
+          places: [
+            { id: 'p1', displayName: { text: 'Academia Força' }, nationalPhoneNumber: '(11) 98765-4321', websiteUri: 'https://instagram.com/forca', formattedAddress: 'Rua B, 2', addressComponents: cidade },
+            { id: 'p2', displayName: { text: 'Fixo Sem Celular' }, nationalPhoneNumber: '(11) 3333-4444', formattedAddress: 'Rua C, 3', addressComponents: cidade },
+          ],
+        }),
+      )
+    }
+    return fetchReal(entrada, init)
+  }) as typeof fetch
 
   const conector = await import('./agente/conector.js')
+  ;(await import('./agente/agente.js')).definirGoogle({ chave: 'AIzaChaveDeTesteAaaaaaaaaaaaaaaaaaaaaaaaaa', restante: 900 })
   const app = express()
   app.use(express.json({ limit: '8mb' }))
   app.post('/mcp', (req, res, next) => void conector.atender(req, res).catch(next))
@@ -70,7 +71,6 @@ before(async () => {
 after(() => {
   supabase.close()
   motor.close()
-  busca.close()
 })
 
 async function conectar(chave: string) {
@@ -128,11 +128,9 @@ test('conector: busca empresas, salva no CRM, muda status, monta disparo e liga/
   // busca: manda cidade, UF, categorias do catálogo e "sem site"; só fica quem tem celular
   const achou = JSON.parse(textoDe(await c.callTool({ name: 'leads_buscar', arguments: { cidade: 'Suzano', uf: 'sp', tipos: ['academia'], quantidade: 10 } })))
   const pedido = buscaPedidos.at(-1)!
-  assert.equal(pedido.auth, 'Bearer token-busca')
-  assert.equal(pedido.corpo.uf, 'SP')
-  assert.equal(pedido.corpo.filtros.site, -1)
-  assert.ok(pedido.corpo.nichos[0].tax.length > 0)
-  assert.equal(achou.total, 2)
+  assert.equal(pedido.chave, 'AIzaChaveDeTesteAaaaaaaaaaaaaaaaaaaaaaaaaa')
+  assert.match(pedido.corpo.textQuery, /academia em Suzano, SP/i)
+  assert.equal(achou.total, 1)
   assert.equal(achou.empresas[0].empresa, 'Academia Força')
 
   // salvar no CRM pelo id da busca, só a escolhida pelo número

@@ -140,6 +140,14 @@ app.post(
 app.get('/agente/sinc', wrap(soAgente(() => agente.pendentesSinc())))
 app.post('/agente/sinc', wrap(soAgente((req) => agente.marcarSinc(req.body?.itens ?? []))))
 app.post('/agente/conhecidos', wrap(soAgente((req) => agente.definirConhecidos(req.body?.telefones))))
+app.post('/agente/google', wrap(soAgente((req) => agente.definirGoogle(req.body ?? {}))))
+app.post('/agente/parar', wrap(comEstado(() => agente.pararTudo())))
+app.post('/agente/voltar', wrap(comEstado(() => agente.voltarATrabalhar())))
+// A tela Conversas da XS: quem está com o vendedor, a conversa de um número, assumir e entregar
+app.get('/agente/mapa', wrap(soAgente(() => agente.mapaConversas())))
+app.get('/agente/tel/:telefone', wrap(soAgente((req) => agente.conversaPorTelefone(String(req.params.telefone)))))
+app.post('/agente/tel/:telefone/assumir', wrap(soAgente((req) => agente.assumirPorTelefone(String(req.params.telefone)))))
+app.post('/agente/tel/:telefone/entregar', wrap(soAgente((req) => agente.entregarAoAgente(String(req.params.telefone), req.body?.nome ? String(req.body.nome) : undefined))))
 
 // Xico, o assistente do dono (mesma sessão e mesma chave do Agente IA)
 app.get('/agente/xico', wrap(soAgente(() => xico.ver())))

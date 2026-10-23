@@ -186,6 +186,39 @@ export async function chamarOutra<S extends z.ZodType>(modelo: Modelo, sistema: 
   throw new FalhaIA('A cota grátis do Gemini acabou por agora em todos os modelos. O agente tenta de novo mais tarde.')
 }
 
+/** Transcreve um áudio do WhatsApp (só com a chave do Gemini, que entende áudio de graça). */
+export async function transcreverAudio(audio: Buffer, mime: string): Promise<string> {
+  const k = chaves()
+  if (!k.gemini) throw new FalhaIA('A transcrição de áudio usa a chave do Gemini.', true)
+  const agora = Date.now()
+  for (const m of ESCADA_GEMINI.filter((x) => (descanso.get(x) ?? 0) < agora)) {
+    let r: Response
+    try {
+      r = await fetch(`${GEMINI}/models/${m}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': k.gemini },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime.split(';')[0] || 'audio/ogg', data: audio.toString('base64') } }, { text: 'Transcreva este áudio em português do Brasil, palavra por palavra. Responda só com a transcrição.' }] }],
+          generationConfig: { maxOutputTokens: 4096 },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      })
+    } catch {
+      descanso.set(m, Date.now() + 2 * 60_000)
+      continue
+    }
+    if (r.status === 401 || r.status === 403) throw new FalhaIA('A chave do Gemini foi recusada.', true)
+    if (!r.ok) {
+      descanso.set(m, Date.now() + (r.status === 429 ? 10 : 2) * 60_000)
+      continue
+    }
+    const j = (await r.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] }
+    const texto = (j.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? '').join('').trim()
+    if (texto) return texto.slice(0, 2000)
+  }
+  throw new FalhaIA('Não consegui transcrever o áudio agora.')
+}
+
 /** Confere a chave do Gemini sem gastar cota (lista os modelos). */
 export async function testarGemini(chave: string): Promise<void> {
   let r: Response

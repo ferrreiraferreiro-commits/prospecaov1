@@ -12,11 +12,19 @@
  */
 import { randomUUID } from 'node:crypto'
 import type { WAMessageKey } from '@whiskeysockets/baileys'
+import { abrirConversa, conversaEventos } from '../conversas.js'
 import { recipientByPhone, sentPhones } from '../disparo.js'
 import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, registerSent, samePhone, sendText, sentByThisMotor, waEvents, withTimeout } from '../whatsapp.js'
+import { buscarTrechos, materiaisComTreino, textoDoMaterial } from './base.js'
+import { limparCapacidades, pode } from './capacidades.js'
+import { CONFERENCIAS, conferir, linksDe, parecenca, pareceManipulacao, precisaAprovacao, type ContextoConferencia } from './conferente.js'
 import { completarConfig, db, gravarChaves, lerChaves, salvar } from './estado.js'
+import { buscarNoGoogle, caixaDaCidade, ErroGoogle, notaEncaixe, type ResultadoGoogle } from './google.js'
 import * as ia from './ia.js'
+import * as apoioIA from './ia-apoio.js'
+import { blocoRoteiro } from './metodo.js'
 import { testarGemini, testarXai, usarChaves } from './outras-ias.js'
+import { calcularPadroes, faixaBoa, horariosLivres, numerosDoRamo, rotuloHorario, taxaDoRamo, type Padroes } from './padroes.js'
 import {
   analisarTeste,
   boaHoraPara,
@@ -51,7 +59,11 @@ import {
   type Mensagem,
   type Modelo,
   type NichoBusca,
+  type NomeAgente,
+  type Pendencia,
+  type Piloto,
   type Teste,
+  type Trace,
   type Variante,
   provedorDe,
   type Provedor,
@@ -59,8 +71,6 @@ import {
 
 /** Só a sessão do dono liga o agente (no systemd: /etc/xs-whatsapp/motor-principal.env). */
 export const AGENTE_LIGADO = process.env.XS_AGENTE === '1'
-const BUSCA_URL = (process.env.XS_BUSCA_URL ?? 'http://127.0.0.1:8091').replace(/\/+$/, '')
-const BUSCA_TOKEN = process.env.XS_BUSCA_TOKEN ?? ''
 
 /** Mensagens do agente numa conversa no mesmo dia antes de parar e chamar você (evita conversa sem fim com outro robô) */
 const MAX_POR_CONVERSA_DIA = 30
@@ -148,7 +158,7 @@ const limparTexto = (t: string) =>
     .slice(0, 1200)
 
 /** Manda os balões como gente: marca como lida, "digitando…" proporcional ao texto, pausa entre eles. */
-async function enviar(c: Conversa, textos: string[], de: Mensagem['de'] = 'agente'): Promise<number> {
+async function enviar(c: Conversa, textos: string[], de: Mensagem['de'] = 'agente', trace?: Trace): Promise<number> {
   const sock = getSock()
   if (!sock) throw new Error('WhatsApp desconectado.')
   const jid = c.jid ?? `${c.telefone}@s.whatsapp.net`
@@ -171,7 +181,7 @@ async function enviar(c: Conversa, textos: string[], de: Mensagem['de'] = 'agent
     const id = res?.key?.id
     if (!id) throw new Error('O WhatsApp não confirmou o envio.')
     registerSent(id)
-    c.mensagens.push({ id: randomUUID(), de, texto, em: iso(), waId: id })
+    c.mensagens.push({ id: randomUUID(), de, texto, em: iso(), waId: id, ...(trace ? { trace } : {}) })
     c.atualizadaEm = iso()
     hoje().enviadas++
     n++
@@ -215,26 +225,286 @@ export function detalhesDoBruto(bruto: Record<string, unknown> | null | undefine
 const comDetalhes = (c: Conversa) => ({ ...c, detalhes: detalhesDoBruto(c.bruto) })
 
 // ---------------------------------------------------------------------------
+// Apoio: roteiro do ramo, material consultado, ficha do cliente e agenda
+// ---------------------------------------------------------------------------
+
+let padroesCache: { em: number; p: Padroes } | null = null
+/** Padrões das conversas (recalcula a cada 10 min). */
+export function padroes(): Padroes {
+  if (!padroesCache || Date.now() - padroesCache.em > 10 * 60_000) padroesCache = { em: Date.now(), p: calcularPadroes(db.conversas) }
+  return padroesCache.p
+}
+
+const materiais = () => materiaisComTreino(db.materiais, db.config)
+
+/** Lições valendo de um ramo (vão junto do roteiro do ramo). */
+function licoesDoRamo(nicho: string): string[] {
+  const n = nicho.toLowerCase()
+  return ia
+    .licoesValendo(db.licoes)
+    .filter((l) => l.tipo === 'conversa' && l.escopo?.toLowerCase() === `ramo:${n}`)
+    .map((l) => l.texto)
+}
+
+function apoioPara(c: Pick<Conversa, 'nicho' | 'mensagens'> & { fatos?: Conversa['fatos'] }, consulta: string, comAgenda = true): ia.Apoio {
+  const cfg = db.config
+  return {
+    roteiro: blocoRoteiro(c.nicho, licoesDoRamo(c.nicho), numerosDoRamo(padroes(), c.nicho)),
+    trechos: pode(cfg, 'consultar_base') ? buscarTrechos(materiais(), `${consulta} ${c.nicho}`).map((t) => ({ titulo: t.titulo, texto: t.texto })) : [],
+    fatos: c.fatos ?? [],
+    horarios: comAgenda && pode(cfg, 'ver_horarios') && pode(cfg, 'marcar_reuniao') ? horariosLivres(cfg.agenda, db.reunioes).map(rotuloHorario) : [],
+  }
+}
+
+/** O que o cliente disse por último (para procurar no material). */
+const ultimasDoCliente = (c: Pick<Conversa, 'mensagens'>) =>
+  c.mensagens
+    .filter((m) => m.de === 'lead' && !m.auto)
+    .slice(-3)
+    .map((m) => m.texto)
+    .join(' ')
+
+// ---------------------------------------------------------------------------
+// O Conferente e os níveis de piloto (antes de cada mensagem sair)
+// ---------------------------------------------------------------------------
+
+/** Conferências que não adianta reescrever (o problema não é o texto). */
+const SEM_REESCRITA = new Set(['parar', 'lgpd', 'horario', 'ritmo', 'robo_robo'])
+
+/** Textos que saíram para outras pessoas nos últimos dias (para não repetir). */
+function enviadosOutros(c: Conversa): string[] {
+  const limite = Date.now() - 7 * 86_400_000
+  const out: { em: string; texto: string }[] = []
+  for (const x of db.conversas) {
+    if (x.id === c.id) continue
+    for (const m of x.mensagens) if (m.de === 'agente' && Date.parse(m.em) > limite) out.push(m)
+  }
+  return out
+    .sort((a, b) => b.em.localeCompare(a.em))
+    .slice(0, 300)
+    .map((m) => m.texto)
+}
+
+function linksPermitidos(): string[] {
+  const cfg = db.config
+  return [...new Set([...linksDe(textoDoMaterial(materiais())), ...linksDe(cfg.linksPermitidos), ...cfg.linksPermitidos.split(/\s+/).filter((l) => /\./.test(l))])]
+}
+
+function ritmoMotivo(c: Conversa, proativa: boolean, t = new Date()): string | null {
+  if (db.extra.pausadoPorRisco) return 'O WhatsApp está em pausa por segurança.'
+  if (proativa && db.extra.freio === diaDe(t)) return 'O freio de segurança está ligado hoje (muita gente pediu para parar).'
+  const dia = diaDe(t)
+  if (c.mensagens.filter((m) => m.de === 'agente' && diaDe(new Date(m.em)) === dia).length >= MAX_POR_CONVERSA_DIA) return `Já foram ${MAX_POR_CONVERSA_DIA} mensagens nesta conversa hoje.`
+  return null
+}
+
+function contextoConferencia(c: Conversa, proativa: boolean, t = new Date()): ContextoConferencia {
+  const cfg = db.config
+  return {
+    agora: t,
+    mensagens: c.mensagens,
+    estado: c.estado,
+    proativa,
+    bloqueado: db.extra.apagados.includes(phoneKey(c.telefone)),
+    ritmo: ritmoMotivo(c, proativa, t),
+    nicho: c.nicho,
+    enviadosOutros: enviadosOutros(c),
+    maxBolha: cfg.estiloResposta.maxBolha,
+    material: textoDoMaterial(materiais(), t),
+    descontoMax: pode(cfg, 'negociar') ? cfg.negocio.descontoMax : 0,
+    linksPermitidos: linksPermitidos(),
+    podePreco: pode(cfg, 'passar_preco'),
+    podePix: pode(cfg, 'mandar_pix'),
+    dono: cfg.negocio.seuNome.trim(),
+    proibidos: cfg.conferencias.assuntosProibidos ? cfg.conferencias.proibidos.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean) : null,
+  }
+}
+
+export interface Pronto {
+  mensagens: string[]
+  acao: string
+  /** O que mais a ação precisa (horário escolhido, aviso para você, resumo) */
+  dados?: Record<string, unknown>
+}
+
+type Saida =
+  | { tipo: 'enviada'; final: Pronto; trace: Trace }
+  | { tipo: 'aguardando'; pendencia: Pendencia }
+  | { tipo: 'barrada'; motivo: string; id: string; pendencia: Pendencia | null }
+
+/** Conferências + reescrita guiada pelo motivo (até 2 vezes). */
+async function conferirComReescrita(
+  c: Conversa,
+  inicial: Pronto,
+  o: { agente: NomeAgente; proativa: boolean; fontes: string[]; horarios: string[]; refazer?: (atual: Pronto, motivo: string) => Promise<Pronto | null> },
+): Promise<{ ok: true; final: Pronto; trace: Trace } | { ok: false; final: Pronto; id: string; titulo: string; motivo: string; trace: Trace }> {
+  const cfg = db.config
+  let atual: Pronto = { ...inicial, mensagens: inicial.mensagens.map(limparTexto).filter(Boolean) }
+  const trace: Trace = { agente: o.agente, fontes: o.fontes, conferencias: 0, reescritas: 0, barradas: [] }
+  for (let tentativa = 0; ; tentativa++) {
+    let r = conferir({ mensagens: atual.mensagens, acao: atual.acao, horariosOferecidos: o.horarios }, contextoConferencia(c, o.proativa))
+    if (r.ok && cfg.conferencias.revisorTom && atual.mensagens.length && chave && !chaveRecusada) {
+      const tom = await comIA(() => apoioIA.revisarTom(ctx(), atual.mensagens), 'Revisor de tom')
+      if (tom && !tom.sim) r = { ok: false, id: 'tom', titulo: 'Revisor de tom', motivo: tom.motivo || 'Soa robótico. Escreva mais natural.', passou: r.passou }
+    }
+    trace.conferencias = r.passou.length
+    if (r.ok) return { ok: true, final: atual, trace }
+    trace.barradas.push(`${r.titulo}: ${r.motivo}`)
+    hoje().barradas = (hoje().barradas ?? 0) + 1
+    if (SEM_REESCRITA.has(r.id) || !o.refazer || tentativa >= 2) return { ok: false, final: atual, id: r.id, titulo: r.titulo, motivo: r.motivo, trace }
+    const novo = await o.refazer(atual, r.motivo)
+    trace.reescritas++
+    hoje().reescritas = (hoje().reescritas ?? 0) + 1
+    if (!novo) return { ok: false, final: atual, id: r.id, titulo: r.titulo, motivo: r.motivo, trace }
+    atual = { ...novo, mensagens: novo.mensagens.map(limparTexto).filter(Boolean) }
+    if (!atual.mensagens.length) return { ok: true, final: atual, trace }
+  }
+}
+
+function novaPendencia(p: Omit<Pendencia, 'id' | 'criadaEm'>): Pendencia {
+  const pend: Pendencia = { id: randomUUID(), criadaEm: iso(), ...p }
+  db.pendencias.push(pend)
+  // Guarda as últimas 400 (as resolvidas mais antigas saem primeiro)
+  if (db.pendencias.length > 400) {
+    const i = db.pendencias.findIndex((x) => x.resolvidaEm)
+    db.pendencias.splice(i >= 0 ? i : 0, 1)
+  }
+  registrar('pendencia', `${p.empresa ? `${p.empresa}: ` : ''}${p.texto}`, p.conversaId ?? undefined)
+  return pend
+}
+
+let avisouAprovacao = 0
+/** Avisa no seu número que tem mensagem esperando (no máximo uma vez por hora). */
+function avisarAprovacoes() {
+  if (Date.now() - avisouAprovacao < 3_600_000) return
+  avisouAprovacao = Date.now()
+  const n = db.pendencias.filter((p) => !p.resolvidaEm && (p.tipo === 'aprovar' || p.tipo === 'barrada')).length
+  if (n) void avisarDono(`📝 ${n} mensagem(ns) esperando você na XS (Vendedor → Precisa de você).`)
+}
+
+/**
+ * O caminho de toda mensagem do agente: confere (e reescreve), vê se o nível de piloto pede a sua
+ * aprovação e só então envia. Barrada de vez ou esperando você: vai para "Precisa de você".
+ */
+async function sair(
+  c: Conversa,
+  pronto: Pronto,
+  o: { agente: NomeAgente; proativa: boolean; fontes?: string[]; horarios?: string[]; refazer?: (atual: Pronto, motivo: string) => Promise<Pronto | null>; maxBolhas?: number },
+): Promise<Saida> {
+  const r = await conferirComReescrita(c, { ...pronto, mensagens: pronto.mensagens.slice(0, o.maxBolhas ?? 3) }, { agente: o.agente, proativa: o.proativa, fontes: o.fontes ?? [], horarios: o.horarios ?? [], refazer: o.refazer })
+  const rascunho = (final: Pronto, trace: Trace) => ({ mensagens: final.mensagens, acao: final.acao, agente: o.agente, fontes: trace.fontes, reescritas: trace.reescritas, barradas: trace.barradas, dados: final.dados })
+  if (!r.ok) {
+    if (SEM_REESCRITA.has(r.id) && r.id !== 'robo_robo') return { tipo: 'barrada', motivo: r.motivo, id: r.id, pendencia: null }
+    registrar('barrada', `${c.empresa}: ${r.titulo} — ${r.motivo}`, c.id)
+    const p = novaPendencia({ tipo: r.id === 'robo_robo' ? 'pessoa' : 'barrada', texto: r.id === 'robo_robo' ? 'O outro lado parece um robô. Dê uma olhada.' : 'A mensagem foi barrada pela conferência e não saiu.', conversaId: c.id, empresa: c.empresa, motivo: `${r.titulo}: ${r.motivo}`, rascunho: rascunho(r.final, r.trace) })
+    c.aguardandoVoce = p.id
+    c.pendente = false
+    // A conversa fica com você (aparece como "Com você" nas Conversas) até você responder ou devolver
+    if (c.mensagens.length) c.estado = 'humano'
+    void avisarDono(`🛑 Barrei uma mensagem para ${c.empresa}: ${r.titulo}. ${r.motivo}\nA conversa ficou com você.\n${link(c)}`)
+    verificarDescida()
+    salvar()
+    return { tipo: 'barrada', motivo: r.motivo, id: r.id, pendencia: p }
+  }
+  if (!r.final.mensagens.length) return { tipo: 'enviada', final: r.final, trace: r.trace }
+  const precisa = precisaAprovacao(db.config.piloto, { mensagens: r.final.mensagens, acao: r.final.acao })
+  if (precisa) {
+    const p = novaPendencia({ tipo: 'aprovar', texto: precisa, conversaId: c.id, empresa: c.empresa, rascunho: rascunho(r.final, r.trace), prazo: new Date(Date.now() + 2 * 3_600_000).toISOString() })
+    c.aguardandoVoce = p.id
+    c.pendente = false
+    avisarAprovacoes()
+    salvar()
+    return { tipo: 'aguardando', pendencia: p }
+  }
+  await enviar(c, r.final.mensagens, 'agente', r.trace)
+  return { tipo: 'enviada', final: r.final, trace: r.trace }
+}
+
+/** Resposta da IA → o que o Conferente recebe. */
+const doIA = (d: ia.RespostaIA): Pronto => ({ mensagens: d.mensagens, acao: d.acao, dados: { temperatura: d.temperatura, resumo: d.resumo, aviso_dono: d.aviso_dono, horario: d.horario } })
+
+/** Desce um nível sozinho quando algo dá errado (e avisa você). */
+function descerNivel(motivo: string) {
+  const cfg = db.config
+  if (cfg.piloto <= 1) return
+  cfg.piloto = (cfg.piloto - 1) as Piloto
+  db.extra.desceuNivel = { em: iso(), motivo }
+  registrar('nivel', `Desceu para o nível ${cfg.piloto}: ${motivo}`)
+  void avisarDono(`⬇️ O vendedor desceu para o nível ${cfg.piloto} de piloto: ${motivo}. Ele sobe de novo quando você quiser, na XS.`)
+  salvar(true)
+}
+
+/** Três mensagens barradas de vez no mesmo dia: desce um nível. */
+function verificarDescida() {
+  const dia = diaDe()
+  const barradasHoje = db.pendencias.filter((p) => p.tipo === 'barrada' && diaDe(new Date(p.criadaEm)) === dia).length
+  if (barradasHoje >= 3 && db.extra.desceuNivel?.em.slice(0, 10) !== dia) descerNivel('três mensagens barradas pela conferência hoje')
+}
+
+/** Guarda na ficha o que o cliente contou (e o retorno combinado). */
+function anotarFatos(c: Conversa, fatos: ia.RespostaIA['fatos']) {
+  if (!pode(db.config, 'anotar_fatos') || !fatos?.length) return
+  c.fatos ??= []
+  for (const f of fatos) {
+    const valor = String(f.valor ?? '').trim().slice(0, 300)
+    if (!valor) continue
+    const i = c.fatos.findIndex((x) => x.chave === f.chave && f.chave !== 'outro' && f.chave !== 'objecao')
+    const fato = { chave: f.chave, valor, em: iso() }
+    if (i >= 0) c.fatos[i] = fato
+    else c.fatos.push(fato)
+    if (f.chave === 'retomar_em' && /^\d{4}-\d{2}-\d{2}$/.test(valor) && valor > diaDe()) c.retomarEm = valor
+  }
+  if (c.fatos.length > 30) c.fatos.splice(0, c.fatos.length - 30)
+}
+
+/** Pergunta que o material não respondeu: vira um aviso (junta as parecidas). */
+function anotarLacuna(c: Conversa, lacuna: string) {
+  const t = lacuna.trim()
+  if (!t || !pode(db.config, 'avisar_lacuna')) return
+  const aberta = db.pendencias.find((p) => p.tipo === 'lacuna' && !p.resolvidaEm && parecenca(p.motivo ?? '', t) >= 0.5)
+  if (aberta) {
+    const n = Number((aberta.texto.match(/^(\d+)/) ?? [])[1] ?? 1) + 1
+    aberta.texto = `${n} clientes perguntaram e o seu material não responde.`
+    return
+  }
+  novaPendencia({ tipo: 'lacuna', texto: '1 cliente perguntou e o seu material não responde.', motivo: t.slice(0, 300), conversaId: c.id, empresa: c.empresa })
+}
+
+// ---------------------------------------------------------------------------
 // Aprendizado
 // ---------------------------------------------------------------------------
 
-function guardarLicao(tipo: Licao['tipo'], texto: string, origem: Licao['origem']): Licao | null {
+function guardarLicao(tipo: Licao['tipo'], texto: string, origem: Licao['origem'], extra: Partial<Licao> = {}): Licao | null {
   const t = texto.trim()
   if (!t) return null
-  const l: Licao = { id: randomUUID(), tipo, texto: t.slice(0, 400), origem, ativa: true, em: iso() }
+  const status = extra.status ?? 'ativa'
+  const l: Licao = {
+    id: randomUUID(),
+    tipo,
+    texto: t.slice(0, 400),
+    origem,
+    ativa: status === 'ativa',
+    em: iso(),
+    escopo: 'geral',
+    confianca: origem === 'voce' ? 'alta' : 'media',
+    revisarEm: diaDe(new Date(Date.now() + 60 * 86_400_000)),
+    ...extra,
+    status,
+  }
   db.licoes.push(l)
   // Só as automáticas mais novas ficam ativas; as que você escreveu nunca saem sozinhas
   const auto = db.licoes.filter((x) => x.tipo === tipo && x.ativa && x.origem !== 'voce')
-  for (const velha of auto.slice(0, Math.max(0, auto.length - MAX_LICOES_AUTO))) velha.ativa = false
-  registrar('licao', `Aprendeu: ${l.texto}`)
+  for (const velha of auto.slice(0, Math.max(0, auto.length - MAX_LICOES_AUTO))) {
+    velha.ativa = false
+    velha.status = 'arquivada'
+  }
+  registrar('licao', status === 'proposta' ? `Propôs uma lição: ${l.texto}` : `Aprendeu: ${l.texto}`)
   return l
 }
 
-/** Fim de conversa com troca de verdade: vale tirar uma lição. */
-async function aprenderCom(c: Conversa, resultado: string) {
-  if (c.mensagens.filter((m) => m.de === 'lead').length < 2 || !chave || chaveRecusada) return
-  const r = await comIA(() => ia.licaoDoResultado(ctx(), c, resultado), 'Lição da conversa')
-  if (r?.licao) guardarLicao('conversa', r.licao, 'resultado')
+/** Fim de conversa: o Professor lê à noite (a reflexão vira proposta de lição para você aprovar). */
+function aprenderCom(c: Conversa, _resultado: string) {
+  c.refletidaEm = null
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +557,7 @@ function novaConversa(p: Partial<Conversa> & Pick<Conversa, 'telefone' | 'empres
 /** Mensagem do cliente (exportada para os testes). */
 export function receber(phone: string, texto: string, key: WAMessageKey) {
   const cfg = db.config
-  if (cfg.avisos.telefone && samePhone(phone, cfg.avisos.telefone)) return
+  if (cfg.avisos.telefone && samePhone(phone, cfg.avisos.telefone)) return comandoDoDono(texto)
   const c = porTelefone(phone) ?? (cfg.ativo && cfg.responderDisparos ? daCampanha(phone) : undefined)
   if (!c) return
   // Resposta automática do WhatsApp Business antes de qualquer resposta de verdade: guarda, mas não
@@ -312,10 +582,20 @@ export function receber(phone: string, texto: string, key: WAMessageKey) {
     return
   }
   if (c.origem === 'agente' && !respondeu(c)) hoje().responderam++
-  c.mensagens.push({ id: randomUUID(), de: 'lead', texto: texto || '[mensagem sem texto]', em: iso() })
+  // Antes de ler: tentativa de manipular o assistente (regra sem custo; a IA confere depois, se ligada)
+  c.mensagens.push({ id: randomUUID(), de: 'lead', texto: texto || '[mensagem sem texto]', em: iso(), ...(pareceManipulacao(texto) ? { manipulacao: true } : {}) })
   c.ultimaChave = key
   c.followups = 0
   c.atualizadaEm = iso()
+  // Chegou mensagem nova: a resposta que esperava você ficou velha (ele escreve outra com tudo)
+  if (c.aguardandoVoce) {
+    const p = db.pendencias.find((x) => x.id === c.aguardandoVoce && !x.resolvidaEm)
+    if (p && (p.tipo === 'aprovar' || p.tipo === 'barrada')) {
+      p.resolvidaEm = iso()
+      p.resultado = 'substituida'
+      c.aguardandoVoce = null
+    }
+  }
   if (c.estado === 'optout') return salvar()
   if (pediuParaParar(texto)) return void optout(c)
   if (c.estado === 'fechado') {
@@ -334,27 +614,80 @@ export function receber(phone: string, texto: string, key: WAMessageKey) {
 /** Você mandou mensagem pelo celular para alguém em conversa com o agente: ele para ali. */
 export function saiuPeloCelular(phone: string, texto: string, waId: string) {
   if (sentByThisMotor(waId)) return
+  voceAssumiu(phone, texto, waId, 'pelo celular')
+}
+
+/** Você respondeu pela tela Conversas da XS: o agente para ali, igual ao celular. */
+export function saiuPelaXS(phone: string, texto: string, waId: string) {
+  voceAssumiu(phone, texto, waId, 'pela XS')
+}
+
+function voceAssumiu(phone: string, texto: string, waId: string, como: string) {
   const c = porTelefone(phone)
   if (!c || c.mensagens.some((m) => m.waId === waId)) return
   c.mensagens.push({ id: randomUUID(), de: 'voce', texto: texto || '[mídia]', em: iso(), waId })
   c.pendente = false
   c.atualizadaEm = iso()
+  if (c.aguardandoVoce) {
+    const p = db.pendencias.find((x) => x.id === c.aguardandoVoce && !x.resolvidaEm)
+    if (p) Object.assign(p, { resolvidaEm: iso(), resultado: 'feita' })
+    c.aguardandoVoce = null
+  }
   if (c.estado !== 'optout' && c.estado !== 'fechado' && c.estado !== 'humano') {
     c.estado = 'humano'
-    registrar('humano', `Você respondeu ${c.empresa} pelo celular: o agente parou nessa conversa`, c.id)
+    registrar('humano', `Você respondeu ${c.empresa} ${como}: o agente parou nessa conversa`, c.id)
   }
   salvar()
 }
 
-async function optout(c: Conversa, despedida?: string[]) {
+/** Pediu para parar: nada mais sai para essa pessoa (nem despedida), por nenhum caminho. */
+async function optout(c: Conversa) {
   c.estado = 'optout'
   c.pendente = false
+  c.aguardandoVoce = null
   hoje().optouts++
   db.extra.descartados.push(phoneKey(c.telefone))
+  for (const p of db.pendencias) if (p.conversaId === c.id && !p.resolvidaEm && (p.tipo === 'aprovar' || p.tipo === 'barrada')) Object.assign(p, { resolvidaEm: iso(), resultado: 'substituida' })
   registrar('optout', `${c.empresa} pediu para não receber mais mensagens`, c.id)
   frearSePreciso()
-  if (db.config.ativo && getSock()) await enviar(c, (despedida?.length ? despedida : ['Tudo bem, não vou mais te mandar mensagens. Desculpe o incômodo e um ótimo dia!']).slice(0, 1)).catch(() => undefined)
   salvar()
+}
+
+/** Mensagem do seu número de avisos: "XS pausar" para tudo; "XS voltar" retoma. */
+function comandoDoDono(texto: string) {
+  const t = String(texto ?? '').trim().toLowerCase()
+  if (/^xs\s+(pausar|pausa|parar|para)\b/.test(t)) {
+    pararTudo('pelo WhatsApp')
+    void avisarDono('⏸️ Parei tudo. Para voltar, mande "XS voltar" ou ligue na XS.')
+  } else if (/^xs\s+(voltar|volta|retomar|ligar)\b/.test(t)) {
+    try {
+      voltarATrabalhar()
+      void avisarDono('▶️ Voltei a trabalhar.')
+    } catch (err) {
+      void avisarDono(`Não consegui voltar: ${(err as Error).message}`)
+    }
+  } else if (/^xs\s+(status|como foi|resumo)\b/.test(t)) {
+    const d = hoje()
+    const esperando = db.pendencias.filter((p) => !p.resolvidaEm).length
+    void avisarDono(`📊 Hoje: ${d.abordados} abordadas, ${d.responderam} responderam, ${d.quentes} quentes, ${d.vendas} vendas. ${esperando} item(ns) em "Precisa de você". Nível ${db.config.piloto}. ${db.config.ativo ? 'Ligado.' : 'Desligado.'}`)
+  }
+}
+
+/** Botão de parar tudo (ou "XS pausar" no WhatsApp). */
+export function pararTudo(como = 'pela XS') {
+  db.config.ativo = false
+  db.extra.paradoEm = iso()
+  registrar('aviso', `Você parou tudo ${como}`)
+  salvar(true)
+}
+
+export function voltarATrabalhar() {
+  if (!chave) throw new Error('Falta a chave da IA.')
+  db.config.ativo = true
+  db.extra.paradoEm = null
+  db.extra.pausadoPorRisco = null
+  registrar('aviso', 'Voltou a trabalhar')
+  salvar(true)
 }
 
 /**
@@ -366,6 +699,7 @@ function frearSePreciso(t = new Date()) {
   if (db.extra.freio === diaDe(t) || !db.config.prospeccao.ativa || !precisaFrear(d)) return
   db.extra.freio = diaDe(t)
   registrar('aviso', `Freio de segurança: ${d.optouts} pessoas pediram para parar hoje (de ${d.abordados} abordadas). A prospecção para até amanhã para proteger o número.`)
+  descerNivel('muita gente pediu para parar hoje')
   void avisarDono(`🛑 Freio de segurança: ${d.optouts} pessoas pediram para parar hoje (de ${d.abordados} abordadas). Parei de abordar empresas novas até amanhã para proteger o número; as conversas continuam. Vale revisar a primeira mensagem com o Xico.`)
 }
 
@@ -373,19 +707,39 @@ function frearSePreciso(t = new Date()) {
 // Responder, follow-up, prospectar, resumo do dia
 // ---------------------------------------------------------------------------
 
-async function aplicar(c: Conversa, d: ia.RespostaIA, apresentou = false) {
-  c.temperatura = d.temperatura
-  if (d.resumo.trim()) c.resumo = d.resumo.trim()
-  if (d.acao === 'aguardar') return salvar()
-  if (d.acao === 'optout') return optout(c, d.mensagens)
-  if (d.mensagens.length) await enviar(c, d.mensagens.slice(0, 3))
-  const aviso = (d.aviso_dono || d.resumo).trim()
-  switch (d.acao) {
+/** Depois que a mensagem saiu (ou você aprovou): muda o estado da conversa conforme a ação. */
+async function aplicarAcao(c: Conversa, f: Pronto, apresentou = false) {
+  const d = f.dados ?? {}
+  const temperatura = (d.temperatura as Conversa['temperatura']) ?? c.temperatura
+  const resumo = String(d.resumo ?? '').trim()
+  c.temperatura = temperatura
+  if (resumo) c.resumo = resumo
+  const aviso = (String(d.aviso_dono ?? '') || resumo).trim()
+  switch (f.acao) {
     case 'chamar_dono':
       c.estado = 'humano'
       registrar('humano', `${c.empresa} precisa de você: ${aviso}`, c.id)
+      novaPendencia({ tipo: 'pessoa', texto: 'Pediu para falar com você ou ele não soube responder.', motivo: aviso, conversaId: c.id, empresa: c.empresa, prazo: new Date(Date.now() + 2 * 3_600_000).toISOString() })
       await avisarDono(`🙋 ${c.empresa} precisa de você.\n${aviso}\n${link(c)}`)
       break
+    case 'marcar_reuniao': {
+      const quando = String(d.horario ?? '')
+      const livre = horariosLivres(db.config.agenda, db.reunioes, new Date(), 12).find((h) => rotuloHorario(h) === quando)
+      if (!livre || !pode(db.config, 'marcar_reuniao')) {
+        c.estado = 'humano'
+        novaPendencia({ tipo: 'reuniao', texto: `Combinou conversa${quando ? ` (${quando})` : ''}, mas o horário não está mais livre. Confirme com o cliente.`, conversaId: c.id, empresa: c.empresa })
+        await avisarDono(`📅 ${c.empresa} quer conversar${quando ? ` (${quando})` : ''}, mas o horário não está mais livre. Confirme com o cliente.\n${link(c)}`)
+        break
+      }
+      for (const r of db.reunioes) if (r.conversaId === c.id && (r.estado === 'marcada' || r.estado === 'confirmada')) r.estado = 'cancelada'
+      db.reunioes.push({ id: randomUUID(), conversaId: c.id, empresa: c.empresa, telefone: c.telefone, inicio: livre.toISOString(), fim: new Date(livre.getTime() + db.config.agenda.duracaoMin * 60_000).toISOString(), estado: 'marcada', criadaEm: iso() })
+      c.estado = 'reuniao'
+      hoje().reunioes++
+      registrar('reuniao', `Conversa marcada com ${c.empresa}: ${quando}`, c.id)
+      await avisarDono(`📅 Conversa marcada com ${c.empresa}: ${quando}.\n${aviso}\n${link(c)}`)
+      void aprenderCom(c, 'reunião marcada')
+      break
+    }
     case 'reuniao_marcada':
       c.estado = 'reuniao'
       hoje().reunioes++
@@ -393,8 +747,21 @@ async function aplicar(c: Conversa, d: ia.RespostaIA, apresentou = false) {
       await avisarDono(`📅 Reunião marcada com ${c.empresa}.\n${aviso}\n${link(c)}`)
       void aprenderCom(c, 'reunião marcada')
       break
+    case 'pedir_contrato':
+      c.estado = 'humano'
+      novaPendencia({ tipo: 'contrato', texto: 'Fechou e precisa do contrato. Gere em Projetos e mande para o cliente.', motivo: aviso, conversaId: c.id, empresa: c.empresa, prazo: new Date(Date.now() + 4 * 3_600_000).toISOString() })
+      registrar('venda', `${c.empresa} pediu o contrato`, c.id)
+      await avisarDono(`📄 ${c.empresa} fechou e precisa do contrato.\n${aviso}\n${link(c)}`)
+      break
     case 'venda_fechada':
+      if (!pode(db.config, 'marcar_resultado')) {
+        c.estado = 'humano'
+        novaPendencia({ tipo: 'pessoa', texto: 'Disse que fechou. Confira o pagamento e marque a venda.', motivo: aviso, conversaId: c.id, empresa: c.empresa })
+        await avisarDono(`💰 ${c.empresa} disse que fechou. Confira o pagamento e marque a venda na XS.\n${aviso}\n${link(c)}`)
+        break
+      }
       c.estado = 'fechado'
+      c.fechadoEm = iso()
       hoje().vendas++
       registrar('venda', `Venda: ${c.empresa} fechou. ${aviso}`, c.id)
       await avisarDono(`💰 Venda! ${c.empresa} fechou. Confira o pagamento.\n${aviso}\n${link(c)}`)
@@ -406,7 +773,7 @@ async function aplicar(c: Conversa, d: ia.RespostaIA, apresentou = false) {
       void aprenderCom(c, 'o cliente recusou')
       break
     default:
-      if (d.temperatura === 'quente' && c.estado !== 'reuniao') {
+      if (temperatura === 'quente' && c.estado !== 'reuniao') {
         c.estado = 'quente'
         if (!c.avisadoQuente) {
           c.avisadoQuente = true
@@ -423,7 +790,7 @@ async function aplicar(c: Conversa, d: ia.RespostaIA, apresentou = false) {
 async function responderPendente(t: Date): Promise<boolean> {
   const cfg = db.config
   const c = db.conversas
-    .filter((x) => x.pendente && ESTADOS_ATIVOS.includes(x.estado) && Date.parse(x.responderEm ?? '') <= t.getTime())
+    .filter((x) => x.pendente && !x.aguardandoVoce && ESTADOS_ATIVOS.includes(x.estado) && Date.parse(x.responderEm ?? '') <= t.getTime())
     .sort((a, b) => (a.responderEm ?? '').localeCompare(b.responderEm ?? ''))[0]
   if (!c) return false
   if (!dentroDoHorario(t, cfg.respostas.inicio, cfg.respostas.fim)) {
@@ -444,12 +811,26 @@ async function responderPendente(t: Date): Promise<boolean> {
     await avisarDono(`🙋 A conversa com ${c.empresa} passou de ${MAX_POR_CONVERSA_DIA} mensagens hoje. Dê uma olhada.\n${link(c)}`)
     return true
   }
+  if (!pode(cfg, c.apresentar ? 'apresentar' : 'responder')) {
+    c.pendente = false
+    c.estado = 'humano'
+    novaPendencia({ tipo: 'pessoa', texto: 'Respondeu, e ele está sem permissão para responder (Treino → Capacidades).', conversaId: c.id, empresa: c.empresa })
+    return true
+  }
+  // Antes de ler: a IA confere se as mensagens novas tentam manipular o assistente (se você ligou)
+  const novas = c.mensagens.filter((m) => m.de === 'lead' && !m.auto && m.manipulacao === undefined && Date.parse(m.em) > Date.now() - 3_600_000)
+  if (novas.length && cfg.conferencias.manipulacao) {
+    const r = await comIA(() => apoioIA.manipulacao(ctx(), novas.map((m) => m.texto).join('\n')), `Conferir mensagem de ${c.empresa}`)
+    for (const m of novas) m.manipulacao = r?.sim ? true : false
+    if (r?.sim) registrar('aviso', `${c.empresa} tentou manipular o assistente: ${r.motivo}`, c.id)
+  }
   const total = c.mensagens.length
   // Só mandou o cumprimento: a vez agora é da apresentação (com o ângulo do teste, se for de um)
   const apresentar = !!c.apresentar
   const angulo = apresentar && c.testeId ? (db.testes.find((x) => x.id === c.testeId)?.variantes.find((v) => v.id === c.variante)?.angulo ?? '') : ''
+  const apoio = apoioPara(c, ultimasDoCliente(c), !apresentar)
   const r = await comIA(
-    () => (apresentar ? ia.apresentacao(ctx(), comDetalhes(c), t, angulo) : ia.responder(ctx(), comDetalhes(c), t)),
+    () => (apresentar ? ia.apresentacao(ctx(), comDetalhes(c), t, angulo, apoio) : ia.responder(ctx(), comDetalhes(c), t, apoio)),
     `${apresentar ? 'Apresentação' : 'Resposta'} para ${c.empresa}`,
   )
   if (!r) {
@@ -465,8 +846,39 @@ async function responderPendente(t: Date): Promise<boolean> {
   if (!c.pendente || !ESTADOS_ATIVOS.includes(c.estado)) return true
   c.pendente = false
   c.responderEm = null
+  anotarFatos(c, r.fatos)
+  anotarLacuna(c, r.lacuna)
+  if (r.acao === 'aguardar') {
+    c.temperatura = r.temperatura
+    if (r.resumo.trim()) c.resumo = r.resumo.trim()
+    salvar()
+    return true
+  }
+  if (r.acao === 'optout') {
+    await optout(c)
+    return true
+  }
+  const fontes = r.fontes.map((i) => apoio.trechos[i - 1]?.titulo).filter((x): x is string => !!x)
+  const s = await sair(c, doIA(r), {
+    agente: apresentar ? 'abridor' : r.acao === 'venda_fechada' || r.acao === 'pedir_contrato' ? 'fechador' : r.acao === 'marcar_reuniao' ? 'agendador' : 'vendedor',
+    proativa: false,
+    fontes: [...new Set(fontes)],
+    horarios: apoio.horarios,
+    refazer: async (atual, motivo) => {
+      const n = await comIA(() => ia.reescrever(ctx(), comDetalhes(c), atual, motivo, t, apoio), `Reescrever para ${c.empresa}`)
+      return n ? doIA(n) : null
+    },
+  })
+  if (s.tipo === 'barrada' && !s.pendencia) {
+    // Horário, ritmo: tenta de novo quando abrir
+    c.pendente = true
+    c.responderEm = (s.id === 'horario' ? proximaAbertura(t, Math.max(8, cfg.respostas.inicio), Math.min(21, cfg.respostas.fim)) : new Date(t.getTime() + 30 * 60_000)).toISOString()
+    salvar()
+    return true
+  }
+  if (s.tipo !== 'enviada') return true
   if (apresentar) c.apresentar = false
-  await aplicar(c, r, apresentar)
+  await aplicarAcao(c, s.final, apresentar)
   return true
 }
 
@@ -485,15 +897,44 @@ function apresentarSemResposta(t: Date): boolean {
   return false // quem manda é o responderPendente, no próximo ciclo
 }
 
+const emFerias = (t = new Date()) => !!db.config.feriasAte && diaDe(t) <= db.config.feriasAte
+
+/** Manda uma mensagem que ele mesmo puxa (follow-up, retorno, reativação, pós-venda) pelo Conferente. */
+async function mandarProativa(c: Conversa, mensagens: string[], agente: NomeAgente, t: Date, refazer?: (atual: Pronto, motivo: string) => Promise<Pronto | null>): Promise<boolean> {
+  const s = await sair(c, { mensagens, acao: 'continuar' }, { agente, proativa: true, maxBolhas: 1, refazer })
+  return s.tipo === 'enviada' && s.final.mensagens.length > 0
+}
+
+/** Retorno combinado ("me chama mês que vem"): chama no dia. */
+async function retornoCombinado(t: Date): Promise<boolean> {
+  const cfg = db.config
+  const p = cfg.prospeccao
+  if (!pode(cfg, 'retorno_combinado') || emFerias(t) || t.getTime() < proximoFollowup || !dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
+  const hojeStr = diaDe(t)
+  const c = db.conversas.find((x) => x.retomarEm && x.retomarEm <= hojeStr && !x.pendente && !x.aguardandoVoce && ['aguardando', 'conversando', 'quente', 'perdido', 'sem_resposta'].includes(x.estado) && x.mensagens.at(-1)?.de !== 'lead')
+  if (!c) return false
+  proximoFollowup = Date.now() + (3 + Math.random() * 3) * 60_000
+  const apoio = apoioPara(c, c.resumo, false)
+  const r = await comIA(() => ia.followup(ctx(), { ...comDetalhes(c), retomarCombinado: true }, 1, t, apoio), `Retorno combinado com ${c.empresa}`)
+  if (!r) return true
+  c.retomarEm = null
+  if (await mandarProativa(c, r.mensagens, 'recuperador', t)) {
+    if (c.estado === 'perdido' || c.estado === 'sem_resposta') c.estado = 'aguardando'
+    registrar('followup', `Retomou com ${c.empresa} no dia combinado`, c.id)
+  }
+  salvar()
+  return true
+}
+
 async function fazerFollowup(t: Date): Promise<boolean> {
   const cfg = db.config
   const p = cfg.prospeccao
   const dias = cfg.followup.dias.filter((d) => d > 0)
-  if (!cfg.followup.ativo || !dias.length || t.getTime() < proximoFollowup || !dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
+  if (!cfg.followup.ativo || !pode(cfg, 'followup') || emFerias(t) || !dias.length || t.getTime() < proximoFollowup || !dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
   let alvo: Conversa | null = null
   for (const c of db.conversas) {
     // Ainda falta a apresentação: o follow-up só começa depois dela
-    if (c.pendente || c.apresentar || !['aguardando', 'conversando', 'quente'].includes(c.estado)) continue
+    if (c.pendente || c.apresentar || c.aguardandoVoce || c.retomarEm || !['aguardando', 'conversando', 'quente'].includes(c.estado)) continue
     // Resposta automática não conta: o follow-up segue o relógio da nossa última mensagem
     const ultima = c.mensagens.filter((m) => !m.auto).at(-1)
     if (!ultima || ultima.de === 'lead') continue
@@ -510,15 +951,17 @@ async function fazerFollowup(t: Date): Promise<boolean> {
   }
   if (!alvo) return false
   const c = alvo
-  const r = await comIA(() => ia.followup(ctx(), comDetalhes(c), dias.length, t), `Follow-up para ${c.empresa}`)
+  const apoio = apoioPara(c, c.resumo, false)
+  const r = await comIA(() => ia.followup(ctx(), comDetalhes(c), dias.length, t, apoio), `Follow-up para ${c.empresa}`)
   proximoFollowup = Date.now() + (3 + Math.random() * 3) * 60_000
   if (!r) return true
   c.followups++
   c.atualizadaEm = iso()
-  if (r.mensagens.length) {
-    await enviar(c, r.mensagens.slice(0, 1))
-    registrar('followup', `Follow-up ${c.followups} para ${c.empresa}`, c.id)
+  const refazer = async (atual: Pronto, motivo: string) => {
+    const n = await comIA(() => ia.reescrever(ctx(), comDetalhes(c), atual, motivo, t, apoio), `Reescrever follow-up para ${c.empresa}`)
+    return n ? { mensagens: n.mensagens.slice(0, 1), acao: 'continuar' } : null
   }
+  if (r.mensagens.length && (await mandarProativa(c, r.mensagens, 'recuperador', t, refazer))) registrar('followup', `Follow-up ${c.followups} para ${c.empresa}`, c.id)
   salvar()
   return true
 }
@@ -527,62 +970,64 @@ function bloqueados(): Set<string> {
   return new Set([...db.extra.conhecidos, ...db.extra.descartados, ...sentPhones(), ...db.conversas.map((c) => phoneKey(c.telefone))])
 }
 
-interface ResultadoBase {
-  name: string
-  niche: string
-  phone: string
-  website: string
-  instagram: string
-  address: string
-  city: string
-  state: string
+/** Pede ao app para somar consultas do Google ao contador do mês (o app soma quando abre). */
+function contarGoogle(chamadas: number) {
+  const g = db.extra.google
+  g.restante = Math.max(0, g.restante - chamadas)
+  g.pendentes += chamadas
+  salvar()
+}
+
+/** Texto da busca no Google de um tipo de negócio (cidades antigas não tinham). */
+const textoBusca = (n: NichoBusca) => (n.busca?.trim() || n.nome).toLowerCase()
+
+/** Busca no Google Maps com a chave do dono (a mesma de "Buscar empresas"). */
+async function buscarGoogle(alvo: Alvo, meta: number, soSemSite: boolean, conhecidos: Set<string>): Promise<ResultadoGoogle[]> {
+  const g = db.extra.google
+  if (!g.chave) throw new Error('Coloque a chave do Google em Configurações → Busca do Google e abra a XS uma vez para o vendedor receber a chave.')
+  if (!alvo.caixa) {
+    alvo.caixa = await caixaDaCidade(alvo.cidade, alvo.uf)
+    salvar()
+  }
+  try {
+    const r = await buscarNoGoogle({ chave: g.chave, cidade: alvo.cidade, uf: alvo.uf, caixa: alvo.caixa, nichos: alvo.nichos.map((n) => ({ nome: n.nome, busca: textoBusca(n) })), meta, soSemSite, conhecidos, restante: g.restante, phoneKey })
+    contarGoogle(r.chamadas)
+    return r.resultados
+  } catch (err) {
+    if (err instanceof ErroGoogle && err.parar) throw new Error(err.message)
+    throw new Error((err as Error).message || 'A busca do Google falhou.')
+  }
 }
 
 /** Busca mais empresas para a fila numa cidade/nicho (sorteado pelos resultados, ou o que você escolher). */
 async function reabastecer(alvoEscolhido?: Alvo, testeId?: string): Promise<{ achadas: number; mantidas: FilaItem[] }> {
   const p = db.config.prospeccao
+  if (!pode(db.config, 'buscar_maps')) throw new Error('A capacidade "Buscar empresas no Google Maps" está desligada.')
   const alvo = alvoEscolhido ?? escolherAlvo(p.alvos, db.conversas)
   if (!alvo) throw new Error('Cadastre ao menos uma cidade com tipos de negócio em Prospecção.')
-  if (!BUSCA_TOKEN) throw new Error('A busca de empresas não está configurada neste servidor.')
-  const conhecidos = [...bloqueados(), ...db.fila.map((f) => phoneKey(f.telefone))]
-  let res: Response
-  try {
-    res = await fetch(`${BUSCA_URL}/buscar`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${BUSCA_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uf: alvo.uf,
-        cidade: alvo.cidade,
-        nichos: alvo.nichos,
-        filtros: { celular: 1, site: p.soSemSite ? -1 : 0 },
-        meta: 40,
-        conhecidos: { telefones: conhecidos },
-        pular: true,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    })
-  } catch {
-    throw new Error('A busca de empresas não respondeu agora.')
-  }
-  const data = (await res.json().catch(() => ({}))) as { results?: ResultadoBase[]; error?: string }
-  if (!res.ok) throw new Error(data.error || 'A busca de empresas falhou.')
+  const conhecidos = new Set([...bloqueados(), ...db.fila.map((f) => phoneKey(f.telefone))])
+  const resultados = await buscarGoogle(alvo, 30, p.soSemSite, conhecidos)
   const agora = iso()
-  let itens: FilaItem[] = (data.results ?? [])
-    .map((r) => ({
-      id: randomUUID(),
-      telefone: formatBrazilPhone(r.phone),
-      empresa: r.name,
-      nicho: r.niche,
-      cidade: r.city || alvo.cidade,
-      uf: r.state || alvo.uf,
-      endereco: r.address ?? '',
-      site: r.website ?? '',
-      instagram: r.instagram ?? '',
-      alvoId: alvo.id,
-      bruto: r as unknown as Record<string, unknown>,
-      em: agora,
-      ...(testeId ? { testeId } : {}),
-    }))
+  const pad = padroes()
+  let itens: FilaItem[] = resultados
+    .map((r) => {
+      const n = pode(db.config, 'nota_encaixe') ? notaEncaixe(r, taxaDoRamo(pad, r.niche)) : null
+      return {
+        id: randomUUID(),
+        telefone: formatBrazilPhone(r.phone),
+        empresa: r.name,
+        nicho: r.niche,
+        cidade: r.city || alvo.cidade,
+        uf: r.state || alvo.uf,
+        endereco: r.address ?? '',
+        site: r.website ?? '',
+        instagram: r.instagram ?? '',
+        alvoId: alvo.id,
+        bruto: { ...r, ...(n ? { encaixe: n.nota, encaixeMotivos: n.motivos } : {}) } as unknown as Record<string, unknown>,
+        em: agora,
+        ...(testeId ? { testeId } : {}),
+      }
+    })
     .filter((f) => isValidBrazilWhatsApp(f.telefone))
   const achadas = itens.length
   const temCriterio = !!p.criterios.trim() || db.licoes.some((l) => l.ativa && l.tipo === 'busca')
@@ -594,10 +1039,12 @@ async function reabastecer(alvoEscolhido?: Alvo, testeId?: string): Promise<{ ac
       itens = itens.filter((_, i) => manter.has(i))
     }
   }
+  // Quem combina mais vai primeiro (nota de encaixe)
+  itens.sort((a, b) => Number(b.bruto.encaixe ?? 0) - Number(a.bruto.encaixe ?? 0))
   db.fila.push(...itens)
   if (db.fila.length > 300) db.fila.splice(0, db.fila.length - 300)
   const nomes = alvo.nichos.map((n) => n.nome).join(', ')
-  registrar('busca', `Buscou ${nomes} em ${alvo.cidade}: ${itens.length} empresa(s) nova(s) na fila${achadas > itens.length ? ` (${achadas - itens.length} fora dos seus critérios)` : ''}`)
+  registrar('busca', `Buscou ${nomes} em ${alvo.cidade} no Google Maps: ${itens.length} empresa(s) nova(s) na fila${achadas > itens.length ? ` (${achadas - itens.length} fora dos seus critérios)` : ''}`)
   return { achadas, mantidas: itens }
 }
 
@@ -613,33 +1060,13 @@ export interface EmpresaAchada {
 }
 
 /**
- * Busca empresas na base aberta para o dono escolher (conector do Claude/Jarvis).
+ * Busca empresas no Google Maps para o dono escolher (conector do Claude/Jarvis).
  * Não mexe na fila do vendedor; pula quem já foi abordado ou descartado.
  */
 export async function buscarEmpresas(p: { uf: string; cidade: string; nichos: NichoBusca[]; quantidade: number; soSemSite: boolean }): Promise<EmpresaAchada[]> {
-  if (!BUSCA_TOKEN) throw new Error('A busca de empresas não está configurada neste servidor.')
-  let res: Response
-  try {
-    res = await fetch(`${BUSCA_URL}/buscar`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${BUSCA_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uf: p.uf,
-        cidade: p.cidade,
-        nichos: p.nichos,
-        filtros: { celular: 1, site: p.soSemSite ? -1 : 0 },
-        meta: p.quantidade,
-        conhecidos: { telefones: [...bloqueados()] },
-        pular: true,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    })
-  } catch {
-    throw new Error('A busca de empresas não respondeu agora.')
-  }
-  const data = (await res.json().catch(() => ({}))) as { results?: ResultadoBase[]; error?: string }
-  if (!res.ok) throw new Error(data.error || 'A busca de empresas falhou.')
-  return (data.results ?? [])
+  const alvo: Alvo = { id: 'conector', uf: p.uf, cidade: p.cidade, nichos: p.nichos, ativo: true, caixa: db.config.prospeccao.alvos.find((a) => a.cidade === p.cidade && a.uf === p.uf)?.caixa }
+  const resultados = await buscarGoogle(alvo, Math.max(1, Math.min(60, p.quantidade)), p.soSemSite, bloqueados())
+  return resultados
     .map((r) => ({
       empresa: r.name,
       nicho: r.niche,
@@ -653,6 +1080,7 @@ export async function buscarEmpresas(p: { uf: string; cidade: string; nichos: Ni
     .filter((e) => isValidBrazilWhatsApp(e.telefone))
     .slice(0, p.quantidade)
 }
+
 
 /** Teste que ainda precisa abordar empresas (o mais antigo primeiro). */
 function testeAtivo(): Teste | undefined {
@@ -670,6 +1098,10 @@ function proximaVariante(t: Teste): Variante {
  * -2 = só sobrou empresa em hora ruim (melhor esperar); -1 = não tem ninguém.
  */
 function indiceNaFila(t: Date, deste: (f: FilaItem) => boolean): number {
+  // Primeiro quem está na melhor faixa do dia para o ramo (quando já há dados), depois a ordem da fila
+  const p = padroes()
+  const boa = db.fila.findIndex((f) => deste(f) && boaHoraPara(f.nicho, t) && faixaBoa(p, f.nicho, t) === true)
+  if (boa >= 0) return boa
   const i = db.fila.findIndex((f) => deste(f) && boaHoraPara(f.nicho, t))
   if (i >= 0) return i
   return db.fila.some(deste) ? -2 : -1
@@ -717,7 +1149,7 @@ async function proximoDaFila(t = new Date()): Promise<FilaItem | 'espera' | null
 
 async function prospectar(t: Date): Promise<boolean> {
   const p = db.config.prospeccao
-  if (!p.ativa || t.getTime() < proximaAbordagem || !dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
+  if (!p.ativa || emFerias(t) || t.getTime() < proximaAbordagem || !dentroDoHorario(t, p.inicio, p.fim, p.dias)) return false
   if (db.extra.freio === diaDe(t)) return false
   const dia = hoje(t)
   const cota = cotaHoje(t)
@@ -754,10 +1186,11 @@ async function prospectar(t: Date): Promise<boolean> {
   const teste = item.testeId ? db.testes.find((x) => x.id === item.testeId && x.estado === 'rodando') : undefined
   const variante = teste ? proximaVariante(teste) : undefined
   // Do jeito do dono: primeiro só o cumprimento (sem IA); a apresentação vem depois da resposta
-  const doisPassos = p.cumprimentarPrimeiro
+  const doisPassos = p.cumprimentarPrimeiro && pode(db.config, 'cumprimentar')
+  const apoio = apoioPara({ nicho: item.nicho, mensagens: [] }, item.nicho, false)
   const r = doisPassos
     ? { mensagens: [cumprimento(item.empresa, t)] }
-    : await comIA(() => ia.abordagem(ctx(), { ...lead, detalhes: detalhesDoBruto(item.bruto) }, t, variante?.angulo), `Abordagem de ${item.empresa}`)
+    : await comIA(() => ia.abordagem(ctx(), { ...lead, detalhes: detalhesDoBruto(item.bruto) }, t, variante?.angulo, apoio), `Abordagem de ${item.empresa}`)
   if (!r?.mensagens.length) {
     db.fila.unshift(item)
     proximaAbordagem = Date.now() + 5 * 60_000
@@ -772,15 +1205,34 @@ async function prospectar(t: Date): Promise<boolean> {
     bruto: item.bruto,
     testeId: teste?.id ?? null,
     variante: variante?.id ?? null,
+    encaixe: typeof item.bruto.encaixe === 'number' ? item.bruto.encaixe : undefined,
     ...(doisPassos ? { apresentar: true } : {}),
   })
   db.conversas.push(c)
+  // Cumprimento repetido demais: tenta outra frase (sem IA); abordagem escrita: a IA reescreve pelo motivo
+  const refazer = doisPassos
+    ? async (_a: Pronto) => ({ mensagens: [cumprimento(item.empresa, t, Math.random())], acao: 'continuar' })
+    : async (atual: Pronto, motivo: string) => {
+        const n = await comIA(() => ia.reescrever(ctx(), { ...comDetalhes(c), mensagens: [] }, atual, motivo, t, apoio), `Reescrever abordagem de ${item.empresa}`)
+        return n ? doIA(n) : null
+      }
+  let s: Saida
   try {
-    await enviar(c, r.mensagens.slice(0, 2))
+    s = await sair(c, { mensagens: r.mensagens, acao: 'continuar' }, { agente: doisPassos ? 'cumprimento' : 'abridor', proativa: true, maxBolhas: 2, refazer })
   } catch (err) {
     if (!c.mensagens.length) db.conversas.splice(db.conversas.indexOf(c), 1)
     registrar('erro', `Não consegui mandar para ${item.empresa}: ${(err as Error).message}`)
     proximaAbordagem = Date.now() + 5 * 60_000
+    return true
+  }
+  if (s.tipo !== 'enviada' || !c.mensagens.length) {
+    // Barrou ou espera você: a empresa volta para a fila (ou fica com você, se virou pendência)
+    if (s.tipo === 'barrada' && !s.pendencia) {
+      db.conversas.splice(db.conversas.indexOf(c), 1)
+      db.fila.unshift(item)
+      proximaAbordagem = Date.now() + 15 * 60_000
+    }
+    salvar()
     return true
   }
   dia.abordados++
@@ -886,6 +1338,7 @@ async function ciclo() {
     }
     apresentarSemResposta(t)
     if (await responderPendente(t)) return
+    if (await retornoCombinado(t)) return
     if (await fazerFollowup(t)) return
     if (await prospectar(t)) return
     if (await lembrarDono(t)) return
@@ -904,6 +1357,8 @@ if (AGENTE_LIGADO) {
   })
   // Espera um pouco: o envio do próprio motor registra o id logo depois do evento
   waEvents.outgoing((phone, texto, id) => void setTimeout(() => saiuPeloCelular(phone, texto, id), 4000))
+  // Você respondeu pela tela Conversas da XS: o agente para naquela conversa
+  conversaEventos.enviouPelaXS((phone, texto, id) => saiuPelaXS(phone, texto, id))
   waEvents.risk(({ reason }) => {
     db.extra.pausadoPorRisco = iso()
     // A cota volta ao começo: o número precisa de calma depois de um problema
@@ -944,6 +1399,10 @@ export function estado() {
     mes: { custoUSD: soma('custoUSD'), abordados: soma('abordados'), responderam: soma('responderam'), reunioes: soma('reunioes'), vendas: soma('vendas') },
     contagem,
     licoes: db.licoes.filter((l) => l.ativa).length,
+    piloto: db.config.piloto,
+    paradoEm: db.extra.paradoEm,
+    pendencias: db.pendencias.filter((p) => !p.resolvidaEm).length,
+    google: { temChave: !!db.extra.google.chave, restante: db.extra.google.restante, atualizadoEm: db.extra.google.atualizadoEm },
   }
 }
 
@@ -961,12 +1420,14 @@ function limparAlvo(a: Partial<Alvo>): Alvo | null {
     .slice(0, 30)
     .map((n) => ({
       nome: txt(n?.nome, 80),
+      busca: txt(n?.busca, 80) || txt(n?.nome, 80).toLowerCase(),
       tax: (Array.isArray(n?.tax) ? n.tax : []).map((x) => txt(x, 60)).filter(Boolean).slice(0, 40),
       nomes: (Array.isArray(n?.nomes) ? n.nomes : []).map((x) => txt(x, 60)).filter(Boolean).slice(0, 20),
     }))
-    .filter((n) => n.nome && (n.tax.length || n.nomes.length))
+    .filter((n) => n.nome)
   if (!/^[A-Z]{2}$/.test(uf) || !cidade || !nichos.length) return null
-  return { id: txt(a.id, 60) || randomUUID(), uf, cidade, nichos, ativo: a.ativo !== false }
+  const caixa = Array.isArray(a.caixa) && a.caixa.length === 4 && a.caixa.every((x) => Number.isFinite(Number(x))) ? (a.caixa.map(Number) as [number, number, number, number]) : undefined
+  return { id: txt(a.id, 60) || randomUUID(), uf, cidade, nichos, ativo: a.ativo !== false, ...(caixa ? { caixa } : {}) }
 }
 
 export function lerConfig(): AgenteConfig {
@@ -1016,6 +1477,31 @@ export function salvarConfig(body: Partial<AgenteConfig>): AgenteConfig {
     },
     responderDisparos: b.responderDisparos !== false,
     limiteDiaUSD: num(b.limiteDiaUSD, 0.1, 100, 3),
+    piloto: ([1, 2, 3, 4].includes(Number(b.piloto)) ? Number(b.piloto) : atual.piloto) as Piloto,
+    persona: { nome: txt(b.persona.nome, 60) || 'Atendente IA', tom: (['caloroso', 'objetivo', 'curto'] as const).includes(b.persona.tom) ? b.persona.tom : 'caloroso', regrasCasa: txt(b.persona.regrasCasa, 3000) },
+    estiloResposta: { variasBolhas: b.estiloResposta.variasBolhas !== false, maxBolha: Math.round(num(b.estiloResposta.maxBolha, 80, 4000, 600)) },
+    capacidades: limparCapacidades(b.capacidades),
+    conferencias: {
+      revisorTom: b.conferencias.revisorTom === true,
+      assuntosProibidos: b.conferencias.assuntosProibidos !== false,
+      proibidos: txt(b.conferencias.proibidos, 1000),
+      manipulacao: b.conferencias.manipulacao !== false,
+      transcreverAudio: b.conferencias.transcreverAudio === true,
+    },
+    agenda: {
+      dias: [...new Set((Array.isArray(b.agenda.dias) ? b.agenda.dias : []).map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort(),
+      inicio: horas(b.agenda.inicio, 9),
+      fim: horas(b.agenda.fim, 18),
+      duracaoMin: Math.round(num(b.agenda.duracaoMin, 15, 180, 30)),
+      antecedenciaH: Math.round(num(b.agenda.antecedenciaH, 0, 72, 3)),
+      como: txt(b.agenda.como, 200),
+    },
+    posVenda: { depoimentoDias: Math.round(num(b.posVenda.depoimentoDias, 1, 120, 15)), indicacaoDias: Math.round(num(b.posVenda.indicacaoDias, 1, 180, 30)) },
+    reativacao: { diasParado: Math.round(num(b.reativacao.diasParado, 7, 365, 30)), porDia: Math.round(num(b.reativacao.porDia, 0, 50, 5)) },
+    linksPermitidos: txt(b.linksPermitidos, 3000),
+    autoAprovarLicoes: b.autoAprovarLicoes === true,
+    inteligenciaXS: b.inteligenciaXS === true,
+    feriasAte: typeof b.feriasAte === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.feriasAte) ? b.feriasAte : null,
   }
   if (nova.avisos.telefone && !isValidBrazilWhatsApp(nova.avisos.telefone)) throw new Error('O número para avisos precisa ter DDD + número.')
   if (nova.prospeccao.fim <= nova.prospeccao.inicio || nova.respostas.fim <= nova.respostas.inicio) throw new Error('O horário de fim precisa ser depois do início.')
@@ -1157,6 +1643,7 @@ export function marcar(id: string, estadoNovo: Estado) {
   c.estado = estadoNovo
   c.pendente = false
   if (estadoNovo === 'fechado') {
+    c.fechadoEm = iso()
     hoje().vendas++
     void aprenderCom(c, 'venda fechada')
   }
@@ -1219,7 +1706,7 @@ export function apagarLicao(id: string) {
 }
 
 export function listarFila() {
-  return db.fila.slice(0, 150).map(({ bruto: _b, ...f }) => f)
+  return db.fila.slice(0, 150).map(({ bruto, ...f }) => ({ ...f, encaixe: typeof bruto?.encaixe === 'number' ? bruto.encaixe : null, encaixeMotivos: Array.isArray(bruto?.encaixeMotivos) ? (bruto.encaixeMotivos as string[]) : [] }))
 }
 
 /** Tira uma empresa da fila (ela não volta). Com motivo, vira critério de busca. */
@@ -1449,3 +1936,89 @@ export function definirConhecidos(telefones: unknown) {
   salvar()
   return { total: db.extra.conhecidos.length }
 }
+
+// ---------------------------------------------------------------------------
+// Chave do Google (a mesma de "Buscar empresas") e a tela Conversas da XS
+// ---------------------------------------------------------------------------
+
+/**
+ * O app manda a chave do Google e quanto ainda cabe na cota do mês; o vendedor devolve quantas
+ * consultas fez desde a última vez (o app soma no contador e confirma com `ack`).
+ */
+export function definirGoogle(body: { chave?: unknown; restante?: unknown; ack?: unknown }) {
+  const g = db.extra.google
+  if (typeof body.chave === 'string') g.chave = /^AIza[\w-]{30,}$/.test(body.chave.trim()) ? body.chave.trim() : ''
+  if (body.restante !== undefined) g.restante = Math.max(0, Math.round(num(body.restante, 0, 1_000_000, 0)) - g.pendentes)
+  const ack = Math.round(num(body.ack, 0, g.pendentes, 0))
+  g.pendentes -= ack
+  g.atualizadoEm = iso()
+  salvar()
+  return { temChave: !!g.chave, restante: g.restante, pendentes: g.pendentes }
+}
+
+/** Para a lista da tela Conversas: quais números estão com o vendedor e em que pé. */
+export function mapaConversas() {
+  return db.conversas
+    .filter((c) => c.estado !== 'optout' || Date.now() - Date.parse(c.atualizadaEm) < 7 * 86_400_000)
+    .map((c) => ({ id: c.id, telefone: c.telefone, estado: c.estado, temperatura: c.temperatura, aguardando: !!c.aguardandoVoce || (c.estado === 'humano' && c.mensagens.at(-1)?.de === 'lead') }))
+}
+
+/** A conversa do vendedor com um número (para a tela Conversas): estado, ficha e quais mensagens foram dele. */
+export function conversaPorTelefone(telefone: string) {
+  const c = porTelefone(telefone)
+  if (!c) return null
+  const pendencia = c.aguardandoVoce ? (db.pendencias.find((p) => p.id === c.aguardandoVoce && !p.resolvidaEm) ?? null) : null
+  return {
+    id: c.id,
+    estado: c.estado,
+    temperatura: c.temperatura,
+    resumo: c.resumo,
+    origem: c.origem,
+    fatos: c.fatos ?? [],
+    pendente: c.pendente,
+    pendencia: pendencia ? { id: pendencia.id, tipo: pendencia.tipo, texto: pendencia.texto, motivo: pendencia.motivo ?? '', mensagens: pendencia.rascunho?.mensagens ?? [] } : null,
+    doAgente: c.mensagens.filter((m) => m.de === 'agente' && m.waId).map((m) => ({ waId: m.waId!, trace: m.trace ?? null })),
+  }
+}
+
+/**
+ * Você entrega ao vendedor uma conversa da tela Conversas: ele assume com o histórico recente.
+ * Se a última mensagem é do cliente, responde em instantes.
+ */
+export function entregarAoAgente(telefone: string, nome?: string) {
+  const tel = formatBrazilPhone(telefone)
+  if (!isValidBrazilWhatsApp(tel)) throw new Error('Telefone inválido.')
+  if (db.extra.apagados.includes(phoneKey(tel))) throw new Error('Este contato foi apagado a pedido e não pode receber mensagens.')
+  let c = porTelefone(tel)
+  if (c?.estado === 'optout') throw new Error('Esta pessoa pediu para não receber mensagens.')
+  if (!c) {
+    const hist = abrirConversa(tel)
+    c = novaConversa({ telefone: hist.telefone || tel, empresa: txt(nome, 120) || hist.nome || tel, origem: 'manual', estado: 'conversando' })
+    c.mensagens = hist.msgs
+      .filter((m) => m.texto)
+      .slice(-20)
+      .map((m) => ({ id: randomUUID(), de: m.deMim ? ('voce' as const) : ('lead' as const), texto: m.texto, em: m.em, waId: m.id }))
+    c.sinc.mensagens = c.mensagens.length
+    db.conversas.push(c)
+  } else {
+    c.estado = respondeu(c) ? (c.temperatura === 'quente' ? 'quente' : 'conversando') : 'aguardando'
+  }
+  c.aguardandoVoce = null
+  if (c.mensagens.at(-1)?.de === 'lead') {
+    c.pendente = true
+    c.responderEm = new Date(Date.now() + 5000).toISOString()
+  }
+  registrar('aviso', `Você entregou a conversa com ${c.empresa} ao vendedor`, c.id)
+  return conversaPorTelefone(c.telefone)
+}
+
+/** Assumir pelo número (botão da tela Conversas). */
+export function assumirPorTelefone(telefone: string) {
+  const c = porTelefone(telefone)
+  if (!c) throw new Error('O vendedor não está nesta conversa.')
+  assumir(c.id)
+  return conversaPorTelefone(c.telefone)
+}
+
+/** Lista técnica para a tela: as conferências na ordem (a tela de Segurança chega na fase 1). */
+export const conferencias = () => CONFERENCIAS

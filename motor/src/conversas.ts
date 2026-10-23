@@ -182,6 +182,13 @@ export async function marcarLidas(telefone: string) {
   return { ok: true }
 }
 
+type AoEnviar = (telefone: string, texto: string, id: string) => void
+const aoEnviar = new Set<AoEnviar>()
+/** Quem quer saber das respostas digitadas na tela Conversas (o vendedor para naquela conversa). */
+export const conversaEventos = {
+  enviouPelaXS: (l: AoEnviar) => (aoEnviar.add(l), () => aoEnviar.delete(l)),
+}
+
 /** Resposta digitada na tela Conversas. */
 export async function enviarNaConversa(telefone: string, texto: string): Promise<MensagemConversa> {
   const s = getSock()
@@ -212,6 +219,13 @@ export async function enviarNaConversa(telefone: string, texto: string): Promise
   c.naoLidas = 0
   c.atualizadaEm = msg.em
   salvar()
+  for (const l of aoEnviar) {
+    try {
+      l(k, t, id)
+    } catch (err) {
+      console.error('[conversas] aviso de envio falhou:', err)
+    }
+  }
   return msg
 }
 

@@ -2,6 +2,7 @@
 import { useEffect } from 'react'
 import { phoneKey } from './duplicates'
 import { knownKeys, mapsToParsed, type MapsResult } from './mapsSearch'
+import { restantes, semTeto, SEM_TETO, useGoogleKey } from '../store/useGoogleKey'
 import { useWaServico, waFetch } from './waServico'
 import type { StatusId } from './types'
 import { useApp } from '../store/useApp'
@@ -25,6 +26,8 @@ export const MODELOS: { id: Modelo; nome: string; nota: string; custo: string }[
 
 export interface NichoBusca {
   nome: string
+  /** Texto da busca no Google Maps */
+  busca?: string
   tax: string[]
   nomes: string[]
 }
@@ -35,6 +38,7 @@ export interface Alvo {
   cidade: string
   nichos: NichoBusca[]
   ativo: boolean
+  caixa?: [number, number, number, number]
 }
 
 export interface AgenteConfig {
@@ -72,6 +76,27 @@ export interface AgenteConfig {
   followup: { ativo: boolean; dias: number[] }
   responderDisparos: boolean
   limiteDiaUSD: number
+}
+
+/** A conversa do vendedor com um número, para a tela Conversas. */
+export interface ConversaDoAgente {
+  id: string
+  estado: Estado
+  temperatura: 'frio' | 'morno' | 'quente'
+  resumo: string
+  origem: string
+  fatos: { chave: string; valor: string; em: string }[]
+  pendente: boolean
+  pendencia: { id: string; tipo: string; texto: string; motivo: string; mensagens: string[] } | null
+  doAgente: { waId: string; trace: { agente: string; fontes: string[]; conferencias: number; reescritas: number; barradas: string[] } | null }[]
+}
+
+export interface MapaAgente {
+  id: string
+  telefone: string
+  estado: Estado
+  temperatura: 'frio' | 'morno' | 'quente'
+  aguardando: boolean
 }
 
 export type Estado = 'aguardando' | 'conversando' | 'quente' | 'humano' | 'reuniao' | 'fechado' | 'perdido' | 'optout' | 'sem_resposta'
@@ -117,6 +142,11 @@ export interface EstadoAgente {
   mes: { custoUSD: number; abordados: number; responderam: number; reunioes: number; vendas: number }
   contagem: Partial<Record<Estado, number>>
   licoes: number
+  /** Motor mais novo (fase 0 da IA nova) */
+  piloto?: number
+  paradoEm?: string | null
+  pendencias?: number
+  google?: { temChave: boolean; restante: number; atualizadoEm: string | null }
 }
 
 export interface Mensagem {
@@ -176,6 +206,9 @@ export interface FilaItem {
   instagram: string
   alvoId: string
   em: string
+  /** Nota de encaixe (0 a 100) e por quê */
+  encaixe?: number | null
+  encaixeMotivos?: string[]
 }
 
 export interface Atividade {
@@ -319,6 +352,21 @@ async function enviarConhecidos() {
   conhecidosEnviados = leads.length
 }
 
+/**
+ * Leva a chave do Google (a mesma de "Buscar empresas") para o vendedor e soma ao contador do mês as
+ * consultas que ele fez. Motor antigo responde 404: ignora.
+ */
+async function sincronizarGoogle() {
+  const g = useGoogleKey.getState()
+  if (!g.loaded) await g.load()
+  const c = useGoogleKey.getState().config
+  const r = await waFetch<{ pendentes: number }>('/agente/google', { method: 'POST', json: { chave: c.chave ?? '', restante: semTeto(c) ? SEM_TETO : restantes(c) }, timeoutMs: 8000 })
+  if (r.pendentes > 0) {
+    await useGoogleKey.getState().addUso(r.pendentes)
+    await waFetch('/agente/google', { method: 'POST', json: { ack: r.pendentes }, timeoutMs: 8000 })
+  }
+}
+
 /** A cada 1 min, com a aba aberta e o agente disponível (só no WhatsApp do dono). */
 export function useAgenteSync() {
   const disponivel = useWaServico((s) => !!s.online && !!s.health?.agente)
@@ -330,6 +378,7 @@ export function useAgenteSync() {
       busy = true
       try {
         await enviarConhecidos()
+        await sincronizarGoogle().catch(() => undefined)
         await syncAgente()
       } catch {
         /* serviço ocupado ou fora do ar: tenta de novo depois */
