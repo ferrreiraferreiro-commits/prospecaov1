@@ -1,10 +1,29 @@
 import clsx from 'clsx'
-import { Bell, CalendarCheck, CalendarClock, ChartColumn, Crown, Eye, EyeOff, LogOut, Monitor, Moon, Settings, ShieldCheck, Sun } from 'lucide-react'
+import {
+  Bell,
+  CalendarCheck,
+  CalendarClock,
+  ChartColumn,
+  Crown,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  LogOut,
+  Megaphone,
+  Monitor,
+  Moon,
+  Send,
+  Settings,
+  ShieldCheck,
+  Sun,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../data/supabaseClient'
 import { LOGIN_DOMAIN } from '../lib/auth'
-import { formatDateTime, formatDayLabel, periodoLabel } from '../lib/dates'
+import { apagarAviso, marcarAvisosVistos, publicarAviso, useAvisosNovos, useAvisosStore, type Aviso } from '../lib/avisos'
+import { formatDateTime, formatDayLabel, formatRelative, periodoLabel } from '../lib/dates'
 import { PRIVACY_SHORTCUT, usePrivacy } from '../lib/privacy'
 import { buildTodayPlan } from '../lib/selectors'
 import { useTheme, type ThemePref } from '../lib/theme'
@@ -14,9 +33,9 @@ import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 import { Avatar } from './Avatar'
 import { EscolherPlano } from './Planos'
-import { Popover } from './ui'
+import { Button, Popover } from './ui'
 
-/** Login atual: o usuário (ex.: "ana.web") ou o e-mail; `null` no modo local. */
+/** Login atual: o usuário (ex.: "flaviosites") ou o e-mail; `null` no modo local. */
 function useLogin(): string | null {
   const [login, setLogin] = useState<string | null>(null)
   useEffect(() => {
@@ -60,6 +79,7 @@ function PrivacyToggle() {
   )
 }
 
+/** Sininho: avisos da XS (do dono para todas as contas) + retornos e reuniões de hoje. */
 function NotificationBell() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLButtonElement>(null)
@@ -71,30 +91,80 @@ function NotificationBell() {
   const index = useIndex()
   const today = useToday()
   const navigate = useNavigate()
+  const admin = useIsAdmin()
+  const avisos = useAvisosStore((s) => s.lista)
+  const novos = useAvisosNovos()
+  const abrirSino = useAvisosStore((s) => s.abrirSino)
+  // Avisos que eram novos quando o sininho abriu: continuam marcados até ele fechar
+  const [destaque, setDestaque] = useState<Set<string>>(new Set())
+  const [escrevendo, setEscrevendo] = useState(false)
   const plan = useMemo(() => buildTodayPlan(leads, interactions, index, meetings, today, max), [leads, interactions, index, meetings, today, max])
-  const count = plan.followups.length + plan.reunioesHoje.length
+  const hoje = plan.followups.length + plan.reunioesHoje.length
   const atrasados = plan.followups.filter((f) => f.atrasado).length
+  const count = novos.length + hoje
+
+  const abrir = () => {
+    setDestaque(new Set(novos.map((a) => a.id)))
+    setOpen(true)
+    void marcarAvisosVistos()
+  }
+
+  // Botão "Ver" do aviso na tela
+  useEffect(() => {
+    if (abrirSino) abrir()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirSino])
 
   return (
     <>
       <button
         ref={ref}
-        onClick={() => setOpen((o) => !o)}
-        className="relative inline-flex size-10 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 transition-colors hover:bg-hover hover:text-fg"
-        aria-label={`Avisos: ${count} para hoje`}
-        title="Retornos e reuniões de hoje"
+        onClick={() => (open ? setOpen(false) : abrir())}
+        className={clsx(
+          'relative inline-flex size-10 items-center justify-center rounded-xl border transition-colors',
+          novos.length ? 'border-gold/40 bg-gold/10 text-gold hover:bg-gold/15' : 'border-line bg-panel text-fg-2 hover:bg-hover hover:text-fg',
+        )}
+        aria-label={novos.length ? `Notificações: ${novos.length} ${novos.length === 1 ? 'aviso novo' : 'avisos novos'}` : `Notificações: ${hoje} para hoje`}
+        title={novos.length ? `${novos.length === 1 ? 'Aviso novo' : `${novos.length} avisos novos`} da XS` : 'Notificações'}
       >
         <Bell className="size-[18px]" strokeWidth={1.75} />
         {count > 0 && (
-          <span className={clsx('num absolute -top-1 -right-1 min-w-[18px] rounded-full px-1 text-center text-[10px] leading-[18px] font-semibold text-ink', atrasados ? 'bg-orange-400' : 'bg-sky-400')}>
-            {count}
+          <span
+            className={clsx(
+              'num absolute -top-1 -right-1 min-w-[18px] rounded-full px-1 text-center text-[10px] leading-[18px] font-semibold',
+              novos.length ? 'bg-gold text-on-gold' : atrasados ? 'bg-orange-400 text-ink' : 'bg-sky-400 text-ink',
+            )}
+          >
+            {count > 9 ? '9+' : count}
           </span>
         )}
       </button>
-      <Popover anchor={ref.current} open={open} onClose={() => setOpen(false)} width={320} align="end">
+      <Popover anchor={ref.current} open={open} onClose={() => setOpen(false)} width={340} align="end">
         <div className="p-2">
-          <p className="px-1 pb-2 text-xs font-semibold text-fg">Para hoje</p>
-          {count === 0 && <p className="px-1 pb-2 text-xs text-fg-3">Nenhum retorno ou reunião para hoje.</p>}
+          <div className="flex items-center justify-between gap-2 px-1 pb-2">
+            <p className="text-xs font-semibold text-fg">Notificações</p>
+            {admin && !escrevendo && (
+              <button onClick={() => setEscrevendo(true)} className="inline-flex h-7 items-center gap-1.5 rounded-md bg-gold/10 px-2 text-2xs font-semibold text-gold hover:bg-gold/15">
+                <Megaphone className="size-3.5" /> Enviar aviso
+              </button>
+            )}
+          </div>
+
+          {admin && escrevendo && <NovoAviso onClose={() => setEscrevendo(false)} />}
+
+          {avisos.length > 0 && (
+            <div className="mb-2 border-b border-line-soft pb-2">
+              <p className="px-1 pb-1 text-2xs font-medium text-fg-3">Avisos da XS</p>
+              <ul className="space-y-1">
+                {avisos.slice(0, 5).map((a) => (
+                  <AvisoItem key={a.id} aviso={a} novo={destaque.has(a.id)} admin={admin} />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="px-1 pb-1 text-2xs font-medium text-fg-3">Para hoje</p>
+          {hoje === 0 && <p className="px-1 pb-2 text-xs text-fg-3">Nenhum retorno ou reunião para hoje.</p>}
           <ul className="space-y-0.5">
             {plan.reunioesHoje.map(({ lead, meeting }) => (
               <BellItem
@@ -147,6 +217,90 @@ function BellItem({ icon, title, detail, onClick }: { icon: ReactNode; title: st
         </span>
       </button>
     </li>
+  )
+}
+
+function AvisoItem({ aviso, novo, admin }: { aviso: Aviso; novo: boolean; admin: boolean }) {
+  const [apagando, setApagando] = useState(false)
+  const toast = useApp((s) => s.toast)
+  return (
+    <li className={clsx('rounded-md border px-2.5 py-2', novo ? 'border-gold/30 bg-gold/[0.06]' : 'border-transparent')}>
+      <div className="flex items-start gap-2">
+        <Megaphone className={clsx('mt-0.5 size-3.5 shrink-0', novo ? 'text-gold' : 'text-fg-3')} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="min-w-0 flex-1 text-xs font-semibold break-words text-fg">{aviso.titulo}</p>
+            {novo && <span className="shrink-0 rounded bg-gold px-1 py-px text-[9px] leading-3 font-bold text-on-gold uppercase">Novo</span>}
+          </div>
+          {aviso.texto && <p className="mt-0.5 text-2xs leading-4 break-words whitespace-pre-line text-fg-2">{aviso.texto}</p>}
+          <div className="mt-1.5 flex items-center gap-3">
+            <span className="text-[10px] text-fg-4">{formatRelative(aviso.criado_em)}</span>
+            {aviso.link && (
+              <a href={aviso.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-2xs font-medium text-blue-300 hover:text-blue-200">
+                Abrir link <ExternalLink className="size-3" />
+              </a>
+            )}
+            {admin && (
+              <button
+                disabled={apagando}
+                onClick={() => {
+                  if (!window.confirm('Apagar este aviso para todo mundo?')) return
+                  setApagando(true)
+                  apagarAviso(aviso.id)
+                    .then(() => toast('Aviso apagado.', 'info'))
+                    .catch((err: unknown) => {
+                      setApagando(false)
+                      toast(err instanceof Error ? err.message : 'Falha ao apagar.', 'error')
+                    })
+                }}
+                className="ml-auto inline-flex items-center gap-1 text-[10px] text-fg-4 hover:text-red-300 disabled:opacity-40"
+              >
+                <Trash2 className="size-3" /> Apagar
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+/** Só o dono da XS: escreve um aviso que vai para o sininho de todas as contas. */
+function NovoAviso({ onClose }: { onClose: () => void }) {
+  const [titulo, setTitulo] = useState('')
+  const [texto, setTexto] = useState('')
+  const [link, setLink] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const toast = useApp((s) => s.toast)
+
+  const enviar = async () => {
+    setEnviando(true)
+    try {
+      await publicarAviso(titulo, texto, link)
+      toast('Aviso enviado para todas as contas.')
+      onClose()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Falha ao enviar.', 'error')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="mb-2 space-y-2 rounded-md border border-gold/30 bg-ink p-2.5">
+      <p className="text-2xs font-medium text-gold">Aviso para todas as contas</p>
+      <input className="input" value={titulo} maxLength={120} onChange={(e) => setTitulo(e.target.value)} placeholder="Título (ex.: Novidade na busca)" autoFocus />
+      <textarea className="input" rows={4} value={texto} maxLength={2000} onChange={(e) => setTexto(e.target.value)} placeholder="Escreva o aviso…" />
+      <input className="input" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Link (opcional)" inputMode="url" />
+      <div className="flex justify-end gap-1.5">
+        <Button size="sm" variant="ghost" onClick={onClose} disabled={enviando}>
+          Cancelar
+        </Button>
+        <Button size="sm" variant="gold" icon={<Send className="size-3.5" />} loading={enviando} disabled={!titulo.trim()} onClick={() => void enviar()}>
+          Enviar para todos
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -263,7 +417,7 @@ function UserMenu({ compact }: { compact?: boolean }) {
             )}
             {supabase && (
               <button
-                onClick={() => supabase!.auth.signOut()}
+                onClick={() => supabase!.auth.signOut({ scope: 'local' })}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-bad/10 text-xs font-semibold text-red-300 transition-colors hover:bg-bad/20"
               >
                 <LogOut className="size-4" /> Sair
@@ -283,6 +437,9 @@ function PlanCard() {
   if (!plan) return null
   const vitalicio = profile?.plano === 'vitalicio'
   const perto = plan.dias !== null && plan.dias <= 3
+  // Plano pago: a SigiloPay cobra sozinha todo mês. O botão só aparece se faltar menos de 1 dia
+  // (a cobrança não passou), para ninguém assinar duas vezes.
+  const renovarAgora = profile?.plano === 'ativo' && !!plan.ate && Date.parse(plan.ate) - Date.now() < 86_400_000
   return (
     <div className="mt-3 rounded-lg border border-line-soft bg-ink px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
@@ -309,10 +466,13 @@ function PlanCard() {
       ) : (
         <p className="mt-1.5 text-xs text-fg-2">{vitalicio ? 'Não acaba, é para sempre' : 'Sem data para acabar'}</p>
       )}
-      {(profile?.plano === 'teste' || (profile?.plano === 'ativo' && plan.ate)) && (
+      {profile?.plano === 'ativo' && plan.ate && !renovarAgora && (
+        <p className="mt-2.5 border-t border-line-soft pt-2.5 text-2xs text-fg-3">Assinou pelo checkout? A cobrança renova sozinha todo mês.</p>
+      )}
+      {(profile?.plano === 'teste' || renovarAgora) && (
         <EscolherPlano
           size="sm"
-          titulo={<p className="mt-2.5 mb-1.5 border-t border-line-soft pt-2.5 text-2xs font-medium text-fg-3">{profile.plano === 'teste' ? 'Assinar pelo WhatsApp' : 'Renovar pelo WhatsApp'}</p>}
+          titulo={<p className="mt-2.5 mb-1.5 border-t border-line-soft pt-2.5 text-2xs font-medium text-fg-3">{profile?.plano === 'teste' ? 'Continuar depois do teste' : 'A cobrança do mês não chegou?'}</p>}
         />
       )}
     </div>

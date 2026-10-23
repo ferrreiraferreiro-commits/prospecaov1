@@ -28,17 +28,19 @@ const ANA = 'aaaaaaaa-0000-4000-8000-000000000001'
 const BRUNO = 'bbbbbbbb-0000-4000-8000-000000000002'
 const CARLA = 'cccccccc-0000-4000-8000-000000000003'
 const VENCIDA = 'dddddddd-0000-4000-8000-000000000004'
+const DAVI = 'eeeeeeee-0000-4000-8000-000000000005'
 
 const contas: Record<string, Conta> = {
-  'token-dono-aaaaaaaaaaaaaaaa': { id: DONO, usuario: 'gabriel', podeUsar: true },
+  'token-dono-aaaaaaaaaaaaaaaa': { id: DONO, usuario: 'gabriel', podeUsar: true, admin: true },
   'token-ana-aaaaaaaaaaaaaaaaa': { id: ANA, usuario: 'ana.web', podeUsar: true },
   'token-bruno-aaaaaaaaaaaaaaa': { id: BRUNO, usuario: 'bruno', podeUsar: true },
   'token-carla-aaaaaaaaaaaaaaa': { id: CARLA, usuario: 'carla', podeUsar: true },
   'token-vencida-aaaaaaaaaaaaa': { id: VENCIDA, usuario: 'vencida', podeUsar: false },
+  'token-davi-aaaaaaaaaaaaaaaa': { id: DAVI, usuario: 'davi', podeUsar: true },
 }
 
 /** Motores de mentira: cada um guarda o que recebeu, como o de verdade */
-type Recebido = { porta: number; method: string; url: string; body: string; origin?: string }
+type Recebido = { porta: number; method: string; url: string; body: string; origin?: string; auth?: string }
 const recebidos: Recebido[] = []
 let waStatus = 'disconnected'
 const motores = new Map<number, http.Server>()
@@ -47,10 +49,11 @@ function abrirMotor(porta: number): Promise<void> {
   const m = http.createServer(async (req, res) => {
     const chunks: Buffer[] = []
     for await (const c of req) chunks.push(c as Buffer)
-    recebidos.push({ porta, method: req.method!, url: req.url!, body: Buffer.concat(chunks).toString(), origin: req.headers.origin })
+    recebidos.push({ porta, method: req.method!, url: req.url!, body: Buffer.concat(chunks).toString(), origin: req.headers.origin, auth: req.headers.authorization })
+    if (req.url === '/mcp') return res.writeHead(req.headers.authorization === 'Bearer xs_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ? 200 : 401, { 'content-type': 'application/json' }).end('{"jsonrpc":"2.0"}')
     res.setHeader('Content-Type', 'application/json')
     if (req.url === '/health') return res.end(JSON.stringify({ ok: true, versao: '1.4.0', computador: 'vps-123', acordado: false, whatsapp: { status: waStatus, user: null } }))
-    if (req.url === '/whatsapp/status') return res.end(JSON.stringify({ status: waStatus, qrCodeUrl: null, user: null, lastError: 'connect ECONNREFUSED 127.0.0.1:443' }))
+    if (req.url === '/whatsapp/status') return res.end(JSON.stringify({ status: waStatus, qrCodeUrl: null, user: waStatus === 'connected' ? { id: '5543999129525:7@s.whatsapp.net', name: 'Ana' } : null, lastError: 'connect ECONNREFUSED 127.0.0.1:443' }))
     if (req.url === '/whatsapp/teste') return res.writeHead(400).end(JSON.stringify({ error: 'Este número não tem WhatsApp ativo.' }))
     res.end(JSON.stringify({ ok: true, porta }))
   })
@@ -143,6 +146,19 @@ test('sem login ou com login errado: 401, e nenhum motor é chamado', async () =
   assert.equal(recebidos.length, antes)
 })
 
+test('conector do Claude (/mcp): vai direto para o WhatsApp do dono, com a chave pessoal e sem login do Supabase', async () => {
+  const boa = await fetch(`${base}/mcp`, { method: 'POST', headers: { Authorization: 'Bearer xs_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' })
+  assert.equal(boa.status, 200)
+  assert.equal(await boa.text(), '{"jsonrpc":"2.0"}')
+  const r = recebidos.at(-1)!
+  assert.equal(r.url, '/mcp')
+  assert.equal(r.porta, portaPrincipal)
+  assert.equal(r.auth, 'Bearer xs_boa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+  assert.match(r.body, /tools\/list/)
+  const ruim = await fetch(`${base}/mcp`, { method: 'POST', headers: { Authorization: 'Bearer xs_errada', 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(ruim.status, 401)
+})
+
 test('origem estranha é recusada mesmo com login', async () => {
   assert.equal((await pedir('token-dono-aaaaaaaaaaaaaaaa', '/motor/health', { headers: { Origin: 'https://site-malicioso.com' } })).status, 403)
 })
@@ -178,9 +194,12 @@ test('cada conta tem o seu Motor: os pedidos da Ana nunca vão para o do Bruno n
   assert.equal(ligadosPeloControle.length, 2)
 })
 
-test('limite de Motores: a terceira conta continua no Motor do computador (403)', async () => {
+test('limite de Motores: sem vaga, o status mostra desconectado e conectar dá indisponível (403)', async () => {
   assert.equal((await pedir('token-carla-aaaaaaaaaaaaaaa', '/acesso')).status, 403)
-  assert.equal((await pedir('token-carla-aaaaaaaaaaaaaaa', '/motor/health')).status, 403)
+  const h = await pedir('token-carla-aaaaaaaaaaaaaaa', '/motor/health')
+  assert.equal(h.status, 200)
+  assert.equal(((await h.json()) as any).whatsapp.status, 'disconnected')
+  assert.equal((await pedir('token-carla-aaaaaaaaaaaaaaa', '/motor/whatsapp/conectar', { method: 'POST', body: '{}' })).status, 403)
 })
 
 test('plano vencido: não ganha WhatsApp na nuvem', async () => {
@@ -195,6 +214,17 @@ test('repassa método, caminho e corpo; não repassa a origem nem o token', asyn
   assert.equal(ultimo.url, '/agenda')
   assert.equal(ultimo.body, '{"texto":"oi"}')
   assert.equal(ultimo.origin, undefined)
+})
+
+test('Agente IA: só o WhatsApp do dono (sessão fixa) chega nas rotas /agente', async () => {
+  const dono = await pedir('token-dono-aaaaaaaaaaaaaaaa', '/motor/agente/estado')
+  assert.equal(dono.status, 200)
+  assert.equal(recebidos.at(-1)!.url, '/agente/estado')
+  assert.equal(recebidos.at(-1)!.porta, portaPrincipal)
+  const antes = recebidos.length
+  const ana = await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/motor/agente/estado')
+  assert.equal(ana.status, 404)
+  assert.equal(recebidos.length, antes)
 })
 
 test('status: erro técnico vira mensagem amigável; sessão salva aparece', async () => {
@@ -268,4 +298,52 @@ test('limparMensagem mantém textos normais (inclusive horários)', () => {
   assert.notEqual(limparMensagem('fetch failed: http://127.0.0.1:3077'), 'fetch failed: http://127.0.0.1:3077')
   assert.equal(limparMensagem(''), null)
   assert.deepEqual(ajustarResposta('/disparo/campanhas', [1, 2], principal), [1, 2])
+})
+
+test('painel: só o dono vê; mostra cada WhatsApp, o final do número e quem está com a XS aberta', async () => {
+  assert.equal((await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/painel')).status, 404)
+  waStatus = 'connected'
+  const r = await pedir('token-dono-aaaaaaaaaaaaaaaa', '/painel')
+  waStatus = 'disconnected'
+  assert.equal(r.status, 200)
+  const p = (await r.json()) as { sessoes: Record<string, any>[]; vistos: Record<string, string>; max: number }
+  const dono = p.sessoes.find((s) => s.sessao === 'principal')!
+  assert.equal(dono.fixa, true)
+  assert.equal(dono.usuario, 'gabriel')
+  assert.equal(dono.estado, 'connected')
+  assert.equal(dono.final, '9525')
+  const ana = p.sessoes.find((s) => s.conta === ANA)!
+  assert.ok(ana && !ana.fixa)
+  assert.ok(p.vistos[ANA] && p.vistos[DONO])
+  assert.equal(p.vistos[VENCIDA] !== undefined, true) // entrou, mesmo sem WhatsApp na nuvem
+  for (const s of p.sessoes) assert.ok(!('motor' in s) && !('dados' in s), 'nada de porta ou pasta')
+})
+
+test('só conectar liga o Motor; olhar o status não liga; desconectar desliga na hora', async () => {
+  configurar({ max: 5 })
+  const ligadosAntes = ligadosPeloControle.length
+  const h = (await (await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/health')).json()) as Record<string, any>
+  assert.equal(h.whatsapp.status, 'disconnected')
+  const st = (await (await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/status')).json()) as Record<string, any>
+  assert.equal(st.status, 'disconnected')
+  assert.equal(ligadosPeloControle.length, ligadosAntes, 'status não liga o Motor')
+
+  assert.equal((await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/conectar', { method: 'POST', body: '{}' })).status, 200)
+  assert.equal(ligadosPeloControle.length, ligadosAntes + 1)
+  const reg = JSON.parse(fs.readFileSync(path.join(dados, 'sessoes.json'), 'utf8')) as Record<string, { nome: string; porta: number }>
+  const davi: Sessao = { nome: reg[DAVI].nome, motor: `http://127.0.0.1:${reg[DAVI].porta}`, dados: path.join(dados, reg[DAVI].nome), fixa: false }
+
+  // O /health que o app confere sozinho não segura o Motor ligado
+  await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/health')
+  assert.equal(await vigiar(davi, Date.now() + 6 * 60_000), 'desligar')
+  assert.equal(desligadosPeloControle.at(-1), davi.nome)
+
+  // Liga de novo, desconecta: desliga na hora
+  await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/conectar', { method: 'POST', body: '{}' })
+  const desligadosAntes = desligadosPeloControle.length
+  assert.equal((await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/desconectar', { method: 'POST', body: '{}' })).status, 200)
+  assert.equal(desligadosPeloControle.length, desligadosAntes + 1)
+  const depois = (await (await pedir('token-davi-aaaaaaaaaaaaaaaa', '/motor/whatsapp/status')).json()) as Record<string, any>
+  assert.equal(depois.status, 'disconnected')
+  configurar({ max: 2 })
 })

@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { BadgeDollarSign, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Trash2, Users } from 'lucide-react'
+import { BadgeDollarSign, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Smartphone, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, NumberInput, SearchInput, Stat } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
@@ -30,10 +30,21 @@ import { formatDateKey, formatDateTime, formatRelative, toDateKey } from '../lib
 import { formatMoney } from '../lib/insights'
 import { salvarSuporteWhatsApp, useSuporteWhatsApp } from '../lib/suporte'
 import { linkComunidadeValido, salvarComunidade, useComunidade } from '../lib/comunidade'
+import { painelWhatsApp, type PainelWhatsApp } from '../lib/waServico'
+import {
+  checkoutValido,
+  pagamentosSemConta,
+  salvarAssinatura,
+  salvarTokenSigilo,
+  statusSigilo,
+  useAssinatura,
+  type PagamentoSemConta,
+  type SigiloStatus,
+} from '../lib/assinatura'
 import { planInfo, type Profile } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
-type Filtro = 'todas' | 'teste' | 'pagantes' | 'vitalicio' | 'bloqueadas'
+type Filtro = 'todas' | 'online' | 'teste' | 'pagantes' | 'vitalicio' | 'bloqueadas'
 
 const DIA = 86_400_000
 
@@ -52,6 +63,47 @@ function nomeDe(c: Conta): string {
   return c.nome || c.usuario || loginDe(c.email)
 }
 
+type LinhaWa = PainelWhatsApp['sessoes'][number]
+
+/** Online = o app falou com o WhatsApp da XS há menos disso (ele confere a cada 5 min com a aba aberta). */
+const ONLINE_MS = 6 * 60_000
+
+/** O WhatsApp de cada conta, lido do servidor a cada 1 min enquanto a aba está visível. */
+function usePainelWhatsApp() {
+  const [painel, setPainel] = useState<PainelWhatsApp | null>(null)
+  const [falhou, setFalhou] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    const ler = () =>
+      painelWhatsApp().then(
+        (p) => {
+          if (!vivo) return
+          setPainel(p)
+          setFalhou(false)
+        },
+        () => vivo && setFalhou(true),
+      )
+    void ler()
+    const id = setInterval(() => document.visibilityState === 'visible' && void ler(), 60_000)
+    return () => {
+      vivo = false
+      clearInterval(id)
+    }
+  }, [])
+  return { painel, falhou }
+}
+
+/** Sessão de WhatsApp da conta: a automática (pelo id) ou a fixa do dono (pelo usuário de login). */
+function linhaDa(c: Conta, p: PainelWhatsApp | null): LinhaWa | null {
+  if (!p) return null
+  return p.sessoes.find((s) => s.conta === c.user_id) ?? p.sessoes.find((s) => !!s.usuario && s.usuario === c.usuario?.toLowerCase()) ?? null
+}
+
+function estaOnline(c: Conta, p: PainelWhatsApp | null, now: number): boolean {
+  const v = p?.vistos[c.user_id]
+  return !!v && now - Date.parse(v) < ONLINE_MS
+}
+
 export function ContasPage() {
   const [contas, setContas] = useState<Conta[] | null>(null)
   const [pagamentos, setPagamentos] = useState<PagamentoXs[]>([])
@@ -60,6 +112,7 @@ export function ContasPage() {
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [editando, setEditando] = useState<string | null>(null)
   const [eu, setEu] = useState<string | null>(null)
+  const { painel, falhou } = usePainelWhatsApp()
 
   const carregar = useCallback(async () => {
     if (!supabase) return
@@ -102,13 +155,14 @@ export function ContasPage() {
     const q = busca.trim().toLowerCase()
     return (contas ?? []).filter((c) => {
       if (q && ![c.nome, c.usuario, c.email, c.cidade].some((v) => v?.toLowerCase().includes(q))) return false
+      if (filtro === 'online') return estaOnline(c, painel, now)
       if (filtro === 'teste') return c.plano === 'teste' && !vencida(c, now)
       if (filtro === 'pagantes') return c.plano === 'ativo' && !vencida(c, now)
       if (filtro === 'vitalicio') return c.plano === 'vitalicio'
       if (filtro === 'bloqueadas') return c.plano === 'cancelado' || vencida(c, now)
       return true
     })
-  }, [contas, busca, filtro, now])
+  }, [contas, busca, filtro, now, painel])
 
   const contaAberta = contas?.find((c) => c.user_id === editando) ?? null
 
@@ -125,6 +179,9 @@ export function ContasPage() {
 
   const mesAtual = recebidoNoMes(pagamentos)
   const totalGeral = pagamentos.reduce((s, p) => s + p.valor, 0)
+  const onlineAgora = (contas ?? []).filter((c) => estaOnline(c, painel, now)).length
+  /** Sessões fixas (a do dono) ficam sempre ligadas e não contam no limite das automáticas */
+  const fixasWa = painel?.sessoes.filter((s) => s.fixa).length ?? 0
 
   return (
     <div className="space-y-4">
@@ -153,6 +210,7 @@ export function ContasPage() {
             onChange={setFiltro}
             options={[
               { id: 'todas', label: 'Todas' },
+              { id: 'online', label: painel ? `Online (${onlineAgora})` : 'Online' },
               { id: 'teste', label: 'Teste' },
               { id: 'pagantes', label: 'Pagantes' },
               { id: 'vitalicio', label: 'Vitalício' },
@@ -160,6 +218,26 @@ export function ContasPage() {
             ]}
           />
           <SearchInput value={busca} onChange={setBusca} placeholder="Buscar nome, e-mail, cidade…" className="w-full sm:ml-auto sm:w-64" />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line-soft px-4 py-2 text-2xs text-fg-3">
+          <span className="inline-flex items-center gap-1.5 font-medium text-fg-2">
+            <Smartphone className="size-3.5" aria-hidden /> WhatsApp
+          </span>
+          {!painel ? (
+            <span className={falhou ? 'text-orange-300' : undefined}>{falhou ? 'Não deu para ler o WhatsApp das contas agora. Tentando de novo…' : 'Carregando…'}</span>
+          ) : (
+            <>
+              <span>
+                <b className="num font-semibold text-fg">{onlineAgora}</b> online (últimos 5 min)
+              </span>
+              <span>
+                <b className="num font-semibold text-fg">{painel.sessoes.filter((s) => s.estado === 'connected').length}</b> conectado(s)
+              </span>
+              <span>
+                <b className="num font-semibold text-fg">{painel.ligados + fixasWa}</b> de {painel.max + fixasWa} vagas em uso
+              </span>
+            </>
+          )}
         </div>
 
         {erro ? (
@@ -172,21 +250,32 @@ export function ContasPage() {
           <p className="px-4 py-10 text-center text-xs text-fg-3">Nenhuma conta aqui.</p>
         ) : (
           <ul className="divide-y divide-line-soft">
-            <li className="hidden grid-cols-[minmax(0,1.6fr)_120px_minmax(0,1.3fr)_100px_110px_auto] gap-4 px-4 py-2 text-2xs font-medium text-fg-4 md:grid">
+            <li className="hidden grid-cols-[minmax(0,1.6fr)_110px_130px_minmax(0,1.3fr)_100px_110px_auto] gap-4 px-4 py-2 text-2xs font-medium text-fg-4 md:grid">
               <span>Conta</span>
               <span>Plano</span>
+              <span>WhatsApp</span>
               <span>Acaba em</span>
               <span className="text-right">Já pagou</span>
               <span>Último acesso</span>
               <span className="w-[92px]" />
             </li>
             {visiveis.map((c) => (
-              <ContaRow key={c.user_id} conta={c} now={now} pago={totalPorConta.get(c.user_id) ?? 0} onEditar={() => setEditando(c.user_id)} />
+              <ContaRow
+                key={c.user_id}
+                conta={c}
+                now={now}
+                pago={totalPorConta.get(c.user_id) ?? 0}
+                wa={painel ? linhaDa(c, painel) : undefined}
+                online={estaOnline(c, painel, now)}
+                visto={painel?.vistos[c.user_id] ?? null}
+                onEditar={() => setEditando(c.user_id)}
+              />
             ))}
           </ul>
         )}
       </Card>
 
+      <SigiloPayCard />
       <SuporteCard />
       <ComunidadeCard />
 
@@ -239,12 +328,57 @@ function FimLabel({ conta, now }: { conta: Conta; now: number }) {
   )
 }
 
-function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; pago: number; onEditar: () => void }) {
-  const legacy = isLegacyEmail(conta.email)
+/** O WhatsApp da conta. undefined = ainda não leu o servidor; null = a conta não tem WhatsApp ligado na XS. */
+function WhatsAppCell({ wa }: { wa: LinhaWa | null | undefined }) {
+  if (wa === undefined) return <span className="text-2xs text-fg-4">—</span>
+  const [texto, tone] = !wa
+    ? ['Nunca ligou', 'text-fg-4']
+    : wa.estado === 'connected'
+      ? ['Conectado', 'text-emerald-300']
+      : wa.estado === 'qrcode' || (wa.estado === 'connecting' && !wa.sessaoSalva)
+        ? ['Lendo QR Code', 'text-amber-200']
+        : wa.estado === 'connecting'
+          ? ['Reconectando', 'text-amber-200']
+          : wa.estado === 'disconnected'
+            ? ['Desconectado', 'text-fg-3']
+            : wa.estado === 'fora'
+              ? ['Fora do ar', 'text-red-300']
+              : ['Desligado', 'text-fg-4']
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-xs md:grid-cols-[minmax(0,1.6fr)_120px_minmax(0,1.3fr)_100px_110px_auto]">
+    <span className="min-w-0 text-2xs">
+      <span className={clsx('inline-flex items-center gap-1.5 font-medium', tone)}>
+        <span className={clsx('size-1.5 shrink-0 rounded-full bg-current', !wa || wa.estado === 'desligado' ? 'opacity-40' : undefined)} aria-hidden />
+        {texto}
+      </span>
+      {wa?.final && <span className="pv num block text-fg-4">final {wa.final}</span>}
+    </span>
+  )
+}
+
+function ContaRow({
+  conta,
+  now,
+  pago,
+  wa,
+  online,
+  visto,
+  onEditar,
+}: {
+  conta: Conta
+  now: number
+  pago: number
+  wa: LinhaWa | null | undefined
+  online: boolean
+  visto: string | null
+  onEditar: () => void
+}) {
+  const legacy = isLegacyEmail(conta.email)
+  const ultimo = visto && (!conta.ultimo_acesso || Date.parse(visto) > Date.parse(conta.ultimo_acesso)) ? visto : conta.ultimo_acesso
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-xs md:grid-cols-[minmax(0,1.6fr)_110px_130px_minmax(0,1.3fr)_100px_110px_auto]">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate font-medium text-fg">
+          {online && <span className="size-2 shrink-0 rounded-full bg-go" title="Usou a XS nos últimos 5 minutos" aria-label="Online agora" />}
           <span className="pv truncate">{nomeDe(conta)}</span>
           {conta.admin && <ShieldCheck className="size-3.5 shrink-0 text-blue-300" aria-label="Dono" />}
         </p>
@@ -257,13 +391,18 @@ function ContaRow({ conta, now, pago, onEditar }: { conta: Conta; now: number; p
         <PlanoBadge conta={conta} now={now} />
       </div>
       <div className="col-span-2 md:col-span-1">
+        <WhatsAppCell wa={wa} />
+      </div>
+      <div className="col-span-2 md:col-span-1">
         <FimLabel conta={conta} now={now} />
       </div>
       <div className={clsx('pv num md:text-right', pago ? 'text-fg' : 'text-fg-4')}>
         <span className="text-2xs text-fg-4 md:hidden">Já pagou </span>
         {formatMoney(pago)}
       </div>
-      <div className="text-2xs text-fg-3">{conta.ultimo_acesso ? formatRelative(conta.ultimo_acesso) : 'Nunca entrou'}</div>
+      <div className="text-2xs text-fg-3">
+        {online ? <span className="font-medium text-emerald-300">Online agora</span> : ultimo ? formatRelative(ultimo) : 'Nunca entrou'}
+      </div>
       <Button size="sm" onClick={onEditar} className="col-span-2 w-full justify-self-end md:col-span-1 md:w-[92px]">
         Gerenciar
       </Button>
@@ -590,6 +729,168 @@ function AcessoAba({ conta, onMudou }: { conta: Conta; onMudou: () => void }) {
   )
 }
 
+/** Endereço público da XS (no localhost, o do site no ar: é ele que vai no painel da SigiloPay). */
+function enderecoXs(): string {
+  const o = window.location.origin
+  return /localhost|127\.0\.0\.1/.test(o) ? 'https://xs-prospeccao.vercel.app' : o
+}
+
+function Copiavel({ label, valor }: { label: string; valor: string }) {
+  const toast = useApp((s) => s.toast)
+  const [copiado, setCopiado] = useState(false)
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(valor)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 1500)
+    } catch {
+      toast('Não deu para copiar. Selecione o texto e copie.', 'error')
+    }
+  }
+  return (
+    <div>
+      <p className="label">{label}</p>
+      <div className="flex max-w-xl items-center gap-2">
+        <code className="input flex items-center truncate text-xs select-all">{valor}</code>
+        <Button size="sm" icon={copiado ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} onClick={() => void copiar()}>
+          {copiado ? 'Copiado' : 'Copiar'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** Venda do plano Mensal pela SigiloPay: checkout, preço, token do webhook e pagamentos sem conta. */
+function SigiloPayCard() {
+  const toast = useApp((s) => s.toast)
+  const atual = useAssinatura()
+  const [checkout, setCheckout] = useState('')
+  const [preco, setPreco] = useState<number | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  const [token, setToken] = useState('')
+  const [salvandoToken, setSalvandoToken] = useState(false)
+  const [status, setStatus] = useState<SigiloStatus | null>(null)
+  const [semConta, setSemConta] = useState<PagamentoSemConta[]>([])
+
+  useEffect(() => setCheckout(atual.checkout ?? ''), [atual.checkout])
+  useEffect(() => setPreco(atual.preco), [atual.preco])
+
+  const recarregar = useCallback(async () => {
+    try {
+      const [s, p] = await Promise.all([statusSigilo(), pagamentosSemConta()])
+      setStatus(s)
+      setSemConta(p)
+    } catch {
+      /* migração ainda não aplicada: o cartão continua usável */
+    }
+  }, [])
+  useEffect(() => {
+    void recarregar()
+  }, [recarregar])
+
+  const linkInvalido = !!checkout.trim() && !checkoutValido(checkout)
+  const mudou = (checkout.trim() || null) !== atual.checkout || preco !== atual.preco
+
+  const salvar = async () => {
+    setSalvando(true)
+    try {
+      await salvarAssinatura(checkout, preco)
+      toast(checkout.trim() ? 'Checkout salvo. Os botões de assinar já levam para ele.' : 'Checkout removido. Os botões voltam para o WhatsApp.')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não foi possível salvar.', 'error')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const salvarToken = async () => {
+    setSalvandoToken(true)
+    try {
+      await salvarTokenSigilo(token)
+      setToken('')
+      toast('Token salvo. A XS já aceita os avisos de pagamento.')
+      await recarregar()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não foi possível salvar.', 'error')
+    } finally {
+      setSalvandoToken(false)
+    }
+  }
+
+  const base = enderecoXs()
+  return (
+    <Card
+      title="Vendas pela SigiloPay"
+      description="Plano Mensal: a pessoa paga no checkout e a conta vira Mensal sozinha (+1 mês a cada cobrança). Reembolso ou contestação tiram o mês de volta."
+    >
+      <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Copiavel label="Página de vendas (cole no produto, na SigiloPay)" valor={`${base}/assinar`} />
+          <Copiavel label="URL do webhook (Configurações → Webhooks)" valor={`${base}/api/sigilopay`} />
+        </div>
+
+        <div>
+          <p className="label">Token de validação do webhook</p>
+          <div className="flex max-w-xl gap-2">
+            <input
+              className="input"
+              type="password"
+              autoComplete="off"
+              placeholder={status?.token_salvo ? 'Já salvo. Cole outro para trocar' : 'Cole o token que a SigiloPay mostra no webhook'}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <Button variant="primary" loading={salvandoToken} disabled={!token.trim()} onClick={() => void salvarToken()}>
+              Salvar
+            </Button>
+          </div>
+          <p className={clsx('mt-1 text-2xs', status?.token_salvo ? 'text-go' : 'text-amber-200')}>
+            {status?.token_salvo ? 'Token salvo.' : 'Sem token, a XS recusa todos os avisos de pagamento.'}
+            {status?.ultimo_aviso && <span className="text-fg-3"> Último aviso recebido {formatRelative(status.ultimo_aviso)}.</span>}
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+          <div>
+            <p className="label">Link do checkout (oferta mensal)</p>
+            <input className="input" inputMode="url" placeholder="https://…" value={checkout} onChange={(e) => setCheckout(e.target.value)} />
+            {linkInvalido && <p className="mt-1 text-2xs text-red-300">Cole o link completo, começando com https://</p>}
+          </div>
+          <div>
+            <p className="label">Preço por mês</p>
+            <NumberInput value={preco} onChange={setPreco} prefix="R$" min={0} step={0.01} placeholder="0,00" />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="primary" loading={salvando} disabled={linkInvalido || !mudou} onClick={() => void salvar()}>
+            Salvar checkout e preço
+          </Button>
+          <p className="text-2xs text-fg-4">O preço é só o que aparece nos botões; quem cobra é a SigiloPay.</p>
+        </div>
+
+        {semConta.length > 0 && (
+          <div className="border-t border-line-soft pt-4">
+            <p className="label">Pagaram, mas não têm conta com esse e-mail</p>
+            <p className="mb-2 text-2xs text-fg-3">
+              Entra sozinho quando a pessoa criar a conta com esse e-mail. Se ela já tem conta com outro e-mail, troque o e-mail dela ou libere o plano à mão aqui em cima.
+            </p>
+            <ul className="divide-y divide-line-soft rounded-lg border border-line-soft">
+              {semConta.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs">
+                  <span className="pv min-w-0 flex-1 truncate text-fg">{p.nome || 'Sem nome'}</span>
+                  <span className="pv text-fg-2">{p.email || 'Sem e-mail'}</span>
+                  {p.valor != null && <span className="num pv text-fg-2">{formatMoney(p.valor)}</span>}
+                  <span className="num text-fg-3">{formatDateTime(p.recebido_em)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 function SuporteCard() {
   const toast = useApp((s) => s.toast)
   const atual = useSuporteWhatsApp()
@@ -610,7 +911,7 @@ function SuporteCard() {
   }
 
   return (
-    <Card title="Seu WhatsApp para renovações" description="Aparece no aviso de plano acabando e na tela de plano vencido, com o botão “Renovar pelo WhatsApp”.">
+    <Card title="Seu WhatsApp de atendimento" description="Para contas pausadas falarem com você. Enquanto o checkout da SigiloPay não estiver salvo, o botão de assinar também abre este WhatsApp.">
       <div className="flex max-w-md gap-2">
         <input className="input num" inputMode="tel" placeholder="(43) 91234-5678" value={numero} onChange={(e) => setNumero(e.target.value)} />
         <Button variant="primary" loading={salvando} disabled={(numero.trim() || null) === atual} onClick={() => void salvar()}>

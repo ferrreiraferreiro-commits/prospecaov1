@@ -1,6 +1,8 @@
 import clsx from 'clsx'
-import { useState, type FormEvent } from 'react'
+import { ExternalLink, PlayCircle } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { CANAL_TUTORIAIS } from '../lib/tutoriais'
 import { useAccount } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark } from './Brand'
@@ -34,6 +36,7 @@ export function Welcome() {
   const [cidade, setCidade] = useState('')
   const [meta, setMeta] = useState(settings.meta_diaria || 30)
   const [saving, setSaving] = useState(false)
+  const [etapa, setEtapa] = useState<'ola' | 'canal' | 'form'>('ola')
 
   if (!profile || profile.boas_vindas_feitas) return null
 
@@ -57,6 +60,14 @@ export function Welcome() {
       setSaving(false)
     }
   }
+
+  if (etapa !== 'form')
+    return createPortal(
+      <div className="anim-fade fixed inset-0 z-[60] overflow-y-auto bg-black/80 backdrop-blur-sm">
+        <Intro nome={profile.nome?.trim().split(/\s+/)[0] ?? ''} canal={etapa === 'canal'} onCanal={() => setEtapa('canal')} onContinuar={() => setEtapa('form')} />
+      </div>,
+      document.body,
+    )
 
   return createPortal(
     <div className="anim-fade fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
@@ -148,5 +159,106 @@ export function Welcome() {
       </form>
     </div>,
     document.body,
+  )
+}
+
+/** Quanto tempo o "Olá" fica sozinho no meio da tela antes de subir */
+const OLA_MS = 2600
+
+/**
+ * Abertura do primeiro acesso: "Olá, seja bem-vindo" no meio da tela; depois o texto sobe e aparece o
+ * canal de tutoriais. Clicar em qualquer lugar adianta.
+ */
+function Intro({ nome, canal, onCanal, onContinuar }: { nome: string; canal: boolean; onCanal: () => void; onContinuar: () => void }) {
+  const cartao = useRef<HTMLDivElement>(null)
+  const continuar = useRef<HTMLButtonElement>(null)
+  const avancar = useRef(onCanal)
+  avancar.current = onCanal
+  // Enquanto o cartão está escondido, o "Olá" desce metade da altura dele para ficar no meio da tela
+  const [desce, setDesce] = useState(0)
+
+  useLayoutEffect(() => {
+    setDesce((cartao.current?.offsetHeight ?? 0) / 2 + 20)
+  }, [])
+
+  useEffect(() => {
+    if (canal) {
+      const t = setTimeout(() => continuar.current?.focus({ preventScroll: true }), 700)
+      return () => clearTimeout(t)
+    }
+    const t = setTimeout(() => avancar.current(), OLA_MS)
+    return () => clearTimeout(t)
+  }, [canal])
+
+  const atraso = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
+  const palavras = ['Olá,', nome ? `${nome}!` : 'tudo bem?']
+
+  return (
+    <div
+      role="dialog"
+      aria-modal
+      aria-labelledby="bv-ola"
+      onClick={() => !canal && onCanal()}
+      className="flex min-h-full flex-col items-center justify-center gap-10 px-4 py-10"
+    >
+      <div
+        className="flex flex-col items-center text-center"
+        style={{
+          transform: canal ? 'translateY(0) scale(0.86)' : `translateY(${desce}px)`,
+          transition: 'transform 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <span className="land-in" style={atraso(0)}>
+          <LogoMark size={64} />
+        </span>
+        <h1 id="bv-ola" className="mt-6 text-4xl leading-tight font-semibold tracking-[-0.03em] text-fg sm:text-5xl">
+          {palavras.map((p, i) => (
+            <span key={i} className="land-in inline-block pv" style={atraso(250 + i * 220)}>
+              {p}
+              {i < palavras.length - 1 && ' '}
+            </span>
+          ))}
+        </h1>
+        <p className="land-in mt-3 text-base text-fg-2 sm:text-lg" style={atraso(800)}>
+          Seja bem-vindo à XS Prospecção
+        </p>
+      </div>
+
+      <div
+        ref={cartao}
+        aria-hidden={!canal}
+        className={clsx(
+          'w-full max-w-md rounded-2xl border border-line bg-panel px-6 py-6 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.8)] transition-[opacity,transform,visibility] duration-700 ease-out',
+          canal ? 'visible translate-y-0 opacity-100 delay-200' : 'invisible translate-y-4 opacity-0',
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-red-500/10 text-red-400">
+            <PlayCircle className="size-5" strokeWidth={1.75} />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-fg">Canal de tutoriais</h2>
+            <p className="mt-1 text-xs leading-5 text-fg-3">
+              Vídeos no YouTube mostrando, passo a passo, como usar cada parte da XS. Ficou com dúvida? A resposta está lá.
+            </p>
+          </div>
+        </div>
+        <a
+          href={CANAL_TUTORIAIS}
+          target="_blank"
+          rel="noreferrer"
+          tabIndex={canal ? 0 : -1}
+          className="mt-5 flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-raised text-xs font-medium text-fg transition-colors hover:border-line-strong"
+        >
+          <PlayCircle className="size-4 text-red-400" strokeWidth={1.75} />
+          Abrir o canal no YouTube
+          <ExternalLink className="size-3.5 text-fg-4" />
+        </a>
+        <Button ref={continuar} variant="primary" size="lg" className="mt-2 w-full" tabIndex={canal ? 0 : -1} onClick={onContinuar}>
+          Continuar
+        </Button>
+        <p className="mt-3 text-center text-2xs text-fg-4">O canal também fica no menu, em Tutoriais.</p>
+      </div>
+    </div>
   )
 }

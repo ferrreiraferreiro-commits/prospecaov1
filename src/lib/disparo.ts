@@ -41,7 +41,7 @@ export interface CampaignRecipient {
   status: RecipientStatus
   enviadas: number
   erro: string | null
-  respostas: { em: string; texto: string }[]
+  respostas: { em: string; texto: string; auto?: boolean }[]
   processadoEm: string | null
   sincEnvio: boolean
   sincRespostas: number
@@ -95,7 +95,7 @@ export function phoneKeyBr(phone: string): string {
 export function buildCampaignPayload(funnel: Funnel, leads: Lead[], settings: Settings) {
   const etapas = funnel.etapas
     .filter((s) => (s.tipo === 'mensagem' ? s.variacoes.some((v) => v.trim()) : true))
-    .map((s) => (s.tipo === 'mensagem' ? { tipo: 'mensagem' as const } : { tipo: 'espera' as const, ms: stepDelayMs(s) }))
+    .map((s) => (s.tipo === 'mensagem' ? { tipo: 'mensagem' as const } : { tipo: 'espera' as const, ms: stepDelayMs(s), ...(s.ateResposta ? { ateResposta: true } : {}) }))
   const msgSteps = funnel.etapas.filter((s): s is Extract<typeof s, { tipo: 'mensagem' }> => s.tipo === 'mensagem' && s.variacoes.some((v) => v.trim()))
   const destinatarios = leads.map((lead, i) => ({
     leadId: lead.id,
@@ -128,7 +128,8 @@ export async function syncCampaigns(): Promise<number> {
       if (exists.has(r.leadId)) {
         if (precisaEnvio && r.enviadas > 0) await app.logMessage(r.leadId, r.textos.join('\n\n').replace(/\{\s*saudacao\s*\}/gi, saudacao(new Date(r.processadoEm!))), `Disparo: ${detail.nome}`)
         if (precisaEnvio && r.status === 'falhou') await app.addNote(r.leadId, `Disparo "${detail.nome}" não enviado: ${r.erro ?? 'falha no envio'}`)
-        for (const resp of novasRespostas) await app.addNote(r.leadId, `Respondeu no WhatsApp (${new Date(resp.em).toLocaleString('pt-BR')}): "${resp.texto}"`)
+        for (const resp of novasRespostas)
+          await app.addNote(r.leadId, `${resp.auto ? 'Resposta automática do WhatsApp dele' : 'Respondeu no WhatsApp'} (${new Date(resp.em).toLocaleString('pt-BR')}): "${resp.texto}"`)
       }
       itens.push({ id: r.id, envio: precisaEnvio || r.sincEnvio, respostas: r.respostas.length })
       total++
@@ -138,9 +139,15 @@ export async function syncCampaigns(): Promise<number> {
   return total
 }
 
-/** Sincroniza em segundo plano enquanto o WhatsApp da XS responde (a cada 20 s). */
+/**
+ * Sincroniza em segundo plano (a cada 1 min) só enquanto há WhatsApp conectado ou algo na fila: sem isso
+ * o próprio pedido ligaria o WhatsApp da conta na nuvem e ocuparia uma vaga à toa.
+ */
 export function useDisparoSync() {
-  const online = useWaServico((s) => s.online)
+  const online = useWaServico((s) => {
+    const h = s.online ? s.health : null
+    return !!h && (h.whatsapp.status === 'connected' || h.disparo.running > 0 || (h.agenda?.pendentes ?? 0) > 0)
+  })
   useEffect(() => {
     if (!online) return
     let busy = false
@@ -157,7 +164,7 @@ export function useDisparoSync() {
       }
     }
     void tick()
-    const id = setInterval(() => void tick(), 20_000)
+    const id = setInterval(() => void tick(), 60_000)
     return () => clearInterval(id)
   }, [online])
 }

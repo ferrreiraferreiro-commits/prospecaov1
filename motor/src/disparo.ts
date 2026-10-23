@@ -6,10 +6,12 @@
  * estado fica em motor/storage/*.json — os leads continuam no XS Prospecção.
  */
 import { randomInt, randomUUID } from 'node:crypto'
+import { pareceAutomatica, pediuParaParar, recusou } from './agente/regras.js'
 import { readJson, writeJson } from './store.js'
-import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, receiptOf, samePhone, waEvents, withTimeout, type ReceiptStatus } from './whatsapp.js'
+import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, receiptOf, registerSent, samePhone, waEvents, withTimeout, type ReceiptStatus } from './whatsapp.js'
 
-export type Step = { tipo: 'mensagem' } | { tipo: 'espera'; ms: number }
+/** `ateResposta`: a espera acaba antes se a pessoa responder (resposta automática ou dela mesma). */
+export type Step = { tipo: 'mensagem' } | { tipo: 'espera'; ms: number; ateResposta?: boolean }
 
 export type RecipientStatus = 'pendente' | 'enviando' | 'aceito' | 'entregue' | 'lido' | 'respondeu' | 'falhou' | 'ignorado'
 
@@ -24,7 +26,11 @@ export interface Recipient {
   messageIds: string[]
   enviadas: number
   erro: string | null
-  respostas: { em: string; texto: string }[]
+  respostas: { em: string; texto: string; auto?: boolean }[]
+  /** Pediu para parar ou disse que não tem interesse: o resto do funil não sai */
+  parar?: boolean
+  /** Última mensagem do funil que saiu (para reconhecer resposta automática) */
+  ultimoEnvioEm?: string | null
   processadoEm: string | null
   /** O app já registrou o envio no histórico do lead */
   sincEnvio: boolean
@@ -161,6 +167,21 @@ export function runningCount(): number {
 /** Telefones que já receberam disparo (chave DDD + 8 últimos). */
 export function sentPhones(): string[] {
   return Object.keys(sent)
+}
+
+/**
+ * O destinatário de campanha com este telefone (o mais recente que recebeu algo), para o agente
+ * continuar a conversa de quem respondeu a um disparo. `enviando`: o funil dele ainda está no meio.
+ */
+export function recipientByPhone(phone: string): { campanha: string; leadId: string; nome: string; textos: string[]; enviando: boolean } | null {
+  for (const c of campaigns.slice().sort((a, b) => b.criadaEm.localeCompare(a.criadaEm))) {
+    const r = c.destinatarios.find((x) => x.enviadas > 0 && samePhone(x.telefone, phone))
+    if (r) {
+      const atual = c.status === 'enviando' && c.destinatarios[c.cursor]?.id === r.id
+      return { campanha: c.nome, leadId: r.leadId, nome: r.nome, textos: r.textos.slice(0, r.enviadas).map((t) => finalizeText(t)), enviando: atual }
+    }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +329,30 @@ async function waitActive(c: Campaign, ms: number): Promise<boolean> {
   return isActive(c)
 }
 
+/**
+ * Espera até `ms` ou até a pessoa responder. Respondeu: espera mais 20 s (muita empresa manda duas
+ * mensagens automáticas seguidas) e segue para a próxima etapa.
+ */
+async function esperarResposta(c: Campaign, r: Recipient, ms: number): Promise<boolean> {
+  const antes = r.respostas.length
+  const fim = Date.now() + Math.max(0, ms)
+  while (Date.now() < fim) {
+    if (!isActive(c)) return false
+    if (r.respostas.length > antes || r.parar) {
+      let ultima = r.respostas.length
+      // Mais uma mensagem chegando: espera de novo (até 2 min no total)
+      for (let i = 0; i < 6 && isActive(c); i++) {
+        if (!(await waitActive(c, 20_000))) return false
+        if (r.respostas.length === ultima) break
+        ultima = r.respostas.length
+      }
+      return isActive(c)
+    }
+    await new Promise((res) => setTimeout(res, 1000))
+  }
+  return isActive(c)
+}
+
 function greeting(now = new Date()): string {
   const h = now.getHours()
   return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
@@ -384,11 +429,16 @@ async function runCampaign(c: Campaign) {
         }
         const step = c.etapas[i]
         if (step.tipo === 'espera') {
-          if (!(await waitActive(c, step.ms))) {
+          if (!(await (step.ateResposta ? esperarResposta(c, r, step.ms) : waitActive(c, step.ms)))) {
             r.status = 'pendente'
             return suspend(c)
           }
         } else {
+          // Responder "boa tarde" não para o funil; pedir para parar ou dizer que não tem interesse, sim
+          if (r.parar) {
+            log(c, 'info', `${r.nome} não quer receber: o resto do funil não foi enviado`, undefined, r.leadId)
+            break
+          }
           const text = finalizeText(r.textos[msgIndex] ?? '')
           msgIndex++
           if (text) {
@@ -398,9 +448,11 @@ async function runCampaign(c: Campaign) {
               const res = await withTimeout(s.sendMessage(contact.jid, { text }), 25_000, 'Tempo esgotado ao enviar.')
               const mid = res?.key?.id
               if (!mid) throw new Error('O WhatsApp não confirmou o envio.')
+              registerSent(mid)
               if (receiptOf(mid) === 'failed') throw new Error('O WhatsApp rejeitou a mensagem.')
               r.messageIds.push(mid)
               r.enviadas++
+              r.ultimoEnvioEm = new Date().toISOString()
               sent[key] = { campanha: c.id, em: new Date().toISOString() }
               await new Promise((res2) => setTimeout(res2, 1500))
             } catch (err) {
@@ -500,9 +552,20 @@ waEvents.incoming((phone: string, text: string) => {
   for (const c of campaigns) {
     for (const r of c.destinatarios) {
       if (!r.enviadas || !samePhone(r.telefone, phone)) continue
+      // Resposta automática do WhatsApp Business: fica registrada, mas não conta como resposta nem para o funil
+      const segundos = r.ultimoEnvioEm ? (Date.now() - Date.parse(r.ultimoEnvioEm)) / 1000 : Infinity
+      const auto = r.status !== 'respondeu' && !pediuParaParar(text) && pareceAutomatica(text, segundos)
+      r.respostas.push({ em: new Date().toISOString(), texto: text.slice(0, 1000), ...(auto ? { auto: true } : {}) })
+      if (auto) {
+        log(c, 'info', `${r.nome}: resposta automática do WhatsApp dele`, text.slice(0, 300), r.leadId)
+        continue
+      }
       r.status = 'respondeu'
-      r.respostas.push({ em: new Date().toISOString(), texto: text.slice(0, 1000) })
       log(c, 'resposta', `${r.nome} respondeu`, text.slice(0, 300) || '[mensagem sem texto]', r.leadId)
+      if (pediuParaParar(text)) {
+        r.parar = true
+        log(c, 'aviso', `${r.nome} pediu para não receber mais mensagens`, 'Não mande mais campanhas para este número.', r.leadId)
+      } else if (recusou(text)) r.parar = true
     }
   }
 })

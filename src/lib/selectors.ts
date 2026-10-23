@@ -238,6 +238,8 @@ export function priorityRank(lead: Lead, index: LeadIndex, today = todayKey()): 
   const fu = index.followupsByLead.get(lead.id)?.[0]
   if (fu && fu.data < today) return 0
   if (fu && fu.data === today) return 1
+  // Já mostrou interesse e está sem retorno marcado: vale mais que um lead frio
+  if (!fu && (lead.status === 'cliente_potencial' || lead.status === 'falei_responsavel' || lead.status === 'pediu_whatsapp')) return 1.5
   if (lead.status === 'novo') return 3
   if (SEM_RESPOSTA.includes(lead.status)) {
     return lead.ultima_ligacao && isoDateKey(lead.ultima_ligacao) === today ? 5 : 2
@@ -390,9 +392,16 @@ export interface TodayPlan {
   tentarNovamente: { lead: Lead; tentativas: number; ultima: string | null }[]
   /** Muitas tentativas seguidas sem resposta: sugerir encerrar em vez de ligar de novo */
   esgotados: { lead: Lead; tentativas: number; ultima: string | null }[]
+  /** Já mostrou interesse, mas está sem retorno e sem reunião marcados há dias: esfriando */
+  esfriando: { lead: Lead; dias: number }[]
   novos: Lead[]
   feitasHoje: { lead: Lead; call: Interaction }[]
 }
+
+/** Status de quem já mostrou interesse, do mais quente ao menos quente. */
+const QUENTES: StatusId[] = ['cliente_potencial', 'agendou_reuniao', 'pediu_whatsapp', 'follow_up', 'falei_responsavel']
+/** Dias sem contato a partir dos quais um lead interessado, sem retorno marcado, está esfriando. */
+export const DIAS_ESFRIANDO = 2
 
 export function buildTodayPlan(
   leads: Lead[],
@@ -402,6 +411,8 @@ export function buildTodayPlan(
   today = todayKey(),
   /** Tentativas seguidas sem resposta a partir das quais o lead sai da fila */
   maxTentativas = Infinity,
+  /** Hora de agora: quem não atendeu de manhã tem mais chance à tarde (e vice-versa) */
+  horaAgora = new Date().getHours(),
 ): TodayPlan {
   const byId = new Map(leads.map((l) => [l.id, l]))
   const followups: TodayPlan['followups'] = []
@@ -426,12 +437,18 @@ export function buildTodayPlan(
   const tentarNovamente: TodayPlan['tentarNovamente'] = []
   const esgotados: TodayPlan['esgotados'] = []
   const novos: Lead[] = []
+  const esfriando: TodayPlan['esfriando'] = []
   for (const lead of leads) {
     if (withFollowupToday.has(lead.id)) continue
     if (index.followupsByLead.has(lead.id)) continue // retorno já agendado para outro dia
     const ultima = lead.ultima_ligacao
     if (ultima && isoDateKey(ultima) === today) continue // já ligou hoje → está em "Feitas hoje"
-    if (lead.status === 'novo') novos.push(lead)
+    if (QUENTES.includes(lead.status)) {
+      const temReuniao = index.meetingsByLead.get(lead.id)?.some((m) => m.data >= today)
+      const desde = isoDateKey(ultima ?? lead.updated_at)
+      const dias = Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${desde}T12:00:00`)) / 86_400_000)
+      if (!temReuniao && dias >= DIAS_ESFRIANDO) esfriando.push({ lead, dias })
+    } else if (lead.status === 'novo') novos.push(lead)
     else if (SEM_RESPOSTA.includes(lead.status)) {
       const calls = index.callsByLead.get(lead.id) ?? []
       const item = { lead, tentativas: calls.length, ultima }
@@ -440,10 +457,18 @@ export function buildTodayPlan(
     }
   }
   novos.sort((a, b) => opportunityScore(b) - opportunityScore(a) || a.created_at.localeCompare(b.created_at))
+  // Mesmo número de tentativas: primeiro quem foi tentado no outro período do dia
+  const periodo = (h: number) => (h < 12 ? 0 : 1)
+  const mesmoPeriodo = (t: { ultima: string | null }) => (t.ultima && periodo(new Date(t.ultima).getHours()) === periodo(horaAgora) ? 1 : 0)
   tentarNovamente.sort(
-    (a, b) => a.tentativas - b.tentativas || opportunityScore(b.lead) - opportunityScore(a.lead) || (a.ultima ?? '').localeCompare(b.ultima ?? ''),
+    (a, b) =>
+      a.tentativas - b.tentativas ||
+      mesmoPeriodo(a) - mesmoPeriodo(b) ||
+      opportunityScore(b.lead) - opportunityScore(a.lead) ||
+      (a.ultima ?? '').localeCompare(b.ultima ?? ''),
   )
   esgotados.sort((a, b) => b.tentativas - a.tentativas)
+  esfriando.sort((a, b) => QUENTES.indexOf(a.lead.status) - QUENTES.indexOf(b.lead.status) || a.dias - b.dias)
 
   const feitasHoje: TodayPlan['feitasHoje'] = []
   for (const i of interactions) {
@@ -453,13 +478,14 @@ export function buildTodayPlan(
   }
   feitasHoje.sort((a, b) => b.call.created_at.localeCompare(a.call.created_at))
 
-  return { followups, reunioesHoje, proximasReunioes, tentarNovamente, esgotados, novos, feitasHoje }
+  return { followups, reunioesHoje, proximasReunioes, tentarNovamente, esgotados, esfriando, novos, feitasHoje }
 }
 
-/** Ordem da fila de ligações do dia: retornos → tentar novamente → novos. */
+/** Ordem da fila de ligações do dia: retornos → interessados esfriando → tentar novamente → novos. */
 export function todayQueue(plan: TodayPlan): string[] {
   return [
     ...plan.followups.map((f) => f.lead.id),
+    ...plan.esfriando.map((e) => e.lead.id),
     ...plan.tentarNovamente.map((t) => t.lead.id),
     ...plan.novos.map((l) => l.id),
   ]

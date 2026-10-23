@@ -4,6 +4,8 @@ import {
   BadgeDollarSign,
   CalendarCheck,
   CalendarClock,
+  CircleDollarSign,
+  Flame,
   FolderKanban,
   Headphones,
   MapPinned,
@@ -20,11 +22,12 @@ import { Avatar } from '../components/Avatar'
 import { Progress } from '../components/ui'
 import { monthKey, PROJECT_STATUS, projectProgress, summarize } from '../lib/biz'
 import { formatDayLabel, formatLongToday, periodoLabel } from '../lib/dates'
-import { formatMoney } from '../lib/insights'
+import { contactByHour, formatMoney, MIN_SAMPLE, rate } from '../lib/insights'
 import { saudacao } from '../lib/messages'
 import { useWaServico } from '../lib/waServico'
 import { useHasWhatsApp } from '../store/useAccount'
 import { buildTodayPlan, todayQueue } from '../lib/selectors'
+import { STATUS_MAP } from '../lib/statuses'
 import type { StatusId } from '../lib/types'
 import { useIndex, useMetrics, useToday } from '../store/derived'
 import { useApp } from '../store/useApp'
@@ -63,6 +66,17 @@ export function PainelPage() {
     () => buildTodayPlan(leads, interactions, index, meetings, today, settings.max_tentativas),
     [leads, interactions, index, meetings, today, settings.max_tentativas],
   )
+  // Faixa de horário em que mais gente atende (últimos 60 dias, com amostra mínima)
+  const melhorHora = useMemo(() => {
+    const desde = new Date(Date.now() - 60 * 86_400_000).toISOString()
+    const { byHour } = contactByHour(interactions, desde)
+    let best: { hora: number; taxa: number } | null = null
+    byHour.forEach((c, i) => {
+      const r = rate(c)
+      if (r !== null && c.ligacoes >= MIN_SAMPLE * 2 && (!best || r > best.taxa)) best = { hora: 8 + i, taxa: r }
+    })
+    return best as { hora: number; taxa: number } | null
+  }, [interactions])
   const fin = useMemo(() => summarize(transactions, payments, today.slice(0, 7)), [transactions, payments, today])
   const ativos = projects.filter((p) => ['planejamento', 'em_andamento', 'revisao'].includes(p.status))
   const clientesAtivos = clients.filter((c) => !c.arquivado)
@@ -73,6 +87,12 @@ export function PainelPage() {
   const stageCounts = STAGES.map((st) => ({ ...st, n: st.statuses.reduce((s, id) => s + (metrics.porStatus[id] ?? 0), 0) }))
   const stageMax = Math.max(1, ...stageCounts.map((s) => s.n))
   const queue = todayQueue(plan)
+  // Cobranças vencidas e ainda pendentes (dinheiro parado)
+  const atrasadas = payments
+    .filter((p) => p.status === 'pendente' && p.vencimento && p.vencimento < today)
+    .sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
+  const nomeCliente = (id: string) => clients.find((c) => c.id === id)?.nome ?? 'Cliente'
+  const itensHoje = plan.followups.length + plan.reunioesHoje.length + plan.esfriando.length + atrasadas.length
 
   function startCalls() {
     if (queue.length) setQueue(queue, 'Hoje')
@@ -89,7 +109,15 @@ export function PainelPage() {
               {saudacao()}
               {nome ? `, ${nome}` : ''}
             </h1>
-            <p className="mt-0.5 text-xs text-fg-3 first-letter:uppercase">{formatLongToday()}</p>
+            <p className="mt-0.5 text-xs text-fg-3 first-letter:uppercase">
+              {formatLongToday()}
+              {melhorHora && (
+                <span className="text-fg-4">
+                  {' '}
+                  · mais gente atende às {melhorHora.hora}h ({Math.round(melhorHora.taxa * 100)}%)
+                </span>
+              )}
+            </p>
           </div>
         </div>
         <button
@@ -131,10 +159,10 @@ export function PainelPage() {
       <div className="grid gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card
           title="Para hoje"
-          description="Retornos e reuniões, na ordem do horário."
+          description="Reuniões, retornos, interessados esfriando e cobranças atrasadas."
           bodyClass="p-0"
         >
-          {plan.followups.length + plan.reunioesHoje.length === 0 ? (
+          {itensHoje === 0 ? (
             <p className="px-4 py-10 text-center text-xs text-fg-3">Nada agendado para hoje. Bom momento para ligar para os novos.</p>
           ) : (
             <ul className="divide-y divide-line-soft">
@@ -154,6 +182,24 @@ export function PainelPage() {
                   title={lead.empresa}
                   detail={atrasado ? `Atrasado desde ${formatDayLabel(followup.data)}` : `Retorno ${followup.horario ?? periodoLabel(followup.periodo).toLowerCase()}`}
                   onClick={() => openLead(lead.id)}
+                />
+              ))}
+              {plan.esfriando.slice(0, 5).map(({ lead, dias }) => (
+                <AgendaItem
+                  key={`esf-${lead.id}`}
+                  icon={<Flame className="size-4 text-amber-300" />}
+                  title={lead.empresa}
+                  detail={`${STATUS_MAP[lead.status]?.label ?? 'Interessado'} · ${dias} dias sem contato e sem retorno marcado`}
+                  onClick={() => openLead(lead.id)}
+                />
+              ))}
+              {atrasadas.slice(0, 4).map((p) => (
+                <AgendaItem
+                  key={`pg-${p.id}`}
+                  icon={<CircleDollarSign className="size-4 text-red-300" />}
+                  title={`${nomeCliente(p.client_id)} · ${formatMoney(p.valor)}`}
+                  detail={`Cobrança vencida desde ${formatDayLabel(p.vencimento!).toLowerCase()}${p.descricao ? ` · ${p.descricao}` : ''}`}
+                  onClick={() => navigate('/clientes')}
                 />
               ))}
             </ul>

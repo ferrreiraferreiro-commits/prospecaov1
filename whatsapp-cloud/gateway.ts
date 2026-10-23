@@ -14,11 +14,13 @@
  *   - automáticas (XS_CLOUD_TODOS=1): toda conta com plano em dia e o recurso "motor" ganha a sua na
  *     primeira vez, até XS_CLOUD_MAX Motores ligados. Quem passar do limite vê "indisponível" até abrir vaga.
  *     O gateway liga/desliga cada Motor pelo systemd (xs-whatsapp-motor@<sessao>, regra do polkit).
- *     Motor sem WhatsApp conectado e sem uso há 30 min é desligado (libera memória); com WhatsApp
+ *     Só "Conectar" (ou disparo, agenda, teste) liga o Motor; olhar o status não liga. "Desconectar"
+ *     desliga na hora. Motor sem WhatsApp salvo e sem uso há 5 min é desligado (libera a vaga); com WhatsApp
  *     conectado fica ligado e volta sozinho quando a VPS reinicia.
  *
  * GET  /saude                aberto: o gateway e os Motores estão de pé?
  * GET  /acesso               esta conta usa o WhatsApp na nuvem?
+ * GET  /painel               só o dono (profiles.admin): o WhatsApp de cada conta e quem está com a XS aberta
  * *    /motor/<caminho>      repassa ao WhatsApp da conta (/health, /whatsapp/…, /disparo/…, /agenda…)
  *
  * Variáveis (arquivo /etc/xs-whatsapp/gateway.env na VPS):
@@ -48,8 +50,8 @@ let MAX_AUTO = Math.max(0, Number(process.env.XS_CLOUD_MAX ?? 5) || 0)
 const PORTA_INICIAL = Number(process.env.XS_CLOUD_PORTA_INICIAL ?? 3100)
 const MAX_CORPO = 8 * 1024 * 1024
 const TEMPO_MOTOR_MS = 60_000
-/** Motor automático sem WhatsApp conectado e sem uso por esse tempo é desligado */
-const OCIOSO_MS = 30 * 60_000
+/** Motor automático sem WhatsApp salvo e sem uso por esse tempo é desligado (ex.: abriu o QR Code e saiu) */
+const OCIOSO_MS = 5 * 60_000
 
 export const MSG_INDISPONIVEL = 'O serviço de WhatsApp está temporariamente indisponível. Tente novamente em alguns instantes.'
 const MSG_GENERICA = 'Não foi possível concluir agora. Tente novamente em alguns instantes.'
@@ -106,6 +108,7 @@ export interface Perfil {
   plano?: unknown
   plano_ate?: unknown
   teste_ate?: unknown
+  admin?: unknown
 }
 
 export interface Conta {
@@ -113,6 +116,8 @@ export interface Conta {
   usuario: string | null
   /** Plano em dia e com o recurso do Motor (pode ganhar sessão automática) */
   podeUsar: boolean
+  /** Dono da XS (profiles.admin): vê o painel */
+  admin?: boolean
 }
 
 /** Mesma regra do app (src/store/useAccount.ts → accessOf) + o recurso "motor". */
@@ -169,6 +174,10 @@ let controle: Controle = { ligar: (n) => systemctl('start', n), desligar: (n) =>
 const ligados = new Set<string>()
 /** Último pedido de cada sessão */
 const ultimoUso = new Map<string, number>()
+/** Último pedido de cada conta (id → quando). O app confere a cada 5 min com a aba aberta: é o "online". */
+const vistoConta = new Map<string, number>()
+/** Conta que usou cada sessão por último (as fixas são configuradas pelo usuário de login, não pelo id) */
+const contaDaSessao = new Map<string, string>()
 const ligando = new Map<string, Promise<void>>()
 let fila: Promise<unknown> = Promise.resolve()
 
@@ -308,13 +317,13 @@ async function verificarNoSupabase(token: string): Promise<Conta | null> {
   const user = (await res.json()) as { id?: unknown }
   if (typeof user.id !== 'string' || !UUID_OK.test(user.id)) return null
   // O próprio perfil, lido com o login da pessoa (a regra do banco só deixa cada um ler o seu)
-  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=usuario,recursos,plano,plano_ate,teste_ate&user_id=eq.${user.id}`, {
+  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=usuario,recursos,plano,plano_ate,teste_ate,admin&user_id=eq.${user.id}`, {
     headers,
     signal: AbortSignal.timeout(8000),
   })
   if (!perfil.ok) throw new Error(`supabase perfil ${perfil.status}`)
   const [p] = (await perfil.json()) as Perfil[]
-  return { id: user.id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p) }
+  return { id: user.id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p), admin: p?.admin === true }
 }
 
 let verificar: Verificador = verificarNoSupabase
@@ -396,7 +405,16 @@ export function ajustarResposta(caminho: string, body: unknown, s: Sessao): unkn
 
 // ---------------------------------------------------------------- Motor
 
-const CAMINHO_OK = /^\/(health|whatsapp\/(status|conectar|desconectar|teste)|disparo\/[A-Za-z0-9/_-]{1,120}|agenda(\/[A-Za-z0-9/_-]{1,120})?)$/
+const CAMINHO_OK = /^\/(health|whatsapp\/(status|conectar|desconectar|teste)|disparo\/[A-Za-z0-9/_-]{1,120}|agenda(\/[A-Za-z0-9/_-]{1,120})?|conversas(\/\d{8,15}(\/(enviar|lidas))?)?|agente\/[A-Za-z0-9/_-]{1,120})$/
+
+/** Ler as conversas (a tela fica conferindo) não liga Motor de ninguém nem conta como uso. */
+function leituraDeConversa(method: string, caminho: string): boolean {
+  return method === 'GET' && (caminho === '/conversas' || caminho.startsWith('/conversas/'))
+}
+
+function semConversas(caminho: string): unknown {
+  return caminho === '/conversas' ? { versao: 0, conversas: [] } : { versao: 0, telefone: caminho.split('/')[2] ?? '', nome: null, naoLidas: 0, msgs: [] }
+}
 const METODOS = new Set(['GET', 'POST', 'DELETE'])
 
 /** Última vez que alguém olhou a tela de conexão de cada sessão (para não deixar QR Code girando à toa) */
@@ -413,11 +431,32 @@ export async function chamarMotor(s: Sessao, method: string, caminho: string, co
   return { status: res.status, body: await res.json().catch(() => null) }
 }
 
+/** O que o app vê de quem está sem WhatsApp na nuvem agora (Motor desligado e nada salvo): desconectado. */
+export const SEM_WHATSAPP: Record<string, unknown> = {
+  '/health': { ok: true, nuvem: true, whatsapp: { status: 'disconnected', user: null, sessaoSalva: false }, disparo: { running: 0 }, agenda: { pendentes: 0 } },
+  '/whatsapp/status': { status: 'disconnected', qrCodeUrl: null, user: null, lastError: null, sessaoSalva: false },
+}
+
+/** Desliga um Motor automático e libera a vaga. */
+async function desligarMotor(s: Sessao, motivo: string) {
+  log(`${s.nome}: ${motivo}, desligando o Motor`)
+  ligados.delete(s.nome)
+  await controle.desligar(s.nome).catch((err) => log(`não consegui desligar ${s.nome}: ${(err as Error).message}`))
+}
+
 async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: Sessao, caminho: string) {
   const method = (req.method ?? 'GET').toUpperCase()
   if (!METODOS.has(method) || !CAMINHO_OK.test(caminho)) return send(res, 404, { error: 'Não encontrado.' })
+  // O Agente IA só existe no WhatsApp do dono (sessão fixa)
+  if (caminho.startsWith('/agente/') && !s.fixa) return send(res, 404, { error: 'Não encontrado.' })
   const corpo = method === 'GET' ? undefined : await lerCorpo(req)
-  ultimoUso.set(s.nome, Date.now())
+  const leitura = method === 'GET' && Object.hasOwn(SEM_WHATSAPP, caminho)
+  // Só olhar o status não liga o Motor de ninguém: quem nunca conectou (ou desconectou) não ocupa vaga
+  if (leitura && !s.fixa && !ligados.has(s.nome) && !credsSalvas(s)) return send(res, 200, SEM_WHATSAPP[caminho])
+  const conversa = leituraDeConversa(method, caminho)
+  if (conversa && !s.fixa && !ligados.has(s.nome) && !credsSalvas(s)) return send(res, 200, semConversas(caminho))
+  // O status que o app confere sozinho (/health) e as conversas não contam como uso; a tela de conexão aberta conta
+  if (caminho !== '/health' && !conversa) ultimoUso.set(s.nome, Date.now())
   if (caminho.startsWith('/whatsapp/')) vistoEm.set(s.nome, Date.now())
   try {
     await garantirMotor(s)
@@ -428,12 +467,112 @@ async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: 
   try {
     const r = await chamarMotor(s, method, caminho, corpo)
     send(res, r.status, ajustarResposta(caminho, r.body, s))
+    // Desconectou: desliga o Motor na hora e libera a vaga (conectar de novo liga outra vez)
+    if (!s.fixa && method === 'POST' && caminho === '/whatsapp/desconectar' && r.status < 300) await desligarMotor(s, 'desconectou o WhatsApp')
   } catch (err) {
     const tempo = (err as Error).name === 'TimeoutError'
     log(`motor ${s.nome} ${method} ${caminho}: ${tempo ? 'demorou demais' : 'fora do ar'} (${(err as Error).message})`)
     if (!tempo) ligados.delete(s.nome) // na próxima, confere de novo e liga se precisar
     send(res, tempo ? 504 : 503, { error: tempo ? 'O WhatsApp demorou para responder. Tente de novo.' : MSG_INDISPONIVEL, offline: !tempo })
   }
+}
+
+// ---------------------------------------------------------------- conector do Claude (MCP)
+
+const CABECALHOS_MCP = ['content-type', 'accept', 'authorization', 'mcp-protocol-version', 'mcp-session-id', 'last-event-id']
+
+/**
+ * POST /mcp → Motor do dono (a primeira sessão fixa, "principal"). Não confere login do Supabase: quem
+ * confere é o Motor, pela chave pessoal. Chave recusada conta como tentativa errada do endereço.
+ */
+async function conectorMcp(req: http.IncomingMessage, res: http.ServerResponse, ip: string) {
+  const s = [...fixas.values()][0]
+  if (!s) return send(res, 404, { error: 'Não encontrado.' })
+  const method = (req.method ?? 'GET').toUpperCase()
+  const corpo = method === 'POST' ? await lerCorpo(req) : undefined
+  const headers: Record<string, string> = {}
+  for (const h of CABECALHOS_MCP) {
+    const v = req.headers[h]
+    if (typeof v === 'string') headers[h] = v
+  }
+  let r: Response
+  try {
+    r = await fetch(`${s.motor}/mcp`, { method, headers, body: corpo?.length ? corpo : undefined, signal: AbortSignal.timeout(TEMPO_MOTOR_MS) })
+  } catch {
+    return send(res, 503, { error: MSG_INDISPONIVEL })
+  }
+  if (r.status === 401) falhasPorIp.set(ip, (falhasPorIp.get(ip) ?? 0) + 1)
+  const saida: Record<string, string> = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
+  for (const h of ['content-type', 'mcp-session-id', 'allow']) {
+    const v = r.headers.get(h)
+    if (v) saida[h] = v
+  }
+  res.writeHead(r.status, saida)
+  res.end(Buffer.from(await r.arrayBuffer()))
+}
+
+// ---------------------------------------------------------------- painel do dono
+
+export type EstadoPainel = 'connected' | 'qrcode' | 'connecting' | 'disconnected' | 'desligado' | 'fora'
+
+export interface LinhaPainel {
+  sessao: string
+  fixa: boolean
+  /** Id da conta (quando se sabe) e o usuário de login configurado na sessão fixa */
+  conta: string | null
+  usuario: string | null
+  estado: EstadoPainel
+  /** Só os 4 últimos dígitos do número conectado */
+  final: string | null
+  sessaoSalva: boolean
+}
+
+export interface Painel {
+  sessoes: LinhaPainel[]
+  /** Conta → último pedido (ISO), só desde que o gateway ligou */
+  vistos: Record<string, string>
+  ligados: number
+  max: number
+}
+
+/** O WhatsApp de cada sessão. Não conta como uso: não segura Motor ligado nem liga Motor desligado. */
+export async function montarPainel(): Promise<Painel> {
+  const chaveFixa = new Map([...usuarios].map(([conta, nome]) => [nome, conta]))
+  const donoDe = new Map(Object.entries(registro).map(([id, r]) => [r.nome, id]))
+  const todas = [
+    ...fixas.values(),
+    ...Object.values(registro)
+      .filter((r) => NOME_OK.test(r.nome))
+      .map((r) => sessao(r.nome, r.porta, false)),
+  ]
+  const sessoes = await Promise.all(
+    todas.map(async (s): Promise<LinhaPainel> => {
+      const chave = s.fixa ? (chaveFixa.get(s.nome) ?? null) : null
+      const linha: LinhaPainel = {
+        sessao: s.nome,
+        fixa: s.fixa,
+        conta: donoDe.get(s.nome) ?? contaDaSessao.get(s.nome) ?? (chave && UUID_OK.test(chave) ? chave : null),
+        usuario: chave && !UUID_OK.test(chave) ? chave : null,
+        estado: 'desligado',
+        final: null,
+        sessaoSalva: credsSalvas(s),
+      }
+      if (!s.fixa && !ligados.has(s.nome)) return linha
+      try {
+        const b = (await chamarMotor(s, 'GET', '/whatsapp/status', undefined, 3000)).body as { status?: unknown; user?: { id?: unknown } | null } | null
+        const st = b?.status
+        linha.estado = st === 'connected' || st === 'qrcode' || st === 'connecting' || st === 'disconnected' ? st : 'fora'
+        const id = typeof b?.user?.id === 'string' ? b.user.id.split(/[:@]/)[0].replace(/\D/g, '') : ''
+        if (linha.estado === 'connected' && id.length >= 4) linha.final = id.slice(-4)
+      } catch {
+        linha.estado = 'fora'
+      }
+      return linha
+    }),
+  )
+  const vistos: Record<string, string> = {}
+  for (const [id, em] of vistoConta) vistos[id] = new Date(em).toISOString()
+  return { sessoes, vistos, ligados: ligados.size, max: MAX_AUTO }
 }
 
 // ---------------------------------------------------------------- vigia (reconexão automática)
@@ -445,15 +584,13 @@ const QR_SEM_VER_MS = 4 * 60_000
 /**
  * A cada 30 s, para cada sessão: se há sessão salva e o WhatsApp está desconectado (ex.: a internet da
  * VPS caiu na hora de abrir), manda reconectar. QR Code girando sem ninguém na tela é desligado.
- * Motor automático sem WhatsApp salvo e sem uso há 30 min é desligado (volta no próximo acesso).
+ * Motor automático sem WhatsApp salvo e sem uso há 5 min é desligado (volta quando a pessoa conectar).
  * "Desconectar" na tela apaga a sessão salva, então o vigia não reconecta o que a pessoa desligou.
  */
 export async function vigiar(s: Sessao, agora = Date.now()): Promise<'reconectar' | 'parar-qr' | 'desligar' | null> {
   const salva = credsSalvas(s)
   if (!s.fixa && !salva && agora - (ultimoUso.get(s.nome) ?? 0) > OCIOSO_MS) {
-    log(`vigia ${s.nome}: sem WhatsApp e sem uso, desligando o Motor`)
-    ligados.delete(s.nome)
-    await controle.desligar(s.nome).catch((err) => log(`não consegui desligar ${s.nome}: ${(err as Error).message}`))
+    await desligarMotor(s, 'vigia: sem WhatsApp salvo e sem uso')
     return 'desligar'
   }
   let wa: { status?: string }
@@ -507,6 +644,8 @@ export const server = http.createServer(async (req, res) => {
 
     const ip = ipDe(req)
     if ((falhasPorIp.get(ip) ?? 0) >= MAX_FALHAS) return send(res, 429, { error: 'Muitas tentativas. Aguarde alguns minutos.' })
+    // Conector do Claude (MCP): vai para o WhatsApp do dono, que confere a chave pessoal (xs_…)
+    if (url.pathname === '/mcp') return await conectorMcp(req, res, ip)
     const token = /^Bearer (\S{20,4096})$/.exec(String(req.headers.authorization ?? ''))?.[1]
     try {
       conta = token ? await quemE(token) : null
@@ -518,9 +657,15 @@ export const server = http.createServer(async (req, res) => {
       falhasPorIp.set(ip, (falhasPorIp.get(ip) ?? 0) + 1)
       return send(res, 401, { error: 'Entre na sua conta da XS de novo.' })
     }
+    vistoConta.set(conta.id, Date.now())
+    if (url.pathname === '/painel') return conta.admin ? send(res, 200, await montarPainel()) : send(res, 404, { error: 'Não encontrado.' })
     const s = await sessaoDa(conta)
+    if (s) contaDaSessao.set(s.nome, conta.id)
 
     if (url.pathname === '/acesso') return send(res, s ? 200 : 403, { permitido: !!s })
+    // Sem vaga agora: o status mostra "desconectado"; o "indisponível" só aparece se tentar conectar
+    const sem = url.pathname.startsWith('/motor/') ? url.pathname.slice('/motor'.length) : ''
+    if (!s && conta.podeUsar && req.method === 'GET' && Object.hasOwn(SEM_WHATSAPP, sem)) return send(res, 200, SEM_WHATSAPP[sem])
     if (!s) return send(res, 403, { error: 'Sua conta não usa o WhatsApp na nuvem.' })
     if (url.pathname.startsWith('/motor/')) return await repassar(req, res, s, url.pathname.slice('/motor'.length))
     return send(res, 404, { error: 'Não encontrado.' })
@@ -529,7 +674,7 @@ export const server = http.createServer(async (req, res) => {
   } finally {
     // Sem token, sem corpo e sem mensagens: só o caminho, o resultado e de quem foi
     const caminho = (req.url ?? '').split('?')[0]
-    if (caminho !== '/saude' && !caminho.endsWith('/health') && !caminho.endsWith('/whatsapp/status'))
+    if (caminho !== '/saude' && caminho !== '/painel' && !caminho.endsWith('/health') && !caminho.endsWith('/whatsapp/status'))
       log(`${req.method} ${caminho} → ${res.statusCode} ${Date.now() - inicio}ms${conta ? ` conta ${conta.id.slice(0, 8)}` : ''}`)
   }
 })

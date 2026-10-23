@@ -37,9 +37,16 @@ async function token(): Promise<string> {
   return t
 }
 
+/**
+ * Login que o servidor já recusou (sessão encerrada em outro lugar). Não manda de novo: uma aba esquecida
+ * repetindo um login vencido faz o servidor bloquear a internet inteira da pessoa por alguns minutos.
+ */
+let tokenRecusado: string | null = null
+
 /** Pedido ao WhatsApp da conta. A resposta (inclusive os erros) é a do próprio serviço. */
 async function pedir(path: string, method: string, json: unknown, timeoutMs: number, signal?: AbortSignal | null): Promise<Response> {
   const auth = await token()
+  if (auth === tokenRecusado) throw new WaError('Entre na sua conta da XS de novo.')
   let res: Response
   try {
     res = await fetch(`${WA_URL}/motor${path}`, {
@@ -51,6 +58,7 @@ async function pedir(path: string, method: string, json: unknown, timeoutMs: num
   } catch {
     throw new WaError(MSG_INDISPONIVEL, true)
   }
+  if (res.status === 401) tokenRecusado = auth
   // 403 = sem vaga na nuvem para esta conta agora: para a pessoa, é o serviço indisponível
   if (res.status === 503 || res.status === 502 || res.status === 403) throw new WaError(MSG_INDISPONIVEL, true)
   return res
@@ -70,6 +78,44 @@ export async function waFetch<T>(path: string, init: { method?: string; json?: u
   return body
 }
 
+export interface PainelWhatsApp {
+  sessoes: {
+    sessao: string
+    fixa: boolean
+    conta: string | null
+    usuario: string | null
+    estado: WaStatus | 'desligado' | 'fora'
+    /** 4 últimos dígitos do número conectado */
+    final: string | null
+    sessaoSalva: boolean
+  }[]
+  /** user_id → último pedido ao WhatsApp da XS (o app confere a cada 5 min com a aba aberta) */
+  vistos: Record<string, string>
+  ligados: number
+  max: number
+}
+
+/** Só para o dono (tela Contas): o WhatsApp de cada conta e quem está com a XS aberta. */
+export async function painelWhatsApp(): Promise<PainelWhatsApp> {
+  const auth = await token()
+  if (auth === tokenRecusado) throw new WaError('Entre na sua conta da XS de novo.')
+  let res: Response
+  try {
+    res = await fetch(`${WA_URL}/painel`, { headers: { Authorization: `Bearer ${auth}` }, signal: AbortSignal.timeout(15000) })
+  } catch {
+    throw new WaError(MSG_INDISPONIVEL, true)
+  }
+  if (res.status === 401) tokenRecusado = auth
+  if (!res.ok) throw new WaError(MSG_INDISPONIVEL, true)
+  const p = (await res.json()) as PainelWhatsApp
+  // O relógio da VPS não bate com o do computador. Este próprio pedido acabou de marcar o dono como
+  // visto, então o horário mais recente é o "agora" do servidor: passa tudo para o relógio daqui.
+  const agoraServidor = Math.max(...Object.values(p.vistos).map((v) => Date.parse(v)).filter(Number.isFinite))
+  const ajuste = Number.isFinite(agoraServidor) ? Date.now() - agoraServidor : 0
+  for (const [id, v] of Object.entries(p.vistos)) p.vistos[id] = new Date(Date.parse(v) + ajuste).toISOString()
+  return p
+}
+
 export type WaStatus = 'disconnected' | 'connecting' | 'qrcode' | 'connected'
 
 export interface WaHealth {
@@ -79,6 +125,8 @@ export interface WaHealth {
   whatsapp: { status: WaStatus; user: { id: string; name: string } | null; sessaoSalva?: boolean }
   disparo: { running: number }
   agenda?: { pendentes: number }
+  /** Só no WhatsApp do dono: o Agente IA existe ali */
+  agente?: { ativo: boolean }
 }
 
 export interface WaInfo {
@@ -127,8 +175,8 @@ export const useWaServico = create<WaServicoState>()((set) => ({
   },
 }))
 
-/** Mantém o status do WhatsApp atualizado enquanto a aba está visível. */
-export function useWaPolling(intervalMs = 6000) {
+/** Confere o WhatsApp a cada 5 min enquanto a aba está visível (e na hora em que a pessoa volta para a aba). */
+export function useWaPolling(intervalMs = 5 * 60_000) {
   const check = useWaServico((s) => s.check)
   useEffect(() => {
     void check()

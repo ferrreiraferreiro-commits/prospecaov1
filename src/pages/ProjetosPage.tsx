@@ -1,7 +1,8 @@
 import clsx from 'clsx'
-import { CalendarDays, Check, FolderKanban, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, Check, FileSignature, FolderKanban, GripVertical, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { ContratoModal } from '../components/ContratoModal'
 import { Field, NumberInput, SearchInput, Stat, confirmAction } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Modal, Progress } from '../components/ui'
@@ -154,6 +155,7 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
   const toast = useApp((s) => s.toast)
   const [d, setD] = useState<Project>(project)
   const [task, setTask] = useState('')
+  const [contrato, setContrato] = useState(false)
   const set = <K extends keyof Project>(k: K, v: Project[K]) => setD((x) => ({ ...x, [k]: v }))
 
   async function save(close = true) {
@@ -188,6 +190,9 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
     )
     toast('Cobrança lançada como pendente na ficha do cliente.')
   }
+
+  // O contrato abre no lugar do projeto (o que você editou continua aqui quando voltar)
+  if (contrato) return <ContratoModal projeto={d} cliente={clients.find((c) => c.id === d.client_id)} onClose={() => setContrato(false)} />
 
   return (
     <Modal
@@ -317,6 +322,14 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
               Valor total
             </Button>
           </div>
+        </div>
+
+        <div className="rounded-lg border border-line-soft bg-ink p-3 sm:col-span-2">
+          <p className="text-xs font-medium text-fg">Contrato</p>
+          <p className="mt-0.5 text-2xs text-fg-3">Gera o contrato em PDF com os dados do projeto e do cliente, pronto para mandar e assinar (dá para assinar de graça pelo gov.br).</p>
+          <Button size="sm" variant="primary" className="mt-2" icon={<FileSignature className="size-3.5" />} onClick={() => setContrato(true)}>
+            Gerar contrato em PDF
+          </Button>
         </div>
       </div>
     </Modal>

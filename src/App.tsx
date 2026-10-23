@@ -15,6 +15,7 @@ import { suporteUrl, useSuporteWhatsApp } from './lib/suporte'
 import { CallModeEntry, CallModePage } from './pages/CallModePage'
 import { CentralPage } from './pages/CentralPage'
 import { ForgotPasswordPage, LoginPage, NewPasswordPage, SignupPage } from './pages/AuthPages'
+import { AssinarPage } from './pages/AssinarPage'
 import { LandingPage } from './pages/LandingPage'
 import { PainelPage } from './pages/PainelPage'
 import type { Repository } from './data/repository'
@@ -56,6 +57,7 @@ function lazyPage<T extends ComponentType>(load: () => Promise<{ default: T }>) 
 
 // Telas carregadas sob demanda (o mapa e a gestão não pesam na abertura do app)
 const ClientesPage = lazyPage(() => import('./pages/ClientesPage').then((m) => ({ default: m.ClientesPage })))
+const ConversasPage = lazyPage(() => import('./pages/ConversasPage').then((m) => ({ default: m.ConversasPage })))
 const DisparoPage = lazyPage(() => import('./pages/DisparoPage').then((m) => ({ default: m.DisparoPage })))
 const FinanceiroPage = lazyPage(() => import('./pages/FinanceiroPage').then((m) => ({ default: m.FinanceiroPage })))
 const FunisPage = lazyPage(() => import('./pages/FunisPage').then((m) => ({ default: m.FunisPage })))
@@ -64,6 +66,8 @@ const MapsPage = lazyPage(() => import('./pages/MapsPage').then((m) => ({ defaul
 const PrecificacaoPage = lazyPage(() => import('./pages/PrecificacaoPage').then((m) => ({ default: m.PrecificacaoPage })))
 const ProjetosPage = lazyPage(() => import('./pages/ProjetosPage').then((m) => ({ default: m.ProjetosPage })))
 const AgendamentosPage = lazyPage(() => import('./pages/AgendamentosPage').then((m) => ({ default: m.AgendamentosPage })))
+const AgentePage = lazyPage(() => import('./pages/AgentePage').then((m) => ({ default: m.AgentePage })))
+const XicoPage = lazyPage(() => import('./pages/XicoPage').then((m) => ({ default: m.XicoPage })))
 const RoteirosPage = lazyPage(() => import('./pages/RoteirosPage').then((m) => ({ default: m.RoteirosPage })))
 const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const ContasPage = lazyPage(() => import('./pages/ContasPage').then((m) => ({ default: m.ContasPage })))
@@ -105,10 +109,13 @@ function Routed() {
           <Route path="roteiros" element={<RoteirosPage />} />
           <Route path="maps" element={<MapsPage />} />
           <Route path="mensagens" element={<MensagensPage />} />
+          <Route path="conversas" element={m(<ConversasPage />)} />
           <Route path="funis" element={m(<FunisPage />)} />
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />
           <Route path="whatsapp" element={m(<WhatsAppPage />)} />
+          <Route path="agente" element={admin ? m(<AgentePage />) : <Navigate to="/" replace />} />
+          <Route path="xico" element={admin ? m(<XicoPage />) : <Navigate to="/" replace />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
@@ -116,6 +123,9 @@ function Routed() {
           <Route path="estatisticas" element={<StatsPage />} />
           <Route path="configuracoes" element={<SettingsPage />} />
           <Route path="contas" element={admin ? <ContasPage /> : <Navigate to="/" replace />} />
+          <Route path="assinar" element={<AssinarPage logado />} />
+          {/* Entrou pela página de assinar (/entrar?volta=assinar): volta para ela */}
+          <Route path="entrar" element={<Navigate to={new URLSearchParams(window.location.search).get('volta') === 'assinar' ? '/assinar' : '/'} replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
@@ -172,6 +182,23 @@ const BLOQUEIO = {
 
 function Blocked({ motivo, email }: { motivo: keyof typeof BLOQUEIO; email: string | null }) {
   const suporte = useSuporteWhatsApp()
+  const [conferindo, setConferindo] = useState(false)
+  // Continua nesta tela depois de conferir = o pagamento ainda não foi aprovado
+  const [naoChegou, setNaoChegou] = useState(false)
+  // Pagou no checkout (outra aba) e voltou: confere o plano de novo
+  useEffect(() => {
+    const voltar = () => {
+      if (document.visibilityState === 'visible') void useAccount.getState().recarregar()
+    }
+    document.addEventListener('visibilitychange', voltar)
+    return () => document.removeEventListener('visibilitychange', voltar)
+  }, [])
+  const conferir = async () => {
+    setConferindo(true)
+    await useAccount.getState().recarregar()
+    setConferindo(false)
+    setNaoChegou(true)
+  }
   const pedido = {
     teste_acabou: 'Meu teste grátis da XS terminou e quero assinar.',
     plano_venceu: 'Meu plano da XS venceu e quero renovar.',
@@ -183,11 +210,12 @@ function Blocked({ motivo, email }: { motivo: keyof typeof BLOQUEIO; email: stri
       <LogoMark size={64} />
       <div className="space-y-1">
         <p className="text-base font-semibold text-fg">{BLOQUEIO[motivo]}</p>
-        <p className="max-w-sm text-xs text-fg-3">Seus leads e sua gestão continuam guardados. Fale com a gente para liberar o acesso de novo.</p>
+        <p className="max-w-sm text-xs text-fg-3">
+          Seus leads e sua gestão continuam guardados.{' '}
+          {motivo === 'cancelado' ? 'Fale com a gente para liberar o acesso de novo.' : 'Assine o plano Mensal e tudo volta assim que o pagamento for aprovado.'}
+        </p>
       </div>
-      {motivo !== 'cancelado' && (
-        <EscolherPlano className="justify-center" titulo={<p className="-mb-2 text-2xs font-medium uppercase tracking-wide text-fg-3">Escolha seu plano</p>} />
-      )}
+      {motivo !== 'cancelado' && <EscolherPlano className="justify-center" />}
       <div className="flex flex-wrap justify-center gap-2">
         {motivo === 'cancelado' && suporte && (
           <a
@@ -199,12 +227,28 @@ function Blocked({ motivo, email }: { motivo: keyof typeof BLOQUEIO; email: stri
             <WhatsAppIcon className="size-4" /> Falar pelo WhatsApp
           </a>
         )}
+        {supabase && motivo !== 'cancelado' && (
+          <Button variant="secondary" size="lg" loading={conferindo} onClick={() => void conferir()}>
+            Já paguei
+          </Button>
+        )}
         {supabase && (
-          <Button variant="secondary" size="lg" onClick={() => void supabase!.auth.signOut()}>
+          <Button variant="secondary" size="lg" onClick={() => void supabase!.auth.signOut({ scope: 'local' })}>
             Sair
           </Button>
         )}
       </div>
+      {naoChegou && (
+        <p className="max-w-sm text-2xs text-fg-3">
+          O pagamento ainda não foi aprovado. O Pix costuma ser aprovado em até 1 minuto. Use no checkout o mesmo e-mail da sua conta
+          {email && !email.endsWith('@prospeccao.local') && (
+            <>
+              {' '}(<span className="pv">{email}</span>)
+            </>
+          )}
+          .
+        </p>
+      )}
     </div>
   )
 }
@@ -256,6 +300,7 @@ function SupabaseApp() {
           <Route path="entrar" element={<LoginPage client={client} />} />
           <Route path="criar-conta" element={<SignupPage client={client} />} />
           <Route path="esqueci-senha" element={<ForgotPasswordPage client={client} />} />
+          <Route path="assinar" element={<AssinarPage logado={false} />} />
           {/* Link de recuperação expirado ou já usado */}
           <Route path="redefinir-senha" element={<Navigate to="/esqueci-senha" replace />} />
           {/* Telas do app pedem login e voltam para elas depois */}

@@ -121,7 +121,8 @@ export interface PricingEstimate {
 
 export type FunnelStep =
   | { id: string; tipo: 'mensagem'; variacoes: string[] }
-  | { id: string; tipo: 'espera'; valor: number; unidade: 'segundos' | 'minutos' | 'horas' }
+  /** `ateResposta`: segue antes se a pessoa responder (ex.: "oi" → espera a resposta automática → mensagem de verdade) */
+  | { id: string; tipo: 'espera'; valor: number; unidade: 'segundos' | 'minutos' | 'horas'; ateResposta?: boolean }
 
 export interface Funnel {
   id: string

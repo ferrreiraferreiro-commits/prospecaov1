@@ -167,9 +167,12 @@ export function SignupPage({ client }: { client: SupabaseClient }) {
   if (sentTo) {
     return (
       <AuthShell title="Confira seu e-mail" subtitle={<>Mandamos um link para <span className="text-fg">{sentTo}</span>. Clique nele para ativar sua conta e entrar.</>}>
-        <div className="flex items-start gap-3 rounded-lg border border-line bg-panel px-4 py-3.5 text-xs text-fg-2">
-          <MailCheck className="mt-0.5 size-4 shrink-0 text-go" />
-          Não chegou em alguns minutos? Veja a caixa de spam ou promoções.
+        <div className="flex items-start gap-3 rounded-lg border border-gold/30 bg-gold/[0.07] px-4 py-3.5 text-xs text-fg-2">
+          <MailCheck className="mt-0.5 size-4 shrink-0 text-gold" />
+          <span>
+            <span className="block font-semibold text-fg">Olhe a caixa de spam</span>
+            É lá que o e-mail da XS costuma chegar. Se estiver no spam, marque como "não é spam" e clique no link. Veja também em Promoções.
+          </span>
         </div>
         <Link to="/entrar" className="mt-6 block text-center text-xs font-medium text-blue-300 hover:text-blue-200">
           Já confirmei, quero entrar
@@ -200,15 +203,18 @@ export function SignupPage({ client }: { client: SupabaseClient }) {
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
-            placeholder="ex.: ana.web"
+            placeholder="ex.: flaviosites"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value.toLowerCase().replace(/\s+/g, ''))}
             required
             aside={<UsuarioStatus estado={livre} />}
           />
-          <p className="mt-1 text-2xs text-fg-4">Você entra com o usuário ou com o e-mail.</p>
+          <p className="mt-1 text-2xs text-fg-4">Tudo junto, sem espaço e sem acento. Você entra com o usuário ou com o e-mail.</p>
         </div>
-        <Input id="cd-email" label="E-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <div>
+          <Input id="cd-email" label="E-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <p className="mt-1 text-2xs text-fg-4">O e-mail de confirmação costuma cair no spam. Confira lá depois de criar a conta.</p>
+        </div>
         <Input id="cd-pass" label="Senha" type="password" autoComplete="new-password" minLength={6} placeholder="Pelo menos 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required />
         {error && <ErrorText>{error}</ErrorText>}
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
@@ -266,7 +272,7 @@ export function ForgotPasswordPage({ client }: { client: SupabaseClient }) {
   return (
     <AuthShell
       title="Recuperar a senha"
-      subtitle={sent ? 'Se essa conta existir, o link para criar uma senha nova já foi para o e-mail dela.' : 'Digite seu usuário ou e-mail. Mandamos um link para o e-mail da conta.'}
+      subtitle={sent ? 'Se essa conta existir, o link para criar uma senha nova já foi para o e-mail dela. Olhe também a caixa de spam: é lá que ele costuma chegar.' : 'Digite seu usuário ou e-mail. Mandamos um link para o e-mail da conta.'}
       footer={
         <Link to="/entrar" className="font-medium text-blue-300 hover:text-blue-200">
           Voltar para entrar

@@ -315,7 +315,7 @@ export function SettingsPage() {
             Restaurar backup
           </Button>
           {supabase && (
-            <Button size="sm" variant="ghost" icon={<LogOut className="size-3.5" />} onClick={() => supabase!.auth.signOut()}>
+            <Button size="sm" variant="ghost" icon={<LogOut className="size-3.5" />} onClick={() => supabase!.auth.signOut({ scope: 'local' })}>
               Sair da conta
             </Button>
           )}

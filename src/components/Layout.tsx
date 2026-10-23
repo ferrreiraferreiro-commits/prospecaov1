@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import {
   AlarmClock,
   BadgeDollarSign,
+  Bot,
   Calculator,
   CheckCircle2,
   ChevronsLeft,
@@ -14,6 +15,8 @@ import {
   LayoutList,
   MapPinned,
   Menu,
+  MessageCircle,
+  PlayCircle,
   MessagesSquare,
   ScrollText,
   Send,
@@ -28,11 +31,14 @@ import {
 } from 'lucide-react'
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAvisos } from '../lib/avisos'
 import { useComunidade } from '../lib/comunidade'
+import { CANAL_TUTORIAIS } from '../lib/tutoriais'
+import { useAgenteSync } from '../lib/agente'
 import { useDisparoSync } from '../lib/disparo'
 import { useWaServico, useWaPolling } from '../lib/waServico'
 import { formatDateTime } from '../lib/dates'
-import { accessOf, planInfo, useAccount, useHasWhatsApp } from '../store/useAccount'
+import { accessOf, planInfo, useAccount, useHasWhatsApp, useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -52,9 +58,18 @@ interface NavItem {
   end?: boolean
   /** Só aparece para contas com o WhatsApp da XS (recurso "motor") */
   whatsapp?: boolean
+  /** Só para o dono da XS (o Agente IA roda no WhatsApp dele) */
+  dono?: boolean
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'Assistente',
+    items: [
+      { to: '/xico', label: 'Xico', icon: Sparkles, whatsapp: true, dono: true },
+      { to: '/agente', label: 'Vendedor no WhatsApp', icon: Bot, whatsapp: true, dono: true },
+    ],
+  },
   {
     title: 'Gestão',
     items: [
@@ -72,15 +87,16 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/ligacao', label: 'Ligação', icon: Headphones },
       { to: '/roteiros', label: 'Roteiros', icon: ScrollText },
       { to: '/maps', label: 'Buscar empresas', icon: MapPinned },
+      { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
     ],
   },
   {
     title: 'WhatsApp',
     items: [
+      { to: '/conversas', label: 'Conversas', icon: MessageCircle, whatsapp: true },
       { to: '/disparo', label: 'Disparo', icon: Send, whatsapp: true },
       { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
       { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },
-      { to: '/mensagens', label: 'Modelos de mensagem', icon: MessagesSquare },
       { to: '/whatsapp', label: 'Conexão', icon: Smartphone, whatsapp: true },
     ],
   },
@@ -96,13 +112,15 @@ const MOBILE: NavItem[] = [
 /** Menu da conta: sem o WhatsApp da XS, somem os itens que dependem dele (e grupos vazios). */
 function useGroups() {
   const temWhatsApp = useHasWhatsApp()
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => temWhatsApp || !i.whatsapp) })).filter((g) => g.items.length)
+  const dono = useIsAdmin()
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (dono || !i.dono)) })).filter((g) => g.items.length)
 }
 
-/** Status do WhatsApp da conta e resultados dos disparos para o histórico dos leads. */
+/** Status do WhatsApp da conta e resultados dos disparos (e do Agente IA) para o histórico dos leads. */
 function WhatsAppSync() {
   useWaPolling()
   useDisparoSync()
+  useAgenteSync()
   return null
 }
 
@@ -124,6 +142,7 @@ export function Layout() {
   const temWhatsApp = useHasWhatsApp()
   const groups = useGroups()
   useReminders()
+  useAvisos()
   usePrivacyMode()
 
   useEffect(() => setSheet(false), [pathname])
@@ -175,6 +194,7 @@ export function Layout() {
 
         <div className="space-y-1 border-t border-line-soft p-2.5">
           <ComunidadeLink collapsed={collapsed} />
+          <TutoriaisLink collapsed={collapsed} />
           <TrialPill collapsed={collapsed} />
           {temWhatsApp && <WhatsAppPill collapsed={collapsed} />}
           <button
@@ -330,6 +350,34 @@ function ComunidadeLink({ collapsed, grande }: { collapsed?: boolean; grande?: b
   )
 }
 
+/** Canal do YouTube com os tutoriais da XS. */
+function TutoriaisLink({ collapsed, grande }: { collapsed?: boolean; grande?: boolean }) {
+  if (grande)
+    return (
+      <a href={CANAL_TUTORIAIS} target="_blank" rel="noreferrer" className="mb-3 flex items-center gap-3 rounded-lg border border-line bg-raised px-3 py-2.5 text-xs font-medium text-fg">
+        <PlayCircle className="size-[18px] text-red-400" strokeWidth={1.75} />
+        <span className="flex-1">Tutoriais no YouTube</span>
+        <ExternalLink className="size-3.5 text-fg-3" />
+      </a>
+    )
+  return (
+    <a
+      href={CANAL_TUTORIAIS}
+      target="_blank"
+      rel="noreferrer"
+      title="Tutoriais da XS no YouTube"
+      className={clsx(
+        'flex h-9 items-center gap-2.5 rounded-lg text-xs font-medium text-fg-2 transition-colors hover:bg-tint/[0.04] hover:text-fg',
+        collapsed ? 'justify-center' : 'px-2.5',
+      )}
+    >
+      <PlayCircle className="size-4 shrink-0 text-red-400" strokeWidth={1.75} />
+      {!collapsed && <span className="flex-1 truncate">Tutoriais</span>}
+      {!collapsed && <ExternalLink className="size-3 text-fg-4" />}
+    </a>
+  )
+}
+
 /** No teste grátis, mostra quantos dias faltam. */
 function TrialPill({ collapsed }: { collapsed: boolean }) {
   const profile = useAccount((s) => s.profile)
@@ -359,6 +407,7 @@ function MobileSheet({ groups, onClose }: { groups: typeof GROUPS; onClose: () =
           </button>
         </div>
         <ComunidadeLink grande />
+        <TutoriaisLink grande />
         {groups.map((group) => (
           <div key={group.title} className="mb-3">
             <p className="pb-1.5 text-[10px] font-semibold tracking-[0.08em] text-fg-4 uppercase">{group.title}</p>
@@ -415,7 +464,7 @@ function Toasts() {
 
 const AVISO_KEY = 'xs-prospeccao:aviso-plano'
 
-/** Faixa quando o teste ou o plano acaba em até 3 dias, com um botão por plano para assinar pelo WhatsApp. */
+/** Faixa quando o teste acaba em até 3 dias (ou o plano pago em menos de 1 dia), com o botão do plano Mensal. */
 function PlanoAviso() {
   const profile = useAccount((s) => s.profile)
   const plan = planInfo(profile)
@@ -427,10 +476,11 @@ function PlanoAviso() {
     }
   })
   if (!profile || !plan?.ate) return null
-  const falta = Date.parse(plan.ate) - Date.now()
-  if (falta <= 0 || falta > 3 * 86_400_000 || fechado === plan.ate) return null
-
   const teste = profile.plano === 'teste'
+  const falta = Date.parse(plan.ate) - Date.now()
+  // Plano pago renova sozinho na SigiloPay: só avisa se faltar menos de 1 dia (a cobrança não passou)
+  if (falta <= 0 || falta > (teste ? 3 : 1) * 86_400_000 || fechado === plan.ate) return null
+
   const horas = Math.ceil(falta / 3_600_000)
   const quando = horas < 24 ? `em ${horas} hora${horas === 1 ? '' : 's'}` : `em ${plan.dias} dias`
 
