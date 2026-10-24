@@ -8,6 +8,7 @@ import { Ajustes } from '../components/agente/Ajustes'
 import { Base } from '../components/agente/Base'
 import { Caderno } from '../components/agente/Caderno'
 import { Laboratorio } from '../components/agente/Laboratorio'
+import { Prospeccao } from '../components/agente/Prospeccao'
 import { TreinoNovo } from '../components/agente/TreinoNovo'
 import { erroTexto, useAgente, type AgenteCtx } from '../components/agente/comum'
 import { Conversas } from '../components/agente/Conversas'
@@ -20,7 +21,7 @@ import { useApp } from '../store/useApp'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Segmented, Spinner } from '../components/ui'
 
-type Aba = 'painel' | 'precisa' | 'conversas' | 'treino' | 'base' | 'laboratorio' | 'caderno' | 'agenda' | 'seguranca' | 'ajustes'
+type Aba = 'painel' | 'precisa' | 'conversas' | 'treino' | 'base' | 'laboratorio' | 'caderno' | 'agenda' | 'seguranca' | 'prospeccao' | 'ajustes'
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: 'painel', label: 'Painel' },
@@ -32,6 +33,7 @@ const ABAS: { id: Aba; label: string }[] = [
   { id: 'caderno', label: 'Caderno' },
   { id: 'agenda', label: 'Agenda' },
   { id: 'seguranca', label: 'Segurança' },
+  { id: 'prospeccao', label: 'Prospecção' },
   { id: 'ajustes', label: 'Ajustes' },
 ]
 
@@ -121,6 +123,7 @@ export function AgentePage() {
       {aba === 'laboratorio' && <Laboratorio />}
       {aba === 'caderno' && <Caderno />}
       {aba === 'agenda' && <Agenda ctx={ctx} />}
+      {aba === 'prospeccao' && <Prospeccao ctx={ctx} />}
       {aba === 'seguranca' && <Seguranca ctx={ctx} />}
       {aba === 'ajustes' && <Ajustes ctx={ctx} />}
     </div>
