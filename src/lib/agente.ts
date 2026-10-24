@@ -189,6 +189,8 @@ export interface EstadoAgente {
   piloto?: number
   paradoEm?: string | null
   pendencias?: number
+  materiais?: number
+  notaProva?: number | null
   google?: { temChave: boolean; restante: number; atualizadoEm: string | null }
 }
 

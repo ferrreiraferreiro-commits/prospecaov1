@@ -11,7 +11,7 @@
  * Uma ação por vez (ciclo a cada 15 s). Você responder pelo celular = o agente para naquela conversa.
  */
 import { randomUUID } from 'node:crypto'
-import type { WAMessageKey } from '@whiskeysockets/baileys'
+import { downloadMediaMessage, type WAMessage, type WAMessageKey } from '@whiskeysockets/baileys'
 import { abrirConversa, conversaEventos } from '../conversas.js'
 import { recipientByPhone, sentPhones } from '../disparo.js'
 import { formatBrazilPhone, getSock, getWa, isValidBrazilWhatsApp, registerSent, samePhone, sendText, sentByThisMotor, waEvents, withTimeout } from '../whatsapp.js'
@@ -23,7 +23,7 @@ import { buscarNoGoogle, caixaDaCidade, ErroGoogle, notaEncaixe, type ResultadoG
 import * as ia from './ia.js'
 import * as apoioIA from './ia-apoio.js'
 import { blocoRoteiro } from './metodo.js'
-import { testarGemini, testarXai, usarChaves } from './outras-ias.js'
+import { testarGemini, testarXai, transcreverAudio, usarChaves } from './outras-ias.js'
 import { calcularPadroes, faixaBoa, horariosLivres, numerosDoRamo, rotuloHorario, taxaDoRamo, type Padroes } from './padroes.js'
 import {
   analisarTeste,
@@ -1342,6 +1342,7 @@ async function ciclo() {
     if (await fazerFollowup(t)) return
     if (await prospectar(t)) return
     if (await lembrarDono(t)) return
+    for (const r of rotinasExtras) if (await r(t)) return
     if (await concluirTestes(t)) return
     await resumoDoDia(t)
   } catch (err) {
@@ -1352,8 +1353,21 @@ async function ciclo() {
 }
 
 if (AGENTE_LIGADO) {
-  waEvents.incoming((phone, texto, info) => {
-    if (!info.grupo) receber(phone, texto, info.key)
+  waEvents.incoming(async (phone, texto, info) => {
+    if (info.grupo) return
+    // Áudio: transcreve com o Gemini (se você ligou) antes de o vendedor ler
+    if (texto === '[áudio]' && db.config.conferencias.transcreverAudio && chaves.gemini && info.msg && porTelefone(phone)) {
+      try {
+        const m = info.msg as WAMessage
+        const mime = String((m.message as { audioMessage?: { mimetype?: string } } | null)?.audioMessage?.mimetype ?? 'audio/ogg')
+        const audio = (await downloadMediaMessage(m, 'buffer', {})) as Buffer
+        const t = await transcreverAudio(audio, mime)
+        if (t) texto = `[áudio transcrito] ${t}`
+      } catch {
+        /* sem transcrição: ele pede para escrever */
+      }
+    }
+    receber(phone, texto, info.key)
   })
   // Espera um pouco: o envio do próprio motor registra o id logo depois do evento
   waEvents.outgoing((phone, texto, id) => void setTimeout(() => saiuPeloCelular(phone, texto, id), 4000))
@@ -1402,6 +1416,8 @@ export function estado() {
     piloto: db.config.piloto,
     paradoEm: db.extra.paradoEm,
     pendencias: db.pendencias.filter((p) => !p.resolvidaEm).length,
+    materiais: db.materiais.filter((m) => m.ativo).length,
+    notaProva: db.lab.provas.filter((p) => p.estado === 'pronta').at(-1)?.nota ?? null,
     google: { temChave: !!db.extra.google.chave, restante: db.extra.google.restante, atualizadoEm: db.extra.google.atualizadoEm },
   }
 }
@@ -2075,6 +2091,29 @@ export async function resolverPendencia(pid: string, acao: string, textos?: unkn
     return { ok: true }
   }
   if (acao !== 'aprovar' && acao !== 'editar') throw new Error('Ação inválida.')
+  const primeiroTexto = String((Array.isArray(textos) ? textos[0] : textos) ?? '').trim()
+  // Lição proposta (Professor, Obsidian, sua edição): aprovar põe no Caderno
+  if (p.tipo === 'licao' && p.licao) {
+    const texto = (acao === 'editar' && primeiroTexto) || p.licao.texto
+    const l = p.licao.id ? db.licoes.find((x) => x.id === p.licao!.id) : undefined
+    if (l) Object.assign(l, { texto: texto.slice(0, 400), status: 'ativa', ativa: true })
+    else guardarLicao('conversa', texto, p.licao.origem ?? 'voce', { ...p.licao, id: randomUUID(), status: 'ativa' })
+    fechar(acao === 'editar' ? 'editada' : 'aprovada')
+    salvar()
+    return { ok: true }
+  }
+  // Pergunta que o material não respondia: a sua resposta vira material
+  if (p.tipo === 'lacuna') {
+    if (!primeiroTexto) throw new Error('Escreva a resposta.')
+    const titulo = 'Respostas suas (perguntas que faltavam)'
+    const m = db.materiais.find((x) => x.titulo === titulo)
+    const bloco = `P: ${p.motivo ?? ''}\nR: ${primeiroTexto.slice(0, 2000)}`
+    if (m) Object.assign(m, { texto: `${m.texto}\n\n${bloco}`.slice(0, 20000), atualizadoEm: iso() })
+    else db.materiais.push({ id: randomUUID(), titulo, tipo: 'faq', texto: bloco, ativo: true, atualizadoEm: iso() })
+    fechar('feita')
+    salvar()
+    return { ok: true }
+  }
   if (!p.rascunho || !c) throw new Error('Este item não tem mensagem para enviar.')
   if (c.estado === 'optout') throw new Error('Esta pessoa pediu para não receber mensagens.')
   const editada = acao === 'editar'
@@ -2144,3 +2183,12 @@ export function mudarNivel(valor: unknown) {
   return seguranca()
 }
 
+
+// ---------------------------------------------------------------------------
+// Para a equipe (equipe.ts): Laboratório, Caderno, treino e rotinas
+// ---------------------------------------------------------------------------
+
+export const interno = { ctx, comIA, apoioPara, contextoConferencia, sair, novaPendencia, guardarLicao, registrar, avisarDono }
+
+/** Rotinas extras (véspera, pós-venda, Professor) que a equipe registra; o ciclo chama uma por vez. */
+export const rotinasExtras: ((t: Date) => Promise<boolean>)[] = []

@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import * as disparo from '../disparo.js'
 import * as agente from './agente.js'
+import * as equipe from './equipe.js'
 import { BASE } from './categoriasBase.js'
 import { EXEMPLOS_PROMPT_SITE } from './modelosSite.js'
 import { MODELOS, type Modelo } from './tipos.js'
@@ -160,6 +161,8 @@ function servidor(chave: string): McpServer {
   ferramenta('vendedor_numeros_por_ramo', 'Como cada ramo (tipo de negócio) está indo: abordados, % de resposta, quentes, reuniões, vendas.', {}, doXico('numeros_por_ramo'))
   ferramenta('xico_memoria', 'O que o Xico (o assistente da XS) sabe sobre o dono: preferências, jeito de trabalhar, metas.', {}, doXico('ver_memoria'))
   ferramenta('xico_lembrar', 'Guarda na memória do Xico algo duradouro sobre o dono (frase curta, na terceira pessoa).', { texto: z.string() }, doXico('lembrar'), false)
+  ferramenta('caderno_arquivos', 'As notas do Caderno do vendedor (Markdown no formato do Obsidian): persona, regras, ramos, objeções, lições, diário e material.', {}, () => equipe.cadernoArquivos())
+  ferramenta('caderno_importar', 'Manda uma nota editada no Obsidian de volta para a XS: vira proposta que o dono aprova em Precisa de você.', { caminho: z.string(), conteudo: z.string() }, (a) => equipe.importarDoObsidian(a.caminho, a.conteudo), false)
   ferramenta('xico_prompt_mestre', 'Documento com tudo o que a XS sabe: o dono, a oferta, regras, lições, números por ramo e testes. Bom para começar qualquer trabalho com contexto.', {}, () => xico.promptParaClaude())
 
   // Prompts de site

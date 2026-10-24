@@ -39,6 +39,8 @@ let lastError: string | null = null
 export interface IncomingInfo {
   key: WAMessageKey
   grupo: boolean
+  /** A mensagem inteira (para baixar áudio) */
+  msg?: unknown
 }
 
 type Listener<A extends unknown[]> = (...args: A) => void | Promise<void>
@@ -228,7 +230,7 @@ export async function connect(): Promise<void> {
             if (key.id) emit(onOutgoing, telefone, texto, key.id)
             continue
           }
-          emit(onIncoming, telefone, texto, { key: msg.key, grupo })
+          emit(onIncoming, telefone, texto, { key: msg.key, grupo, msg })
         }
       })
 

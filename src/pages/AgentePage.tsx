@@ -3,30 +3,35 @@ import clsx from 'clsx'
 import { Bot, OctagonX, Power } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Agenda } from '../components/agente/Agenda'
 import { Ajustes } from '../components/agente/Ajustes'
+import { Base } from '../components/agente/Base'
+import { Caderno } from '../components/agente/Caderno'
+import { Laboratorio } from '../components/agente/Laboratorio'
+import { TreinoNovo } from '../components/agente/TreinoNovo'
 import { erroTexto, useAgente, type AgenteCtx } from '../components/agente/comum'
 import { Conversas } from '../components/agente/Conversas'
 import { Painel } from '../components/agente/Painel'
 import { PrecisaDeVoce } from '../components/agente/PrecisaDeVoce'
-import { Prospeccao } from '../components/agente/Prospeccao'
 import { Seguranca } from '../components/agente/Seguranca'
-import { Testes } from '../components/agente/Testes'
 import { Treino } from '../components/agente/Treino'
 import { ag, type EstadoAgente } from '../lib/agente'
 import { useApp } from '../store/useApp'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Segmented, Spinner } from '../components/ui'
 
-type Aba = 'painel' | 'precisa' | 'conversas' | 'treino' | 'seguranca' | 'prospeccao' | 'testes' | 'ajustes'
+type Aba = 'painel' | 'precisa' | 'conversas' | 'treino' | 'base' | 'laboratorio' | 'caderno' | 'agenda' | 'seguranca' | 'ajustes'
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: 'painel', label: 'Painel' },
   { id: 'precisa', label: 'Precisa de você' },
   { id: 'conversas', label: 'Conversas' },
   { id: 'treino', label: 'Treino' },
+  { id: 'base', label: 'Material' },
+  { id: 'laboratorio', label: 'Laboratório' },
+  { id: 'caderno', label: 'Caderno' },
+  { id: 'agenda', label: 'Agenda' },
   { id: 'seguranca', label: 'Segurança' },
-  { id: 'prospeccao', label: 'Prospecção' },
-  { id: 'testes', label: 'Testes' },
   { id: 'ajustes', label: 'Ajustes' },
 ]
 
@@ -106,10 +111,17 @@ export function AgentePage() {
       {aba === 'painel' && <Painel ctx={ctx} irPara={(a) => ir(a)} abrirConversa={(id) => ir('conversas', { conversa: id })} />}
       {aba === 'conversas' && <Conversas abrir={conversa} setAbrir={(id) => ir('conversas', id ? { conversa: id } : {})} />}
       {aba === 'precisa' && <PrecisaDeVoce onMudou={() => void ctx.recarregar()} abrirConversa={(id) => ir('conversas', { conversa: id })} />}
-      {aba === 'treino' && <Treino ctx={ctx} />}
+      {aba === 'treino' && (
+        <div className="space-y-4">
+          <TreinoNovo ctx={ctx} />
+          <Treino ctx={ctx} />
+        </div>
+      )}
+      {aba === 'base' && <Base />}
+      {aba === 'laboratorio' && <Laboratorio />}
+      {aba === 'caderno' && <Caderno />}
+      {aba === 'agenda' && <Agenda ctx={ctx} />}
       {aba === 'seguranca' && <Seguranca ctx={ctx} />}
-      {aba === 'prospeccao' && <Prospeccao ctx={ctx} />}
-      {aba === 'testes' && <Testes />}
       {aba === 'ajustes' && <Ajustes ctx={ctx} />}
     </div>
   )

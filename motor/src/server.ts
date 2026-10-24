@@ -7,6 +7,7 @@
 import express, { type NextFunction, type Request, type Response } from 'express'
 import * as agente from './agente/agente.js'
 import * as conector from './agente/conector.js'
+import * as equipe from './agente/equipe.js'
 import * as xico from './agente/xico.js'
 import { abrirConversa, enviarNaConversa, listarConversas, marcarLidas } from './conversas.js'
 import { agendaPending, cancelAgenda, createAgenda, deleteAgenda, listAgenda, markAgendaSynced, updateAgenda } from './agenda.js'
@@ -147,6 +148,29 @@ app.post('/agente/pendencias/:id', wrap(soAgente((req) => agente.resolverPendenc
 app.get('/agente/seguranca', wrap(soAgente(() => agente.seguranca())))
 // POST (o gateway da nuvem só deixa passar GET, POST e DELETE)
 app.post('/agente/nivel', wrap(soAgente((req) => agente.mudarNivel(req.body?.nivel))))
+// A equipe: treino, material, Laboratório, Caderno, agenda e números
+app.get('/agente/treino', wrap(soAgente(() => equipe.treino())))
+app.post('/agente/treino/pacote', wrap(soAgente((req) => equipe.ligarPacoteDoTreino(String(req.body?.pacote ?? ''), req.body?.ligado === true))))
+app.post('/agente/treino/entrevista', wrap(soAgente((req) => equipe.entrevista(req.body?.resposta, req.body?.encerrar))))
+app.post('/agente/treino/entrevista/aplicar', wrap(soAgente(() => equipe.aplicarEntrevista())))
+app.post('/agente/treino/entrevista/recomecar', wrap(soAgente(() => equipe.recomecarEntrevista())))
+app.post('/agente/treino/meu-jeito', wrap(soAgente((req) => equipe.meuJeito(req.body?.mensagens))))
+app.get('/agente/material', wrap(soAgente(() => equipe.materiais())))
+app.post('/agente/material', wrap(soAgente((req) => equipe.salvarMaterial(req.body ?? {}))))
+app.delete('/agente/material/:id', wrap(soAgente((req) => equipe.apagarMaterial(id(req)))))
+app.get('/agente/laboratorio', wrap(soAgente(() => equipe.laboratorio())))
+app.post('/agente/laboratorio/prova', wrap(soAgente((req) => equipe.rodarProva(req.body?.tamanho))))
+app.post('/agente/laboratorio/versao', wrap(soAgente((req) => equipe.salvarVersao(req.body?.motivo))))
+app.post('/agente/laboratorio/voltar', wrap(soAgente((req) => equipe.voltarParaVersao(req.body?.n))))
+app.post('/agente/conversas/:id/caso', wrap(soAgente((req) => equipe.casoDaConversa(id(req), req.body?.mensagem, req.body?.tipo))))
+app.get('/agente/caderno', wrap(soAgente(() => equipe.caderno())))
+app.get('/agente/caderno/zip', wrap(soAgente(() => equipe.cadernoZip())))
+app.get('/agente/caderno/arquivos', wrap(soAgente(() => equipe.cadernoArquivos())))
+app.post('/agente/caderno/importar', wrap(soAgente((req) => equipe.importarDoObsidian(req.body?.caminho, req.body?.conteudo))))
+app.post('/agente/caderno/licao/:id', wrap(soAgente((req) => equipe.editarLicaoDoCaderno(id(req), req.body ?? {}))))
+app.get('/agente/agenda', wrap(soAgente(() => equipe.agenda())))
+app.post('/agente/agenda/:id', wrap(soAgente((req) => equipe.marcarReuniao(id(req), req.body?.estado))))
+app.get('/agente/padroes', wrap(soAgente(() => equipe.padroes())))
 app.post('/agente/voltar', wrap(comEstado(() => agente.voltarATrabalhar())))
 // A tela Conversas da XS: quem está com o vendedor, a conversa de um número, assumir e entregar
 app.get('/agente/mapa', wrap(soAgente(() => agente.mapaConversas())))
