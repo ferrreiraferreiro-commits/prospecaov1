@@ -43,14 +43,12 @@ const ICONE: Record<Atividade['tipo'], { icon: typeof Send; cls: string }> = {
 /** O que falta para ligar o agente. */
 export function passos(e: EstadoAgente, c: AgenteCtx['config']) {
   return [
-    { ok: e.temChave, texto: 'Conectar a chave da IA (a do Gemini é grátis)', aba: 'ajustes' },
-    { ok: e.whatsapp === 'connected', texto: 'Conectar o WhatsApp do agente (QR Code)', link: '/whatsapp' },
-    { ok: !!c.negocio.seuNome.trim() && !!c.negocio.oferta.trim(), texto: 'Dizer seu nome e o que você vende (preços e prazo)', aba: 'treino' },
+    { ok: e.temChave, texto: 'Colar a chave da IA (a do Google é grátis)', aba: 'conectar' },
+    { ok: e.whatsapp === 'connected', texto: 'Conectar o seu WhatsApp (QR Code)', link: '/whatsapp' },
+    { ok: !!c.negocio.seuNome.trim() && !!c.negocio.oferta.trim(), texto: 'Contar seu nome e o que você vende', aba: 'voce' },
+    { ok: !!c.negocio.estilo.trim(), texto: 'Ensinar o seu jeito de falar', aba: 'jeito', opcional: true },
+    { ok: !!e.materiais, texto: 'Colocar preços e perguntas frequentes no Material', aba: 'material', opcional: true },
     { ok: !!c.avisos.telefone, texto: 'Informar um outro número seu, para receber os avisos', aba: 'ajustes', opcional: true },
-    { ok: c.prospeccao.alvos.some((a) => a.ativo), texto: 'Escolher cidades e tipos de negócio (para ele buscar sozinho)', aba: 'prospeccao', opcional: true },
-    { ok: e.licoes > 0 || !!c.negocio.objecoes.trim(), texto: 'Fazer a entrevista no Treino (10 min)', aba: 'treino', opcional: true },
-    { ok: !!e.materiais, texto: 'Cadastrar preços e perguntas frequentes em Material', aba: 'base', opcional: true },
-    { ok: e.notaProva != null, texto: 'Rodar uma prova no Laboratório antes de soltar no cliente', aba: 'laboratorio', opcional: true },
   ]
 }
 
@@ -94,7 +92,7 @@ export function Painel({ ctx, irPara, abrirConversa }: { ctx: AgenteCtx; irPara:
         </Alerta>
       )}
       {e.chaveRecusada && (
-        <Alerta tom="bad" titulo="A IA parou" acao={<Button size="sm" variant="secondary" onClick={() => irPara('ajustes')}>Ver chave</Button>}>
+        <Alerta tom="bad" titulo="A IA parou" acao={<Button size="sm" variant="secondary" onClick={() => irPara('conectar')}>Ver chave</Button>}>
           {e.ultimoErro ?? 'A chave da API foi recusada ou acabou o crédito.'}
         </Alerta>
       )}
@@ -110,7 +108,7 @@ export function Painel({ ctx, irPara, abrirConversa }: { ctx: AgenteCtx; irPara:
       )}
 
       {(falta.length > 0 || !e.ativo) && (
-        <Card title="Primeiros passos" description="Faça uma vez. Depois, é só ir treinando.">
+        <Card title="O que falta" description="Faça uma vez. Os passos estão em Começar, na ordem.">
           <ol className="space-y-1.5">
             {lista.map((p, i) => (
               <li key={i} className="flex items-center gap-2.5 text-[13px]">
@@ -132,7 +130,7 @@ export function Painel({ ctx, irPara, abrirConversa }: { ctx: AgenteCtx; irPara:
               </li>
             ))}
           </ol>
-          <p className="mt-3 text-2xs text-fg-4">Antes de ligar, teste no Simulador (aba Treino) como ele escreve e corrija o que não gostar.</p>
+          <p className="mt-3 text-2xs text-fg-4">Antes de ligar, teste em Começar → Testar e ligar: converse com a IA fingindo ser um cliente e corrija o que não gostar.</p>
         </Card>
       )}
 
@@ -157,9 +155,9 @@ export function Painel({ ctx, irPara, abrirConversa }: { ctx: AgenteCtx; irPara:
         </button>
       )}
 
-      <Card title="O que o agente fez" description="Atualiza sozinho." bodyClass="px-2 py-1.5">
+      <Card title="O que a IA fez" description="Atualiza sozinho." bodyClass="px-2 py-1.5">
         {atividade.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs text-fg-3">Nada ainda. Quando ligar o agente, tudo o que ele fizer aparece aqui.</p>
+          <p className="px-2 py-6 text-center text-xs text-fg-3">Nada ainda. Quando você ligar a IA, tudo o que ela fizer aparece aqui.</p>
         ) : (
           <ul className="max-h-[480px] divide-y divide-line-soft overflow-y-auto">
             {atividade.map((a, i) => {

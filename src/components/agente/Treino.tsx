@@ -20,7 +20,11 @@ const EXEMPLO_OBJECOES = `Exemplo:
 "Tá caro" → Dá para começar pelo Essencial e parcelar. Um cliente novo por mês já paga o site.
 "Vou pensar" → Claro! Posso te mandar um exemplo de site do seu ramo para você ver?`
 
-export function Treino({ ctx }: { ctx: AgenteCtx }) {
+/** Pedaços do treino, cada um num passo da tela da IA (sem parte = tudo junto). */
+export function Treino({ ctx, parte }: { ctx: AgenteCtx; parte?: 'negocio' | 'testar' | 'licoes' }) {
+  if (parte === 'negocio') return <Negocio ctx={ctx} />
+  if (parte === 'testar') return <Simulador />
+  if (parte === 'licoes') return <Licoes />
   return (
     <div className="space-y-4">
       <Negocio ctx={ctx} />
@@ -55,11 +59,11 @@ function Negocio({ ctx }: { ctx: AgenteCtx }) {
 
   return (
     <Card
-      title="Seu negócio"
-      description="Tudo o que a IA sabe sobre o que você vende sai daqui. Escreva do seu jeito, como explicaria para alguém que vai responder no seu lugar."
+      title="Sobre você e o que você vende"
+      description="A IA só sabe o que estiver aqui. Escreva do seu jeito, como explicaria para um amigo que vai responder no seu lugar. Os campos com (opcional) podem ficar em branco."
       actions={
         <Button variant="primary" size="sm" loading={busy} disabled={!mudou} onClick={() => void salvar()}>
-          Salvar treino
+          Salvar
         </Button>
       }
       bodyClass="px-4 py-4"
@@ -99,30 +103,30 @@ function Negocio({ ctx }: { ctx: AgenteCtx }) {
         <Field label="Como se apresentar (opcional)" className="md:col-span-2" hint={eu ? 'Em branco, ela se apresenta como você faria: pelo primeiro nome, curto.' : 'Ele sempre diz a verdade se perguntarem se é robô: que é o assistente virtual e pode chamar você.'}>
           <input className="input" value={n.apresentacao} onChange={(e) => set('apresentacao', e.target.value)} placeholder={eu ? `Aqui é o ${nome}${n.empresa ? `, da ${n.empresa}` : ''}. Faço sites para negócios da cidade.` : `Sou assistente do ${nome}${n.empresa ? `, da ${n.empresa}` : ''}. A gente cria sites para negócios da cidade.`} />
         </Field>
-        <Field label="O que você vende: pacotes, preços, o que inclui, prazo" className="md:col-span-2">
+        <Field label="O que você vende: pacotes, preços, o que vem incluso e o prazo" className="md:col-span-2" hint="Esse é o mais importante. Sem ele, a IA não sabe o que oferecer.">
           <Texto value={n.oferta} onChange={(v) => set('oferta', v)} rows={6} placeholder={EXEMPLO_OFERTA} />
         </Field>
-        <Field label="Pagamento" hint="Chave Pix, entrada, parcelamento… Ele só manda quando o cliente topar.">
+        <Field label="Como o cliente paga (opcional)" hint="Chave Pix, entrada, parcelamento… Ela só manda quando o cliente topar.">
           <Texto value={n.pagamento} onChange={(v) => set('pagamento', v)} rows={3} placeholder="Pix: (11) 99999-9999. 50% para começar e 50% na entrega." />
         </Field>
-        <Field label="Sites que você já fez (portfólio)" hint="Links que ele pode mandar como exemplo.">
+        <Field label="Sites que você já fez (opcional)" hint="Links que ela pode mandar como exemplo.">
           <Texto value={n.portfolio} onChange={(v) => set('portfolio', v)} rows={3} placeholder={'Pizzaria: https://…\nBarbearia: https://…'} />
         </Field>
-        <Field label="Objeções que você mais ouve e como responde" className="md:col-span-2">
+        <Field label="O que o cliente costuma dizer para não comprar, e o que você responde (opcional)" className="md:col-span-2">
           <Texto value={n.objecoes} onChange={(v) => set('objecoes', v)} rows={5} placeholder={EXEMPLO_OBJECOES} />
         </Field>
-        <Field label="Seu jeito de falar" hint='Ex.: "Informal, chamo de você, uso “show”, “top”. Sem textão."'>
+        <Field label="Seu jeito de falar (opcional)" hint='Ex.: "Informal, chamo de você, uso “show”, “top”. Sem textão."'>
           <Texto value={n.estilo} onChange={(v) => set('estilo', v)} rows={3} />
         </Field>
-        <Field label="Regras extras" hint='Ex.: "Nunca prometa ficar em 1º no Google." "Não atendo fora do meu estado."'>
+        <Field label="Regras extras (opcional)" hint='Ex.: "Nunca prometa ficar em 1º no Google." "Não atendo fora do meu estado."'>
           <Texto value={n.regras} onChange={(v) => set('regras', v)} rows={3} />
         </Field>
       </div>
       <div className="mt-4 grid gap-3 rounded-lg border border-line-soft bg-ink p-3 md:grid-cols-[1fr_auto] md:items-center">
         <div>
-          <p className="text-[13px] font-medium text-fg">Pode fechar a venda sozinho?</p>
+          <p className="text-[13px] font-medium text-fg">A IA pode fechar a venda sozinha?</p>
           <p className="text-xs text-fg-3">
-            {podeFechar ? 'Ele passa preço, negocia até o desconto máximo, manda o Pix e te avisa para conferir o pagamento.' : 'Ele conversa e, quando o cliente se interessar, marca uma conversa com você ou te chama.'} Nos dois casos ele te avisa quando o lead esquenta.
+            {podeFechar ? 'Ela passa o preço, dá desconto até o limite, manda o Pix e te avisa para conferir o pagamento.' : 'Ela conversa e, quando o cliente se interessar, marca um horário com você ou te chama.'} Nos dois casos ela te avisa quando o cliente fica interessado.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

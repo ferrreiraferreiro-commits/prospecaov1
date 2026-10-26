@@ -19,7 +19,7 @@ import { AssinarPage } from './pages/AssinarPage'
 import { LandingPage } from './pages/LandingPage'
 import { PainelPage } from './pages/PainelPage'
 import type { Repository } from './data/repository'
-import { accessOf, useAccount, useHasWhatsApp, useIsAdmin } from './store/useAccount'
+import { accessOf, useAccount, useHasIA, useHasWhatsApp, useIsAdmin } from './store/useAccount'
 import { useApp } from './store/useApp'
 import { useBiz } from './store/useBiz'
 
@@ -96,6 +96,7 @@ function LegalRoutes() {
 function Routed() {
   const temWhatsApp = useHasWhatsApp()
   const admin = useIsAdmin()
+  const temIA = useHasIA()
   // Telas do WhatsApp (disparo, funis, agendadas, conexão) só existem para contas com esse recurso
   const m = (el: ReactNode) => (temWhatsApp ? el : <Navigate to="/" replace />)
   return (
@@ -114,7 +115,7 @@ function Routed() {
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />
           <Route path="whatsapp" element={m(<WhatsAppPage />)} />
-          <Route path="agente" element={admin ? m(<AgentePage />) : <Navigate to="/" replace />} />
+          <Route path="agente" element={temIA ? m(<AgentePage />) : <Navigate to="/" replace />} />
           <Route path="xico" element={admin ? m(<XicoPage />) : <Navigate to="/" replace />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />

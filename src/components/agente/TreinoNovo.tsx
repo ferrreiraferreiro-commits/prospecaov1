@@ -52,7 +52,7 @@ const RISCO: Record<Cap['risco'], { texto: string; tom: 'neutro' | 'azul' | 'our
 }
 
 /** O treino novo: persona, entrevista, "copiar meu jeito" e as capacidades. */
-export function TreinoNovo({ ctx }: { ctx: AgenteCtx }) {
+export function TreinoNovo({ ctx, parte }: { ctx: AgenteCtx; parte?: 'entrevista' | 'jeito' | 'pode' }) {
   const [d, setD] = useState<DadosTreino | null>(null)
   const carregar = useCallback(() => ag<DadosTreino>('/treino', { timeoutMs: 10000 }).then(setD, () => setD(null)), [])
   useEffect(() => {
@@ -65,6 +65,10 @@ export function TreinoNovo({ ctx }: { ctx: AgenteCtx }) {
         <Spinner />
       </div>
     )
+
+  if (parte === 'entrevista') return <EntrevistaXico d={d.entrevista} onMudou={carregar} recarregarCtx={() => void ctx.recarregar()} />
+  if (parte === 'jeito') return <Persona ctx={ctx} d={d} onSalvo={carregar} />
+  if (parte === 'pode') return <Pode d={d} ctx={ctx} onMudou={setD} />
 
   return (
     <div className="space-y-4">
@@ -105,6 +109,33 @@ export function TreinoNovo({ ctx }: { ctx: AgenteCtx }) {
   )
 }
 
+/** O que ela pode fazer (cada um liga e desliga) e o que ela nunca faz. */
+function Pode({ d, ctx, onMudou }: { d: DadosTreino; ctx: AgenteCtx; onMudou: (d: DadosTreino) => void }) {
+  return (
+    <div className="space-y-4">
+      <Capacidades pacotes={d.pacotes} ctx={ctx} onMudou={onMudou} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card title="Ela já vem sabendo" description="O que está ligado agora.">
+          <ul className="grid gap-1 text-xs text-fg-2 sm:grid-cols-2">
+            {d.jaVemSabendo.map((t) => (
+              <li key={t} className="flex gap-1.5">
+                <Check className="mt-0.5 size-3 shrink-0 text-emerald-300" /> {t}
+              </li>
+            ))}
+          </ul>
+        </Card>
+        <Card title="E nunca vai fazer" description="Ela confere isso antes de cada mensagem sair. Não dá para desligar.">
+          <ul className="space-y-1 text-xs text-fg-2">
+            {d.nuncaVaiFazer.map((t) => (
+              <li key={t}>· {t}</li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
 function Persona({ ctx, d, onSalvo }: { ctx: AgenteCtx; d: DadosTreino; onSalvo: () => void }) {
   const [p, setP] = useState(d.persona)
   const [e, setE] = useState(d.estiloResposta)
@@ -133,8 +164,8 @@ function Persona({ ctx, d, onSalvo }: { ctx: AgenteCtx; d: DadosTreino; onSalvo:
 
   return (
     <Card
-      title="Persona"
-      description="Como ele se chama para o seu time e o jeito de falar. O cliente vê só a conversa."
+      title="Jeito de falar"
+      description="Escolha como a IA conversa. O cliente nunca vê as configurações, só as mensagens."
       actions={
         <Button variant="primary" size="sm" loading={busy} disabled={!mudou} onClick={() => void salvar()}>
           Salvar
@@ -142,11 +173,11 @@ function Persona({ ctx, d, onSalvo }: { ctx: AgenteCtx; d: DadosTreino; onSalvo:
       }
       bodyClass="px-4 py-4 space-y-4"
     >
-      <Field label="Como ele vai se chamar">
+      <Field label="Apelido da IA (só você vê)">
         <input className="input" value={p.nome} onChange={(x) => setP({ ...p, nome: x.target.value })} placeholder="Atendente IA" />
       </Field>
       <div>
-        <span className="label">O jeito dele falar</span>
+        <span className="label">Tom da conversa</span>
         <div className="space-y-1.5">
           {TONS.map((t) => (
             <button
@@ -216,7 +247,7 @@ function EntrevistaXico({ d, onMudou, recarregarCtx }: { d: Entrevista | null; o
           <Sparkles className="size-3.5 text-gold" /> Entrevista de treino
         </span>
       }
-      description="Responda umas 10 perguntas, por escrito, e ele monta o treino inteiro: oferta, preços, objeções, regras e o jeito de falar."
+      description="Jeito mais fácil: responda umas 10 perguntas, por escrito, e a XS preenche tudo para você (o que vende, preços, jeito de falar). Depois é só conferir."
       actions={d?.mensagens.length ? <Button size="xs" variant="ghost" onClick={() => void chamar('/treino/entrevista/recomecar')}>Recomeçar</Button> : undefined}
       bodyClass="px-4 py-4 space-y-3"
     >

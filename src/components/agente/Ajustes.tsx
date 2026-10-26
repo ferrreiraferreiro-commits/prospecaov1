@@ -14,7 +14,8 @@ type Rascunho = Pick<AgenteConfig, 'modelo' | 'limiteDiaUSD' | 'avisos' | 'respo
 
 const rascunhoDe = (c: AgenteConfig): Rascunho => ({ modelo: c.modelo, limiteDiaUSD: c.limiteDiaUSD, avisos: c.avisos, respostas: c.respostas, responderDisparos: c.responderDisparos })
 
-export function Ajustes({ ctx }: { ctx: AgenteCtx }) {
+/** parte "chave" = só a chave da IA (passo 1); "funcionamento" = horários, avisos e gastos; sem parte = tudo. */
+export function Ajustes({ ctx, parte }: { ctx: AgenteCtx; parte?: 'chave' | 'funcionamento' }) {
   const [r, setR] = useState<Rascunho>(() => rascunhoDe(ctx.config))
   const [tel, setTel] = useState(formatPhone(ctx.config.avisos.telefone))
   const [busy, setBusy] = useState(false)
@@ -30,11 +31,12 @@ export function Ajustes({ ctx }: { ctx: AgenteCtx }) {
     setBusy(false)
   }
 
+  if (parte === 'chave') return <ChaveApi ctx={ctx} />
   return (
     <div className="space-y-4">
-      <ChaveApi ctx={ctx} />
+      {parte !== 'funcionamento' && <ChaveApi ctx={ctx} />}
       <Card
-        title="Funcionamento"
+        title="Horários, avisos e gastos"
         actions={
           <Button variant="primary" size="sm" loading={busy} disabled={!mudou} onClick={() => void salvar()}>
             Salvar
@@ -43,7 +45,7 @@ export function Ajustes({ ctx }: { ctx: AgenteCtx }) {
         bodyClass="px-4 py-4 space-y-5"
       >
         <section>
-          <span className="label">Modelo da IA</span>
+          <span className="label">Qual IA usar</span>
           <div className="grid gap-2 sm:grid-cols-3">
             {MODELOS.map((m) => (
               <button
@@ -100,7 +102,7 @@ function ChaveApi({ ctx }: { ctx: AgenteCtx }) {
   }
 
   async function remover() {
-    if (!window.confirm('Remover a chave? O agente desliga até você colocar outra.')) return
+    if (!window.confirm('Remover a chave? A IA desliga até você colocar outra.')) return
     try {
       ctx.setEstado(await ag<EstadoAgente>('/chave', { method: 'DELETE' }))
       void ctx.recarregar()
@@ -113,10 +115,10 @@ function ChaveApi({ ctx }: { ctx: AgenteCtx }) {
     <Card
       title={
         <span className="flex items-center gap-1.5">
-          <KeyRound className="size-3.5 text-gold" /> Chave da API do Claude
+          <KeyRound className="size-3.5 text-gold" /> Chave da IA
         </span>
       }
-      description="É por ela que o agente pensa. Fica guardada só no servidor da XS e nunca aparece de novo na tela."
+      description="A chave é como uma senha que deixa a IA pensar. Ela fica guardada só no servidor da XS e não aparece de novo na tela."
     >
       {e.temChave ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -128,17 +130,36 @@ function ChaveApi({ ctx }: { ctx: AgenteCtx }) {
           </Button>
         </div>
       ) : (
-        <ol className="mb-3 list-decimal space-y-1 pl-5 text-xs text-fg-2">
-          <li>
-            Entre em{' '}
-            <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-blue-300 hover:underline">
-              console.anthropic.com <ExternalLink className="size-3" />
-            </a>{' '}
-            e crie a sua conta.
-          </li>
-          <li>Em Billing, coloque crédito (US$ 10 dá para bastante coisa).</li>
-          <li>Em API Keys, clique em "Create Key", copie a chave e cole aqui embaixo.</li>
-        </ol>
+        <div className="mb-3 space-y-3">
+          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.05] p-3">
+            <p className="text-[13px] font-medium text-emerald-200">Grátis: chave do Google (Gemini)</p>
+            <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-xs text-fg-2">
+              <li>
+                Abra{' '}
+                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-blue-300 hover:underline">
+                  aistudio.google.com/apikey <ExternalLink className="size-3" />
+                </a>{' '}
+                e entre com a sua conta do Google (a mesma do Gmail).
+              </li>
+              <li>Clique no botão “Create API key” (criar chave).</li>
+              <li>Copie a chave que aparecer, cole aqui embaixo e clique em Conectar.</li>
+            </ol>
+          </div>
+          <details className="rounded-lg border border-line-soft p-3 text-xs text-fg-2">
+            <summary className="cursor-pointer text-[13px] font-medium text-fg">Prefere o Claude? (pago, escreve melhor)</summary>
+            <ol className="mt-1.5 list-decimal space-y-1 pl-5">
+              <li>
+                Entre em{' '}
+                <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-blue-300 hover:underline">
+                  console.anthropic.com <ExternalLink className="size-3" />
+                </a>{' '}
+                e crie a sua conta.
+              </li>
+              <li>Em Billing, coloque crédito (US$ 10 dá para bastante coisa).</li>
+              <li>Em API Keys, clique em “Create Key”, copie a chave e cole aqui embaixo.</li>
+            </ol>
+          </details>
+        </div>
       )}
       <form
         className="mt-2 flex gap-2"
@@ -147,7 +168,7 @@ function ChaveApi({ ctx }: { ctx: AgenteCtx }) {
           if (valor.trim()) void conectar()
         }}
       >
-        <input className="input flex-1" type="password" autoComplete="off" value={valor} onChange={(ev) => setValor(ev.target.value)} placeholder={e.temChave ? 'Trocar por outra chave (Claude sk-ant-…, Gemini ou Grok xai-…)' : 'Cole a chave aqui (Claude sk-ant-…, Gemini ou Grok xai-…)'} />
+        <input className="input flex-1" type="password" autoComplete="off" value={valor} onChange={(ev) => setValor(ev.target.value)} placeholder={e.temChave ? 'Trocar por outra chave' : 'Cole a chave aqui'} />
         <Button type="submit" variant="primary" loading={busy} disabled={!valor.trim()}>
           {e.temChave ? 'Trocar' : 'Conectar'}
         </Button>
