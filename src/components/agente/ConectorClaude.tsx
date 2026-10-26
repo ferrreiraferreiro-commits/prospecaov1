@@ -9,7 +9,7 @@ import { Card } from '../kit'
 import { Button, Modal } from '../ui'
 import { erroTexto } from './comum'
 
-interface ChaveApi {
+export interface ChaveApi {
   id: string
   nome: string
   final: string
@@ -21,12 +21,12 @@ interface ChaveApi {
 /** Endereço do conector (o mesmo servidor do WhatsApp da XS). */
 export const URL_CONECTOR = `${WA_URL}/mcp`
 
-async function sha256(texto: string): Promise<string> {
+export async function sha256(texto: string): Promise<string> {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto))
   return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function novaChave(): string {
+export function novaChave(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
   return `xs_${btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`
 }
