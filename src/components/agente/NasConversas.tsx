@@ -49,7 +49,7 @@ export function SeloAgente({ m }: { m: MapaAgente | undefined }) {
   const comVoce = m.estado === 'humano'
   return (
     <span
-      title={`Vendedor IA: ${ESTADO[m.estado].label}`}
+      title={`Vendedor IA: ${ESTADO[m.estado]?.label ?? ''}`}
       className={clsx(
         'inline-flex h-4 shrink-0 items-center gap-1 rounded px-1 text-[10px] font-semibold ring-1 ring-inset',
         m.aguardando ? 'bg-red-500/10 text-red-300 ring-red-500/25' : comVoce ? 'bg-tint/[0.05] text-fg-3 ring-line' : 'bg-blue-500/10 text-blue-300 ring-blue-500/25',
@@ -81,7 +81,9 @@ export function FaixaAgente({ telefone, nome, versao, onDoAgente, onMudou }: { t
 
   const carregar = useCallback(async () => {
     try {
-      const r = await ag<ConversaDoAgente | null>(`/tel/${telefone}`, { timeoutMs: 8000 })
+      const resp = await ag<ConversaDoAgente | null>(`/tel/${telefone}`, { timeoutMs: 8000 })
+      // Sem conversa do vendedor o serviço responde { ok: true }: conta como nenhuma
+      const r = resp && resp.estado in ESTADO ? resp : null
       setC(r)
       onDoAgente(new Set((r?.doAgente ?? []).map((m) => m.waId)))
     } catch {
