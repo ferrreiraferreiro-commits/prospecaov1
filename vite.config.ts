@@ -58,6 +58,33 @@ function apiDev(): Plugin {
         const skipAuth = !env.VITE_SUPABASE_URL
         await mod.handle({ method: req.method, headers: req.headers, body: Buffer.concat(chunks).toString() }, out, { skipAuth })
       })
+      // API oficial da Meta (api/meta.ts): no dev só o app usa; o webhook da Meta precisa do site publicado
+      server.middlewares.use('/api/meta', async (req, res) => {
+        const env = loadEnv(server.config.mode, process.cwd(), '')
+        for (const k of ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY']) if (env[k]) process.env[k] = env[k]
+        const chunks: Buffer[] = []
+        for await (const c of req) chunks.push(c as Buffer)
+        const mod = (await server.ssrLoadModule('/api/meta.ts')) as typeof import('./api/meta')
+        let code = 200
+        const out = {
+          status(c: number) {
+            code = c
+            return out
+          },
+          json(body: unknown) {
+            res.statusCode = code
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(body))
+          },
+          send(body: string) {
+            res.statusCode = code
+            res.end(body)
+          },
+          setHeader: (n: string, v: string) => res.setHeader(n, v),
+        }
+        const body = Buffer.concat(chunks).toString()
+        await mod.default(Object.assign((async function* () {})(), { method: req.method, url: `/api/meta${req.url === '/' ? '' : req.url}`, headers: req.headers, body }), out)
+      })
     },
   }
 }

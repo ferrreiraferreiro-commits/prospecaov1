@@ -73,6 +73,9 @@ const SettingsPage = lazyPage(() => import('./pages/SettingsPage').then((m) => (
 const ContasPage = lazyPage(() => import('./pages/ContasPage').then((m) => ({ default: m.ContasPage })))
 const StatsPage = lazyPage(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })))
 const WhatsAppPage = lazyPage(() => import('./pages/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
+const MetaConexaoPage = lazyPage(() => import('./pages/MetaConexaoPage').then((m) => ({ default: m.MetaConexaoPage })))
+const MetaConversasPage = lazyPage(() => import('./pages/MetaConversasPage').then((m) => ({ default: m.MetaConversasPage })))
+const MetaDisparoPage = lazyPage(() => import('./pages/MetaDisparoPage').then((m) => ({ default: m.MetaDisparoPage })))
 const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })))
 const TermsPage = lazyPage(() => import('./pages/TermsPage').then((m) => ({ default: m.TermsPage })))
 
@@ -115,6 +118,9 @@ function Routed() {
           <Route path="disparo" element={m(<DisparoPage />)} />
           <Route path="agendamentos" element={m(<AgendamentosPage />)} />
           <Route path="whatsapp" element={m(<WhatsAppPage />)} />
+          <Route path="api-oficial" element={m(<MetaConexaoPage />)} />
+          <Route path="api-oficial/conversas" element={m(<MetaConversasPage />)} />
+          <Route path="api-oficial/disparo" element={m(<MetaDisparoPage />)} />
           <Route path="agente" element={temIA ? m(<AgentePage />) : <Navigate to="/" replace />} />
           <Route path="xico" element={admin ? m(<XicoPage />) : <Navigate to="/" replace />} />
           <Route path="clientes" element={<ClientesPage />} />

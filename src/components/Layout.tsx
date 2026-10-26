@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import {
   AlarmClock,
+  BadgeCheck,
   BadgeDollarSign,
   Bot,
   Calculator,
@@ -14,10 +15,12 @@ import {
   LayoutDashboard,
   LayoutList,
   MapPinned,
+  Megaphone,
   Menu,
   MessageCircle,
   PlayCircle,
   MessagesSquare,
+  MessageSquareText,
   ScrollText,
   Send,
   Smartphone,
@@ -97,6 +100,15 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/funis', label: 'Funis', icon: Workflow, whatsapp: true },
       { to: '/agendamentos', label: 'Agendadas', icon: AlarmClock, whatsapp: true },
       { to: '/whatsapp', label: 'Conexão', icon: Smartphone, whatsapp: true },
+    ],
+  },
+  {
+    // Segunda forma de usar o WhatsApp: a API oficial da Meta, separada do WhatsApp da XS (QR code)
+    title: 'API oficial (Meta)',
+    items: [
+      { to: '/api-oficial/conversas', label: 'Conversas', icon: MessageSquareText, whatsapp: true },
+      { to: '/api-oficial/disparo', label: 'Disparo', icon: Megaphone, whatsapp: true },
+      { to: '/api-oficial', label: 'Conexão', icon: BadgeCheck, whatsapp: true, end: true },
     ],
   },
 ]

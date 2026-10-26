@@ -47,7 +47,7 @@ import { useWaServico } from '../lib/waServico'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 
-type Filtro = 'todas' | 'naoLidas' | 'leads'
+export type Filtro = 'todas' | 'naoLidas' | 'leads'
 
 /** A tela confere novidades a cada 4 s (só com a aba visível). */
 const INTERVALO_MS = 4000
@@ -231,7 +231,7 @@ export function ConversasPage() {
 
 // ---------------------------------------------------------------- lista
 
-function ListaConversas({
+export function ListaConversas({
   lista,
   filtro,
   busca,
@@ -453,7 +453,7 @@ function Chat({
   )
 }
 
-function Mensagens({ conversa, doAgente }: { conversa: ConversaAberta | null; doAgente: Set<string> }) {
+export function Mensagens({ conversa, doAgente }: { conversa: ConversaAberta | null; doAgente: Set<string> }) {
   const ref = useRef<HTMLDivElement>(null)
   const noFim = useRef(true)
   const total = conversa?.msgs.length ?? 0
@@ -700,7 +700,7 @@ function NenhumaAberta({ demo }: { demo: boolean }) {
 // Só tons que o tema claro escurece (ver index.css), para as iniciais ficarem legíveis nos dois
 const TONS = ['bg-sky-400/15 text-sky-200', 'bg-emerald-400/15 text-emerald-200', 'bg-amber-400/15 text-amber-200', 'bg-teal-400/15 text-teal-300', 'bg-orange-400/15 text-orange-300', 'bg-blue-400/15 text-blue-200']
 
-function Avatar({ nome }: { nome: string }) {
+export function Avatar({ nome }: { nome: string }) {
   const limpo = nome.replace(/[^\p{L}\p{N} ]/gu, ' ').trim()
   const partes = limpo.split(/\s+/).filter(Boolean)
   const iniciais = /^\d/.test(limpo) ? '#' : ((partes[0]?.[0] ?? '') + (partes[1]?.[0] ?? '')).toUpperCase() || '?'
