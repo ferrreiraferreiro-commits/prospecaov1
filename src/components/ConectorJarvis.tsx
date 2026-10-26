@@ -3,6 +3,7 @@ import { Copy, ShieldOff } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../data/supabaseClient'
 import { formatRelative } from '../lib/dates'
+import { useIsAdmin } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { novaChave, sha256, type ChaveApi } from './agente/ConectorClaude'
 import { erroTexto } from './agente/comum'
@@ -14,6 +15,7 @@ import { Button, Modal } from './ui'
  */
 export function ConectorJarvis() {
   const toast = useApp((s) => s.toast)
+  const dono = useIsAdmin()
   const [chaves, setChaves] = useState<ChaveApi[] | null>(null)
   const [gerada, setGerada] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -33,7 +35,7 @@ export function ConectorJarvis() {
     try {
       const chave = novaChave()
       const { error } = await supabase.from('chaves_api').insert({ nome: 'Jarvis', hash: await sha256(chave), final: chave.slice(-4) })
-      if (error) throw new Error(error.message.includes('row-level security') ? 'Só o dono da XS pode criar chaves.' : 'Não consegui criar a chave agora.')
+      if (error) throw new Error(error.message.includes('row-level security') ? 'Sua conta não pode criar chaves agora.' : 'Não consegui criar a chave agora.')
       setGerada(chave)
       await carregar()
     } catch (err) {
@@ -70,7 +72,11 @@ export function ConectorJarvis() {
       <ol className="mb-3 list-decimal space-y-1 pl-4 text-xs text-fg-2">
         <li>Clique em <b>Gerar chave para o Jarvis</b> e depois em <b>Copiar chave</b>.</li>
         <li>No Jarvis, abra <b>Conexões → XS Prospecção</b>, cole a chave e clique em verificar.</li>
-        <li>Pronto: pelo Jarvis você vê e mexe em leads, CRM, financeiro, vendedor, disparos e prompts de site.</li>
+        <li>
+          {dono
+            ? 'Pronto: pelo Jarvis você vê e mexe em leads, CRM, financeiro, vendedor, disparos e prompts de site.'
+            : 'Pronto: pelo Jarvis você vê e mexe nos seus leads, clientes, projetos e financeiro.'}
+        </li>
       </ol>
       {ativas.length > 0 && (
         <ul className="mb-3 space-y-1">

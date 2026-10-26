@@ -17,7 +17,7 @@ import { exportSnapshot, useApp } from '../store/useApp'
 import clsx from 'clsx'
 import { BIZ_TABLES, emptyBiz, type BizSnapshot } from '../lib/biz'
 import { useWaServico } from '../lib/waServico'
-import { useAccount, useHasWhatsApp, useIsAdmin } from '../store/useAccount'
+import { useAccount, useHasWhatsApp } from '../store/useAccount'
 import { useBiz } from '../store/useBiz'
 
 
@@ -38,7 +38,6 @@ function Card({ id, title, description, children, actions }: { id?: string; titl
 
 export function SettingsPage() {
   const temWhatsApp = useHasWhatsApp()
-  const admin = useIsAdmin()
   const settings = useApp((s) => s.settings)
   const imports = useApp((s) => s.imports)
   const leads = useApp((s) => s.leads)
@@ -276,11 +275,9 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      {admin && (
-        <Card id="jarvis" title="Jarvis" description="Chave para conectar a XS ao seu Jarvis: ele passa a ver e mexer em tudo da XS por voz ou pelo Telegram.">
-          <ConectorJarvis />
-        </Card>
-      )}
+      <Card id="jarvis" title="Jarvis" description="Chave (token) para conectar a XS ao seu Jarvis: ele passa a ver e mexer na XS por voz ou pelo Telegram.">
+        <ConectorJarvis />
+      </Card>
 
       <Card id="app" title="Instalar como app" description="Abre em tela cheia, com ícone na tela inicial do celular ou na barra de tarefas do PC. Os dados continuam os mesmos.">
         <InstalarApp />
