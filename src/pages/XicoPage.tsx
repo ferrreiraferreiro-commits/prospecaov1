@@ -142,7 +142,7 @@ export function XicoPage() {
                 <p className="text-[13px] font-semibold text-fg">Falta a chave da API</p>
                 O Xico pensa com o Claude. Coloque a chave em{' '}
                 <Link to="/agente?aba=ajustes" className="text-blue-300 hover:underline">
-                  Vendedor no WhatsApp → Ajustes
+                  IA no WhatsApp → Ajustes
                 </Link>{' '}
                 e volte aqui.
               </div>
@@ -456,7 +456,7 @@ function Vendedor() {
     <Card
       title={
         <span className="flex items-center gap-2">
-          Vendedor no WhatsApp
+          IA no WhatsApp
           <span className={clsx('size-1.5 rounded-full', trabalhando ? 'animate-pulse bg-go' : 'bg-fg-4')} />
           <span className="text-2xs font-normal text-fg-3">{trabalhando ? 'trabalhando' : e.ativo ? 'ligado, parado' : 'desligado'}</span>
         </span>

@@ -209,7 +209,7 @@ function Alvos({ alvos, onChange }: { alvos: Alvo[]; onChange: (a: Alvo[]) => vo
               <option key={u}>{u}</option>
             ))}
           </select>
-          <input className="input flex-1" value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Cidade (ex.: Londrina)" />
+          <input className="input flex-1" value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Cidade (ex.: Curitiba)" />
         </div>
         <input className="input" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Procurar tipo de negócio (pizzaria, dentista, oficina…)" />
         <div className="flex flex-wrap gap-1.5">

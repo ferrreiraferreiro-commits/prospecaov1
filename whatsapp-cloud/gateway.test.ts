@@ -216,15 +216,18 @@ test('repassa método, caminho e corpo; não repassa a origem nem o token', asyn
   assert.equal(ultimo.origin, undefined)
 })
 
-test('Agente IA: só o WhatsApp do dono (sessão fixa) chega nas rotas /agente', async () => {
-  const dono = await pedir('token-dono-aaaaaaaaaaaaaaaa', '/motor/agente/estado')
+test('Agente IA: o vendedor chega para todas as contas; o Xico só para o dono (sessão fixa)', async () => {
+  const dono = await pedir('token-dono-aaaaaaaaaaaaaaaa', '/motor/agente/xico')
   assert.equal(dono.status, 200)
-  assert.equal(recebidos.at(-1)!.url, '/agente/estado')
+  assert.equal(recebidos.at(-1)!.url, '/agente/xico')
   assert.equal(recebidos.at(-1)!.porta, portaPrincipal)
   const antes = recebidos.length
-  const ana = await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/motor/agente/estado')
+  const ana = await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/motor/agente/xico')
   assert.equal(ana.status, 404)
   assert.equal(recebidos.length, antes)
+  const vendedor = await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/motor/agente/estado')
+  assert.equal(vendedor.status, 200)
+  assert.equal(recebidos.at(-1)!.url, '/agente/estado')
 })
 
 test('status: erro técnico vira mensagem amigável; sessão salva aparece', async () => {

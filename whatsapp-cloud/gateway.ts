@@ -447,8 +447,8 @@ async function desligarMotor(s: Sessao, motivo: string) {
 async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: Sessao, caminho: string) {
   const method = (req.method ?? 'GET').toUpperCase()
   if (!METODOS.has(method) || !CAMINHO_OK.test(caminho)) return send(res, 404, { error: 'Não encontrado.' })
-  // O Agente IA só existe no WhatsApp do dono (sessão fixa)
-  if (caminho.startsWith('/agente/') && !s.fixa) return send(res, 404, { error: 'Não encontrado.' })
+  // O vendedor (Agente IA) roda no WhatsApp de cada conta; o Xico é só do dono (sessão fixa)
+  if (caminho.startsWith('/agente/xico') && !s.fixa) return send(res, 404, { error: 'Não encontrado.' })
   const corpo = method === 'GET' ? undefined : await lerCorpo(req)
   const leitura = method === 'GET' && Object.hasOwn(SEM_WHATSAPP, caminho)
   // Só olhar o status não liga o Motor de ninguém: quem nunca conectou (ou desconectou) não ocupa vaga

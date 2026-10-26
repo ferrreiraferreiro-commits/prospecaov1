@@ -6,21 +6,18 @@ import { Link } from 'react-router-dom'
 import { ag, ESTADO, type ConversaDoAgente, type MapaAgente } from '../../lib/agente'
 import { phoneKeyBr } from '../../lib/disparo'
 import { useWaServico } from '../../lib/waServico'
-import { useIsAdmin } from '../../store/useAccount'
 import { useApp } from '../../store/useApp'
 import { erroTexto } from './comum'
 import { RascunhoPendente } from './PrecisaDeVoce'
 
 /**
  * O vendedor IA dentro da tela Conversas: selo na lista, quem está com a conversa, a ficha do cliente
- * e os botões de assumir e entregar. Só na conta do dono (onde o vendedor roda).
+ * e os botões de assumir e entregar. Em toda conta com o WhatsApp da XS.
  */
 
 /** O vendedor está disponível nesta conta? */
 export function useAgenteNasConversas(): boolean {
-  const admin = useIsAdmin()
-  const disponivel = useWaServico((s) => !!s.online && !!s.health?.agente)
-  return admin && disponivel
+  return useWaServico((s) => !!s.online && !!s.health?.agente)
 }
 
 /** Quais números estão com o vendedor (confere a cada 15 s com a aba visível). */

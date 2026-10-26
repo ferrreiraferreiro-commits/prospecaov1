@@ -38,7 +38,7 @@ const ABAS: { id: Aba; label: string }[] = [
 ]
 
 /**
- * Agente IA de vendas. Ele roda sozinho no servidor da XS (no WhatsApp do dono); aqui você liga,
+ * Agente IA de vendas. Ele roda sozinho no servidor da XS (no WhatsApp de cada conta); aqui você liga,
  * acompanha as conversas, treina o jeito de vender e escolhe onde ele procura empresas.
  */
 export function AgentePage() {
@@ -53,7 +53,7 @@ export function AgentePage() {
   if (!dados.estado || !dados.config) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Vendedor no WhatsApp" />
+        <PageHeader title="IA no WhatsApp" />
         {dados.erro ? (
           <Empty icon={<Bot />} title="Agente indisponível agora">
             {dados.erro}
@@ -75,7 +75,7 @@ export function AgentePage() {
     setLigando(true)
     try {
       ctx.setEstado(await ag<EstadoAgente>(e.ativo ? '/parar' : '/voltar', { method: 'POST' }))
-      useApp.getState().toast(e.ativo ? 'Parei tudo. Nada sai até você ligar de novo.' : 'Agente ligado. Ele já começa a trabalhar.')
+      useApp.getState().toast(e.ativo ? 'Parei tudo. Nada sai até você ligar de novo.' : 'IA ligada. Ela já começa a trabalhar.')
       void ctx.recarregar()
     } catch (err) {
       useApp.getState().toast(erroTexto(err), 'error')
@@ -91,17 +91,17 @@ export function AgentePage() {
       <PageHeader
         title={
           <span className="flex items-center gap-2.5">
-            Vendedor no WhatsApp
+            IA no WhatsApp
             <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium ring-1 ring-inset', trabalhando ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/25' : 'bg-tint/[0.04] text-fg-3 ring-line')}>
               <span className={clsx('size-1.5 rounded-full', trabalhando ? 'animate-pulse bg-go' : 'bg-fg-4')} />
               {trabalhando ? 'Trabalhando' : e.ativo ? 'Ligado, parado' : 'Desligado'}
             </span>
           </span>
         }
-        subtitle="Conversa e vende com os leads que você traz, pelo seu WhatsApp, do jeito que você ensinar. Nenhuma mensagem sai sem passar pelas conferências."
+        subtitle="Responde e vende pelo seu WhatsApp como se fosse você, com o seu nome e o seu jeito. Nenhuma mensagem sai sem passar pelas conferências."
         actions={
           <Button variant={e.ativo ? 'danger' : 'go'} icon={e.ativo ? <OctagonX className="size-3.5" /> : <Power className="size-3.5" />} loading={ligando} onClick={() => void alternar()}>
-            {e.ativo ? 'Parar tudo' : 'Ligar agente'}
+            {e.ativo ? 'Parar tudo' : 'Ligar a IA'}
           </Button>
         }
       />

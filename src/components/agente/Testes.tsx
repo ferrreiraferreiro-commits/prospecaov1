@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ag, type NumerosRamo, type TesteView } from '../../lib/agente'
 import { formatRelative } from '../../lib/dates'
+import { useIsAdmin } from '../../store/useAccount'
 import { useApp } from '../../store/useApp'
 import { Card, Pill, PILL } from '../kit'
 import { Button, Empty, Spinner } from '../ui'
@@ -19,6 +20,7 @@ const ESTADO_TESTE: Record<TesteView['estado'], { label: string; cls: string }> 
 /** Testes de abordagens (o Xico cria pela conversa) e como cada ramo está indo. */
 export function Testes() {
   const toast = useApp((s) => s.toast)
+  const dono = useIsAdmin()
   const [testes, setTestes] = useState<TesteView[] | null>(null)
   const [ramos, setRamos] = useState<NumerosRamo[]>([])
 
@@ -58,11 +60,17 @@ export function Testes() {
     <div className="space-y-4">
       {testes.length === 0 ? (
         <Empty icon={<FlaskConical />} title="Nenhum teste ainda">
-          Peça ao{' '}
-          <Link to="/xico" className="text-blue-300 hover:underline">
-            Xico
-          </Link>
-          : "testa restaurantes em Londrina com 3 abordagens diferentes". Ele monta o teste e você confirma.
+          {dono ? (
+            <>
+              Peça ao{' '}
+              <Link to="/xico" className="text-blue-300 hover:underline">
+                Xico
+              </Link>
+              : "testa restaurantes em Curitiba com 3 abordagens diferentes". Ele monta o teste e você confirma.
+            </>
+          ) : (
+            'Quando houver testes de primeira mensagem, eles aparecem aqui com a taxa de resposta de cada um.'
+          )}
         </Empty>
       ) : (
         testes.map((t) => {

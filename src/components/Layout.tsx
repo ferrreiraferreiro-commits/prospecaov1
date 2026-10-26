@@ -66,7 +66,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Assistente',
     items: [
-      { to: '/agente', label: 'Vendedor no WhatsApp', icon: Bot, whatsapp: true, dono: true },
+      { to: '/agente', label: 'IA no WhatsApp', icon: Bot, whatsapp: true },
     ],
   },
   {

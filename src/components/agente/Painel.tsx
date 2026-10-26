@@ -43,12 +43,12 @@ const ICONE: Record<Atividade['tipo'], { icon: typeof Send; cls: string }> = {
 /** O que falta para ligar o agente. */
 export function passos(e: EstadoAgente, c: AgenteCtx['config']) {
   return [
-    { ok: e.temChave, texto: 'Conectar a chave da API do Claude', aba: 'ajustes' },
+    { ok: e.temChave, texto: 'Conectar a chave da IA (a do Gemini é grátis)', aba: 'ajustes' },
     { ok: e.whatsapp === 'connected', texto: 'Conectar o WhatsApp do agente (QR Code)', link: '/whatsapp' },
-    { ok: !!c.negocio.oferta.trim(), texto: 'Contar o que você vende, preços e prazo', aba: 'treino' },
-    { ok: !!c.avisos.telefone, texto: 'Informar o seu outro número, para receber os avisos', aba: 'ajustes' },
+    { ok: !!c.negocio.seuNome.trim() && !!c.negocio.oferta.trim(), texto: 'Dizer seu nome e o que você vende (preços e prazo)', aba: 'treino' },
+    { ok: !!c.avisos.telefone, texto: 'Informar um outro número seu, para receber os avisos', aba: 'ajustes', opcional: true },
     { ok: c.prospeccao.alvos.some((a) => a.ativo), texto: 'Escolher cidades e tipos de negócio (para ele buscar sozinho)', aba: 'prospeccao', opcional: true },
-    { ok: e.licoes > 0 || !!c.negocio.objecoes.trim(), texto: 'Fazer a entrevista com o Xico no Treino (10 min)', aba: 'treino', opcional: true },
+    { ok: e.licoes > 0 || !!c.negocio.objecoes.trim(), texto: 'Fazer a entrevista no Treino (10 min)', aba: 'treino', opcional: true },
     { ok: !!e.materiais, texto: 'Cadastrar preços e perguntas frequentes em Material', aba: 'base', opcional: true },
     { ok: e.notaProva != null, texto: 'Rodar uma prova no Laboratório antes de soltar no cliente', aba: 'laboratorio', opcional: true },
   ]

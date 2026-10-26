@@ -97,11 +97,16 @@ app.post('/agenda/:id/cancelar', wrap((req) => cancelAgenda(String(req.params.id
 app.delete('/agenda/:id', wrap((req) => deleteAgenda(String(req.params.id))))
 app.post('/agenda/sincronizado', wrap((req) => markAgendaSynced(Array.isArray(req.body?.itens) ? req.body.itens : [])))
 
-// ---------------------------------------------------------------- Agente IA (só no WhatsApp do dono: XS_AGENTE=1)
+// ---------------------------------------------------------------- Agente IA (no WhatsApp de cada conta; XS_AGENTE=0 desliga)
 const soAgente =
   (fn: Handler): Handler =>
   (req, res) =>
     agente.AGENTE_LIGADO ? fn(req, res) : res.status(404).json({ error: 'O agente não está disponível nesta conta.' })
+/** O Xico é só do dono da XS (XS_AGENTE=1) */
+const soDono =
+  (fn: Handler): Handler =>
+  (req, res) =>
+    agente.DONO_XS ? fn(req, res) : res.status(404).json({ error: 'Não encontrado.' })
 const id = (req: Request) => String(req.params.id)
 const comEstado = (fn: (req: Request) => unknown) =>
   soAgente(async (req) => {
@@ -178,17 +183,17 @@ app.get('/agente/tel/:telefone', wrap(soAgente((req) => agente.conversaPorTelefo
 app.post('/agente/tel/:telefone/assumir', wrap(soAgente((req) => agente.assumirPorTelefone(String(req.params.telefone)))))
 app.post('/agente/tel/:telefone/entregar', wrap(soAgente((req) => agente.entregarAoAgente(String(req.params.telefone), req.body?.nome ? String(req.body.nome) : undefined))))
 
-// Xico, o assistente do dono (mesma sessão e mesma chave do Agente IA)
-app.get('/agente/xico', wrap(soAgente(() => xico.ver())))
-app.post('/agente/xico/abrir', wrap(soAgente(() => xico.abrir())))
-app.post('/agente/xico/mensagem', wrap(soAgente((req) => xico.mensagem(String(req.body?.texto ?? '')))))
-app.post('/agente/xico/app', wrap(soAgente((req) => xico.responderApp(req.body?.resultados ?? []))))
-app.post('/agente/xico/propostas/:id', wrap(soAgente((req) => xico.decidir(id(req), req.body?.aceitar === true))))
-app.delete('/agente/xico/memoria/:id', wrap(soAgente((req) => xico.apagarLembranca(id(req)))))
-app.post('/agente/xico/recomecar', wrap(soAgente(() => xico.recomecar())))
-app.get('/agente/xico/prompt', wrap(soAgente(() => ({ texto: xico.promptParaClaude() }))))
-app.get('/agente/xico/sites/:id', wrap(soAgente((req) => xico.verPrompt(id(req)))))
-app.delete('/agente/xico/sites/:id', wrap(soAgente((req) => xico.apagarPrompt(id(req)))))
+// Xico, o assistente do dono da XS (mesma sessão e mesma chave do Agente IA)
+app.get('/agente/xico', wrap(soDono(() => xico.ver())))
+app.post('/agente/xico/abrir', wrap(soDono(() => xico.abrir())))
+app.post('/agente/xico/mensagem', wrap(soDono((req) => xico.mensagem(String(req.body?.texto ?? '')))))
+app.post('/agente/xico/app', wrap(soDono((req) => xico.responderApp(req.body?.resultados ?? []))))
+app.post('/agente/xico/propostas/:id', wrap(soDono((req) => xico.decidir(id(req), req.body?.aceitar === true))))
+app.delete('/agente/xico/memoria/:id', wrap(soDono((req) => xico.apagarLembranca(id(req)))))
+app.post('/agente/xico/recomecar', wrap(soDono(() => xico.recomecar())))
+app.get('/agente/xico/prompt', wrap(soDono(() => ({ texto: xico.promptParaClaude() }))))
+app.get('/agente/xico/sites/:id', wrap(soDono((req) => xico.verPrompt(id(req)))))
+app.delete('/agente/xico/sites/:id', wrap(soDono((req) => xico.apagarPrompt(id(req)))))
 app.get('/agente/testes', wrap(soAgente(() => agente.listarTestes())))
 app.post('/agente/testes/:id', wrap(soAgente((req) => agente.mudarTeste(id(req), req.body ?? {}))))
 app.get('/agente/ramos', wrap(soAgente(() => agente.numerosPorRamo())))

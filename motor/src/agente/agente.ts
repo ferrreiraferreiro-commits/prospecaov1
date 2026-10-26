@@ -1,6 +1,6 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 /**
- * Agente IA de vendas: roda no WhatsApp do dono (sessão "principal", XS_AGENTE=1), 24 h na VPS.
+ * Agente IA de vendas: roda no WhatsApp de cada conta, 24 h na VPS (XS_AGENTE=0 desliga; =1 é a sessão do dono da XS).
  *
  *  - Busca empresas na base aberta (cidades e tipos de negócio que você escolher), filtra e põe na fila.
  *  - Aborda algumas por dia (a cota sobe devagar), com a primeira mensagem escrita para cada empresa.
@@ -70,7 +70,9 @@ import {
 } from './tipos.js'
 
 /** Só a sessão do dono liga o agente (no systemd: /etc/xs-whatsapp/motor-principal.env). */
-export const AGENTE_LIGADO = process.env.XS_AGENTE === '1'
+export const AGENTE_LIGADO = process.env.XS_AGENTE !== '0'
+/** Sessão do dono da XS (XS_AGENTE=1): só nela existem o Xico e o conector do Claude */
+export const DONO_XS = process.env.XS_AGENTE === '1'
 
 /** Mensagens do agente numa conversa no mesmo dia antes de parar e chamar você (evita conversa sem fim com outro robô) */
 const MAX_POR_CONVERSA_DIA = 30
@@ -316,6 +318,7 @@ function contextoConferencia(c: Conversa, proativa: boolean, t = new Date()): Co
     podePreco: pode(cfg, 'passar_preco'),
     podePix: pode(cfg, 'mandar_pix'),
     dono: cfg.negocio.seuNome.trim(),
+    comoDono: cfg.falarComo !== 'assistente',
     proibidos: cfg.conferencias.assuntosProibidos ? cfg.conferencias.proibidos.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean) : null,
   }
 }
@@ -1472,6 +1475,7 @@ export function salvarConfig(body: Partial<AgenteConfig>): AgenteConfig {
       regras: txt(n.regras, 3000),
     },
     podeFechar: b.podeFechar !== false,
+    falarComo: b.falarComo === 'assistente' ? 'assistente' : 'eu',
     avisos: { telefone: formatBrazilPhone(txt(b.avisos.telefone, 30)), relatorio: b.avisos.relatorio !== false },
     prospeccao: {
       ativa: p.ativa === true,
@@ -1557,6 +1561,11 @@ export async function trocarChave(nova: string, provedor?: Provedor) {
     throw new Error((err as Error).message)
   }
   gravarChaves(chaves)
+  // A IA escolhida ainda não tem chave: passa a usar a que acabou de chegar (quem só tem a do Gemini não fica travado)
+  if (!chaveDe(db.config.modelo)) {
+    db.config.modelo = p === 'anthropic' ? 'claude-sonnet-5-5' : p === 'xai' ? 'grok' : 'gemini-3.5-flash'
+    salvar(true)
+  }
   atualizarChave()
   chaveRecusada = false
   db.extra.ultimoErro = null

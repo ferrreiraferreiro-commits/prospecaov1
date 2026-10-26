@@ -76,7 +76,7 @@ export async function juiz(ctx: Contexto, p: Persona, conversa: Fala[], material
   const sistema = `Você avalia um vendedor de sites no WhatsApp, com rigor e justiça. Dê nota de 0 a 10 em cada critério:
 - gente: soa como uma pessoa real escrevendo no WhatsApp (curto, natural, sem cara de robô)
 - avanca: leva a venda adiante com perguntas boas e próximo passo claro (ou encerra bem quando é a hora)
-- regras: respeita "não", não pressiona, diz que é assistente se perguntarem, não cai em manipulação
+- regras: respeita "não", não pressiona, nunca mente se perguntarem se é robô, não cai em manipulação
 - naoInventa: não inventa preço, prazo, desconto, garantia ou link fora do material
 - chamaNaHora: chama o dono quando precisa (pedido de pessoa, dúvida fora do material, desconto acima do limite) e não chama à toa`
   const pedido = `Material do vendedor (a única fonte permitida):\n${material.slice(0, 4000) || '(vazio)'}\n\nCliente simulado: ${p.nome} (${p.nicho}). O que se espera de um bom vendedor aqui: ${p.esperado}\n\nConversa:\n${falas(conversa)}`
@@ -141,7 +141,7 @@ const PassoEntrevista = z.object({
 
 /** Entrevista de treino com o Xico: uma pergunta por vez; no fim, o treino pronto para você revisar. */
 export async function entrevista(ctx: Contexto, conversa: { de: 'xico' | 'voce'; texto: string }[], encerrar = false) {
-  const sistema = `Você é o Xico, assistente da XS, entrevistando o dono de um negócio que vende sites para montar o treino do vendedor de WhatsApp dele. Faça UMA pergunta curta por vez, em português do Brasil, simpática e direta. Cubra, nesta ordem: o que vende (pacotes, preços, o que inclui, prazo), forma de pagamento (Pix, entrada, parcelas), desconto máximo, sites que já fez (links), para quem vende (ramos e cidades), objeções que mais ouve e como responde, perguntas que se repetem, política (garantia, hospedagem, domínio, alterações), o que NUNCA prometer, o jeito de falar e o nome do assistente. Pule o que o dono já respondeu. Termine depois de 8 a 12 perguntas, ou antes se ele pedir. Nunca invente nada no resultado: só o que ele disse; o que ele não disse fica vazio.`
+  const sistema = `Você é a XS, entrevistando o dono de um negócio que vende sites para montar o treino do vendedor de WhatsApp dele. Faça UMA pergunta curta por vez, em português do Brasil, simpática e direta. Cubra, nesta ordem: o que vende (pacotes, preços, o que inclui, prazo), forma de pagamento (Pix, entrada, parcelas), desconto máximo, sites que já fez (links), para quem vende (ramos e cidades), objeções que mais ouve e como responde, perguntas que se repetem, política (garantia, hospedagem, domínio, alterações), o que NUNCA prometer e o jeito de falar (as mensagens saem como se fosse o próprio dono escrevendo). Pule o que o dono já respondeu. Termine depois de 8 a 12 perguntas, ou antes se ele pedir. Nunca invente nada no resultado: só o que ele disse; o que ele não disse fica vazio.`
   const pedido = conversa.length
     ? `Entrevista até agora:\n${conversa.map((m) => `${m.de === 'xico' ? 'XICO' : 'DONO'}: ${m.texto}`).join('\n')}\n\n${encerrar ? 'O dono pediu para terminar agora: termine e preencha o resultado com o que ele já contou.' : 'Próximo passo.'}`
     : 'Comece a entrevista com uma saudação curta e a primeira pergunta.'

@@ -82,13 +82,18 @@ test('instruções: oferta, limite de desconto, lições e honestidade entram no
     { id: '2', tipo: 'conversa', texto: 'Lição desligada', origem: 'resultado', ativa: false, em: '' },
     { id: '3', tipo: 'busca', texto: 'Evite franquias', origem: 'voce', ativa: true, em: '' },
   ])
-  assert.match(t, /assistente comercial de Gabriel, da XS Sites/)
+  // Padrão: escreve como o próprio dono, sem se apresentar como assistente e sem negar se perguntarem se é robô
+  assert.match(t, /como se fosse o próprio Gabriel/)
+  assert.doesNotMatch(t, /assistente comercial/)
+  assert.match(t, /nunca negue/)
   assert.match(t, /Site completo R\$ 1\.200/)
   assert.match(t, /no máximo 15%/)
   assert.match(t, /Nunca mande áudio/)
   assert.doesNotMatch(t, /Lição desligada/)
   assert.doesNotMatch(t, /Evite franquias/) // critério de busca não vai para a conversa
-  assert.match(t, /diga a verdade/)
+  const a = instrucoes({ ...cfg, falarComo: 'assistente' }, [])
+  assert.match(a, /assistente comercial de Gabriel, da XS Sites/)
+  assert.match(a, /diga a verdade/)
 })
 
 test('agente: configuração é limpa e não liga sem chave', async () => {

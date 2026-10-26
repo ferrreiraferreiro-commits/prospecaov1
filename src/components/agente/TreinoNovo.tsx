@@ -51,7 +51,7 @@ const RISCO: Record<Cap['risco'], { texto: string; tom: 'neutro' | 'azul' | 'our
   irreversivel: { texto: 'não dá para desfazer', tom: 'vermelho' },
 }
 
-/** O treino novo: persona, entrevista com o Xico, "copiar meu jeito" e as capacidades. */
+/** O treino novo: persona, entrevista, "copiar meu jeito" e as capacidades. */
 export function TreinoNovo({ ctx }: { ctx: AgenteCtx }) {
   const [d, setD] = useState<DadosTreino | null>(null)
   const carregar = useCallback(() => ag<DadosTreino>('/treino', { timeoutMs: 10000 }).then(setD, () => setD(null)), [])
@@ -73,7 +73,7 @@ export function TreinoNovo({ ctx }: { ctx: AgenteCtx }) {
         titulo="Como treinar o vendedor"
         passos={[
           <>Ele já vem sabendo vender: Método XS, as objeções mais comuns do Brasil e um roteiro para cada ramo.</>,
-          <>O jeito mais rápido de ensinar o seu negócio é a <b>entrevista com o Xico</b>: 10 minutos de perguntas e ele monta o treino.</>,
+          <>O jeito mais rápido de ensinar o seu negócio é a <b>entrevista</b>: 10 minutos de perguntas e o treino sai pronto.</>,
           <>Escolha o jeito de falar e o que ele pode fazer. O que tem a etiqueta vermelha só liga uma a uma.</>,
           <>Depois, teste no <b>Laboratório</b> antes de deixar ele conversar com cliente de verdade.</>,
         ]}
@@ -213,7 +213,7 @@ function EntrevistaXico({ d, onMudou, recarregarCtx }: { d: Entrevista | null; o
     <Card
       title={
         <span className="flex items-center gap-2">
-          <Sparkles className="size-3.5 text-gold" /> Entrevista com o Xico
+          <Sparkles className="size-3.5 text-gold" /> Entrevista de treino
         </span>
       }
       description="Responda umas 10 perguntas, por escrito, e ele monta o treino inteiro: oferta, preços, objeções, regras e o jeito de falar."

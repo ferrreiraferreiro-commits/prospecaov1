@@ -57,6 +57,8 @@ export interface AgenteConfig {
     regras: string
   }
   podeFechar: boolean
+  /** eu = escreve como se fosse você (padrão) · assistente = se apresenta como seu assistente */
+  falarComo?: 'eu' | 'assistente'
   avisos: { telefone: string; relatorio: boolean }
   prospeccao: {
     ativa: boolean
@@ -412,7 +414,7 @@ async function sincronizarGoogle() {
   }
 }
 
-/** A cada 1 min, com a aba aberta e o agente disponível (só no WhatsApp do dono). */
+/** A cada 1 min, com a aba aberta e o agente disponível. */
 export function useAgenteSync() {
   const disponivel = useWaServico((s) => !!s.online && !!s.health?.agente)
   useEffect(() => {

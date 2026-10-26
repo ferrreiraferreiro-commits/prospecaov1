@@ -66,7 +66,7 @@ export function Ajustes({ ctx }: { ctx: AgenteCtx }) {
             <NumberInput value={r.limiteDiaUSD} onChange={(v) => setR({ ...r, limiteDiaUSD: v ?? 1 })} min={0.1} />
           </Field>
           <Field label="Seu outro número (recebe os avisos)" hint="Lead quente, venda, reunião, quem precisa de você e o resumo do dia.">
-            <input className="input" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="(43) 99999-9999" />
+            <input className="input" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="(11) 99999-9999" />
           </Field>
         </section>
 

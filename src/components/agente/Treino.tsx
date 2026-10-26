@@ -35,16 +35,20 @@ export function Treino({ ctx }: { ctx: AgenteCtx }) {
 function Negocio({ ctx }: { ctx: AgenteCtx }) {
   const [n, setN] = useState(ctx.config.negocio)
   const [podeFechar, setPodeFechar] = useState(ctx.config.podeFechar)
+  const [falarComo, setFalarComo] = useState(ctx.config.falarComo ?? 'eu')
   const [busy, setBusy] = useState(false)
-  const mudou = JSON.stringify(n) !== JSON.stringify(ctx.config.negocio) || podeFechar !== ctx.config.podeFechar
+  const mudou = JSON.stringify(n) !== JSON.stringify(ctx.config.negocio) || podeFechar !== ctx.config.podeFechar || falarComo !== (ctx.config.falarComo ?? 'eu')
+  const eu = falarComo === 'eu'
+  const nome = n.seuNome.trim().split(/\s+/)[0] || 'Flávio'
   const set = <K extends keyof AgenteConfig['negocio']>(k: K, v: AgenteConfig['negocio'][K]) => setN((x) => ({ ...x, [k]: v }))
 
   async function salvar() {
     setBusy(true)
-    const c = await ctx.salvar({ negocio: n, podeFechar }, 'Treino salvo. O agente já usa a partir da próxima mensagem.')
+    const c = await ctx.salvar({ negocio: n, podeFechar, falarComo }, 'Treino salvo. A IA já usa a partir da próxima mensagem.')
     if (c) {
       setN(c.negocio)
       setPodeFechar(c.podeFechar)
+      setFalarComo(c.falarComo ?? 'eu')
     }
     setBusy(false)
   }
@@ -52,7 +56,7 @@ function Negocio({ ctx }: { ctx: AgenteCtx }) {
   return (
     <Card
       title="Seu negócio"
-      description="Tudo o que o agente sabe sobre o que você vende sai daqui. Escreva do seu jeito, como explicaria para um vendedor novo."
+      description="Tudo o que a IA sabe sobre o que você vende sai daqui. Escreva do seu jeito, como explicaria para alguém que vai responder no seu lugar."
       actions={
         <Button variant="primary" size="sm" loading={busy} disabled={!mudou} onClick={() => void salvar()}>
           Salvar treino
@@ -60,21 +64,46 @@ function Negocio({ ctx }: { ctx: AgenteCtx }) {
       }
       bodyClass="px-4 py-4"
     >
+      <div className="mb-4 rounded-lg border border-line-soft bg-ink p-3">
+        <p className="text-[13px] font-medium text-fg">Quem escreve as mensagens</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              { id: 'eu', nome: 'Como se fosse eu', texto: 'Escreve em primeira pessoa, com o seu nome e o seu jeito. Não diz que é assistente nem vendedor.' },
+              { id: 'assistente', nome: 'Como meu assistente', texto: 'Se apresenta como seu assistente virtual e fala em seu nome.' },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => setFalarComo(o.id)}
+              className={clsx('flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors', falarComo === o.id ? 'border-gold/50 bg-gold/[0.06]' : 'border-line-soft hover:border-line')}
+            >
+              <span className={clsx('mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border', falarComo === o.id ? 'border-gold bg-gold' : 'border-line-strong')}>{falarComo === o.id && <span className="size-1.5 rounded-full bg-ink" />}</span>
+              <span>
+                <span className="block text-[13px] font-medium text-fg">{o.nome}</span>
+                <span className="block text-xs text-fg-3">{o.texto}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        {eu && <p className="mt-2 text-xs text-fg-3">Se alguém perguntar se é robô, a IA não responde nem nega: para e deixa a conversa em “Precisa de você” para você mesmo responder.</p>}
+      </div>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Seu nome">
-          <input className="input" value={n.seuNome} onChange={(e) => set('seuNome', e.target.value)} placeholder="Gabriel" />
+          <input className="input" value={n.seuNome} onChange={(e) => set('seuNome', e.target.value)} placeholder="Flávio" />
         </Field>
-        <Field label="Nome da empresa">
-          <input className="input" value={n.empresa} onChange={(e) => set('empresa', e.target.value)} placeholder="XS Sites" />
+        <Field label="Nome da empresa (opcional)">
+          <input className="input" value={n.empresa} onChange={(e) => set('empresa', e.target.value)} placeholder="Flávio Sites" />
         </Field>
-        <Field label="Como ele se apresenta" className="md:col-span-2" hint="Ele sempre diz a verdade se perguntarem se é robô: que é o assistente virtual e pode chamar você.">
-          <input className="input" value={n.apresentacao} onChange={(e) => set('apresentacao', e.target.value)} placeholder={`Sou assistente do ${n.seuNome || 'Gabriel'}, da ${n.empresa || 'XS Sites'}. A gente cria sites para negócios da cidade.`} />
+        <Field label="Como se apresentar (opcional)" className="md:col-span-2" hint={eu ? 'Em branco, ela se apresenta como você faria: pelo primeiro nome, curto.' : 'Ele sempre diz a verdade se perguntarem se é robô: que é o assistente virtual e pode chamar você.'}>
+          <input className="input" value={n.apresentacao} onChange={(e) => set('apresentacao', e.target.value)} placeholder={eu ? `Aqui é o ${nome}${n.empresa ? `, da ${n.empresa}` : ''}. Faço sites para negócios da cidade.` : `Sou assistente do ${nome}${n.empresa ? `, da ${n.empresa}` : ''}. A gente cria sites para negócios da cidade.`} />
         </Field>
         <Field label="O que você vende: pacotes, preços, o que inclui, prazo" className="md:col-span-2">
           <Texto value={n.oferta} onChange={(v) => set('oferta', v)} rows={6} placeholder={EXEMPLO_OFERTA} />
         </Field>
         <Field label="Pagamento" hint="Chave Pix, entrada, parcelamento… Ele só manda quando o cliente topar.">
-          <Texto value={n.pagamento} onChange={(v) => set('pagamento', v)} rows={3} placeholder="Pix: 43 99999-9999 (Gabriel). 50% para começar e 50% na entrega." />
+          <Texto value={n.pagamento} onChange={(v) => set('pagamento', v)} rows={3} placeholder="Pix: (11) 99999-9999. 50% para começar e 50% na entrega." />
         </Field>
         <Field label="Sites que você já fez (portfólio)" hint="Links que ele pode mandar como exemplo.">
           <Texto value={n.portfolio} onChange={(v) => set('portfolio', v)} rows={3} placeholder={'Pizzaria: https://…\nBarbearia: https://…'} />
@@ -85,7 +114,7 @@ function Negocio({ ctx }: { ctx: AgenteCtx }) {
         <Field label="Seu jeito de falar" hint='Ex.: "Informal, chamo de você, uso “show”, “top”. Sem textão."'>
           <Texto value={n.estilo} onChange={(v) => set('estilo', v)} rows={3} />
         </Field>
-        <Field label="Regras extras" hint='Ex.: "Nunca prometa ficar em 1º no Google." "Não atende fora do Paraná."'>
+        <Field label="Regras extras" hint='Ex.: "Nunca prometa ficar em 1º no Google." "Não atendo fora do meu estado."'>
           <Texto value={n.regras} onChange={(v) => set('regras', v)} rows={3} />
         </Field>
       </div>
@@ -123,7 +152,7 @@ const historicoDe = (msgs: MsgSim[]) => msgs.filter((m) => !m.nulo).map(({ de, t
 /** Você faz o papel do cliente. Nada é enviado no WhatsApp. */
 function Simulador() {
   const toast = useApp((s) => s.toast)
-  const [lead, setLead] = useState({ empresa: 'Pizzaria Bella Massa', nicho: 'Pizzaria', cidade: 'Londrina', uf: 'PR' })
+  const [lead, setLead] = useState({ empresa: 'Pizzaria Bella Massa', nicho: 'Pizzaria', cidade: 'Curitiba', uf: 'PR' })
   const [msgs, setMsgs] = useState<MsgSim[]>([])
   const [texto, setTexto] = useState('')
   const [busy, setBusy] = useState(false)

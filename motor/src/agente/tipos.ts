@@ -48,6 +48,9 @@ export type Piloto = 1 | 2 | 3 | 4
 
 export type Tom = 'caloroso' | 'objetivo' | 'curto'
 
+/** eu = escreve como se fosse você, em primeira pessoa (padrão) · assistente = se apresenta como seu assistente */
+export type FalarComo = 'eu' | 'assistente'
+
 /** Quem da equipe escreveu a mensagem. */
 export type NomeAgente = 'cumprimento' | 'abridor' | 'vendedor' | 'fechador' | 'agendador' | 'recuperador' | 'reativador' | 'posvenda'
 
@@ -75,6 +78,8 @@ export interface AgenteConfig {
   }
   /** Pode passar preço, negociar dentro do limite e mandar o Pix */
   podeFechar: boolean
+  /** Escreve como você (padrão) ou se apresenta como seu assistente */
+  falarComo: FalarComo
   avisos: {
     /** Outro número do dono, que recebe os avisos */
     telefone: string
@@ -148,6 +153,7 @@ export const CONFIG_PADRAO: AgenteConfig = {
     regras: '',
   },
   podeFechar: true,
+  falarComo: 'eu',
   avisos: { telefone: '', relatorio: true },
   prospeccao: {
     ativa: false,

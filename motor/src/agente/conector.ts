@@ -299,7 +299,7 @@ function servidor(chave: string): McpServer {
 /** POST /mcp: confere a chave e atende o pedido (sem sessão: cada pedido é independente). */
 export async function atender(req: Request, res: Response) {
   const chave = /^Bearer (xs_[A-Za-z0-9_-]{30,120})$/.exec(String(req.headers.authorization ?? ''))?.[1]
-  if (!agente.AGENTE_LIGADO) return res.status(404).json({ error: 'O conector não está disponível nesta conta.' })
+  if (!agente.DONO_XS) return res.status(404).json({ error: 'O conector não está disponível nesta conta.' })
   if (!chave) return res.status(401).json({ error: 'Falta a chave da XS (Authorization: Bearer xs_…).' })
   try {
     await conferir(chave)

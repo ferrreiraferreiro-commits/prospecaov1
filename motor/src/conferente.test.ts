@@ -63,6 +63,12 @@ test('conferente: parar, robô, promessa, bastidor, Pix e formatação', async (
   assert.equal(id(r('Não sou robô não, sou o Gabriel!')), 'robo')
   assert.equal(id(r('Claro, me conta mais.', { ...base, mensagens: [{ de: 'lead', texto: 'vc é robô?', em: '' }] })), 'robo')
   assert.equal(r('Sou o assistente virtual do Gabriel, posso chamar ele se preferir.', { ...base, mensagens: [{ de: 'lead', texto: 'vc é robô?', em: '' }] }).ok, true)
+  // Escrevendo como o dono: não responde se é robô (nem nega); só passa a conversa para o dono
+  const comoDono = { ...base, comoDono: true, mensagens: [{ de: 'lead' as const, texto: 'vc é robô?', em: '' }] }
+  assert.equal(id(r('Sou o assistente virtual do Gabriel.', comoDono)), 'robo')
+  assert.equal(id(r('Não sou robô não!', { ...base, comoDono: true })), 'robo')
+  assert.equal(conferir({ mensagens: [], acao: 'chamar_dono' }, comoDono).ok, true)
+  assert.equal(r('Claro, me conta mais.', { ...base, comoDono: true }).ok, true)
   assert.equal(id(r('Com o site você fica em primeiro lugar no Google!')), 'promessa')
   assert.equal(id(r('Vou usar a ação chamar_dono agora')), 'bastidor')
   assert.equal(id(r('Pode mandar no Pix pix@xssites.com.br')), 'sensivel')

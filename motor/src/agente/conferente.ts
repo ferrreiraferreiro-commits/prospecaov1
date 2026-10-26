@@ -32,7 +32,7 @@ export const CONFERENCIAS: Conferencia[] = [
   { id: 'pessoa', titulo: 'Não prometer pessoa que não foi chamada', oQueFaz: '"Vou pedir para o responsável te ligar" só sai se ele chamou você de verdade nesta resposta.', porque: 'O cliente fica esperando uma ligação que ninguém sabe que precisa fazer.', fixa: true, tipo: 'regra' },
   { id: 'agenda', titulo: 'Não prometer agenda sem olhar a agenda', oQueFaz: 'Dia e hora só saem se ele consultou os horários livres e o horário está livre.', porque: 'Horário prometido e ocupado é cliente perdido.', fixa: true, tipo: 'regra' },
   { id: 'sensivel', titulo: 'Não pedir o que não deve', oQueFaz: 'Nunca pede CPF, senha, cartão ou código. Pix só com a capacidade ligada e só a chave cadastrada.', porque: 'É o padrão de golpe que o brasileiro aprendeu a temer.', fixa: true, tipo: 'regra' },
-  { id: 'robo', titulo: 'Dizer que é assistente quando perguntam', oQueFaz: 'Se perguntam se é robô, a resposta não engana: é o assistente virtual e pode chamar você.', porque: 'Esconder é enganar o cliente.', fixa: true, tipo: 'regra' },
+  { id: 'robo', titulo: 'Nunca mentir se perguntam se é robô', oQueFaz: 'Escrevendo como você, ele não responde essa pergunta: para e passa a conversa para você responder. Como assistente, diz que é o assistente virtual.', porque: 'Mentir para o cliente queima o seu nome; quem decide o que dizer é você.', fixa: true, tipo: 'regra' },
   { id: 'insistir', titulo: 'Não insistir depois de um não', oQueFaz: 'Depois de uma recusa clara, cabe uma pergunta leve. No segundo não, a conversa encerra.', porque: 'Insistência gera denúncia e mancha o seu nome.', fixa: true, tipo: 'regra' },
   { id: 'robo_robo', titulo: 'Parar conversa de robô com robô', oQueFaz: 'Atendente automático do outro lado ou mensagens se repetindo: ele para e marca para você.', porque: 'Dois robôs conversando gastam dinheiro e mandam dezenas de mensagens.', fixa: true, tipo: 'regra' },
   { id: 'proibidos', titulo: 'Assuntos proibidos', oQueFaz: 'Política, falar mal de concorrente e os temas que você escrever.', porque: 'Você liga ou desliga.', fixa: false, tipo: 'regra' },
@@ -71,6 +71,8 @@ export interface ContextoConferencia {
   podePix: boolean
   /** Nome do dono (para "vou pedir pro Gabriel te ligar") */
   dono: string
+  /** Escreve como o próprio dono (não se apresenta como assistente) */
+  comoDono?: boolean
   proibidos: string[] | null
 }
 
@@ -336,9 +338,15 @@ const CHECKS: [string, Check][] = [
     'robo',
     (r, c) => {
       const t = r.mensagens.join('\n')
-      if (NEGA_ROBO.test(t)) return 'Você negou ser um assistente. Não pode: diga que é o assistente virtual e que pode chamar o dono.'
       const ultima = ultimaDoCliente(c.mensagens)
-      if (ultima && PERGUNTOU_ROBO.test(ultima.texto) && r.mensagens.length && !ADMITE.test(t)) return 'O cliente perguntou se é robô. Responda com a verdade: você é o assistente virtual e pode chamar o dono.'
+      const perguntou = !!ultima && PERGUNTOU_ROBO.test(ultima.texto)
+      // Escrevendo como o dono: quem responde se é robô é o próprio dono, nunca a IA (nem negando, nem fingindo)
+      if (c.comoDono) {
+        if (NEGA_ROBO.test(t)) return 'Você não pode dizer que não é robô. Não mande nada e chame o dono.'
+        return perguntou && (r.mensagens.length || r.acao !== 'chamar_dono') ? 'O cliente perguntou se é robô. Quem responde é o dono: não mande nada e chame o dono.' : null
+      }
+      if (NEGA_ROBO.test(t)) return 'Você negou ser um assistente. Não pode: diga que é o assistente virtual e que pode chamar o dono.'
+      if (perguntou && r.mensagens.length && !ADMITE.test(t)) return 'O cliente perguntou se é robô. Responda com a verdade: você é o assistente virtual e pode chamar o dono.'
       return null
     },
   ],
