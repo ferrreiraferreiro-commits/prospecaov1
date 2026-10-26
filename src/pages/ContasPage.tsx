@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { BadgeDollarSign, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Smartphone, Trash2, Users } from 'lucide-react'
+import { BadgeDollarSign, Bot, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Smartphone, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, NumberInput, SearchInput, Stat } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
@@ -14,7 +14,9 @@ import {
   fimSugerido,
   gerarSenha,
   isCiclo,
+  definirIA,
   listarContas,
+  listarIA,
   listarPagamentos,
   loginDe,
   nomeDoPlano,
@@ -44,7 +46,7 @@ import {
 import { planInfo, type Profile } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
-type Filtro = 'todas' | 'online' | 'teste' | 'pagantes' | 'vitalicio' | 'bloqueadas'
+type Filtro = 'todas' | 'online' | 'ia' | 'teste' | 'pagantes' | 'vitalicio' | 'bloqueadas'
 
 const DIA = 86_400_000
 
@@ -112,15 +114,17 @@ export function ContasPage() {
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [editando, setEditando] = useState<string | null>(null)
   const [eu, setEu] = useState<string | null>(null)
+  const [comIA, setComIA] = useState<Set<string>>(new Set())
   const { painel, falhou } = usePainelWhatsApp()
 
   const carregar = useCallback(async () => {
     if (!supabase) return
     setErro(null)
     try {
-      const [c, p] = await Promise.all([listarContas(supabase), listarPagamentos(supabase)])
+      const [c, p, ia] = await Promise.all([listarContas(supabase), listarPagamentos(supabase), listarIA(supabase)])
       setContas(c)
       setPagamentos(p)
+      setComIA(ia)
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível carregar as contas.')
     }
@@ -156,13 +160,31 @@ export function ContasPage() {
     return (contas ?? []).filter((c) => {
       if (q && ![c.nome, c.usuario, c.email, c.cidade].some((v) => v?.toLowerCase().includes(q))) return false
       if (filtro === 'online') return estaOnline(c, painel, now)
+      if (filtro === 'ia') return comIA.has(c.user_id)
       if (filtro === 'teste') return c.plano === 'teste' && !vencida(c, now)
       if (filtro === 'pagantes') return c.plano === 'ativo' && !vencida(c, now)
       if (filtro === 'vitalicio') return c.plano === 'vitalicio'
       if (filtro === 'bloqueadas') return c.plano === 'cancelado' || vencida(c, now)
       return true
     })
-  }, [contas, busca, filtro, now, painel])
+  }, [contas, busca, filtro, now, painel, comIA])
+
+  async function alternarIA(c: Conta) {
+    if (!supabase) return
+    const ligar = !comIA.has(c.user_id)
+    try {
+      await definirIA(supabase, c.user_id, ligar)
+      setComIA((s) => {
+        const n = new Set(s)
+        if (ligar) n.add(c.user_id)
+        else n.delete(c.user_id)
+        return n
+      })
+      useApp.getState().toast(ligar ? `IA liberada para ${nomeDe(c)}. Aparece no menu dela em até 1 minuto.` : `IA tirada de ${nomeDe(c)}.`)
+    } catch (err) {
+      useApp.getState().toast(err instanceof Error ? err.message : 'Não deu para mudar a IA agora.', 'error')
+    }
+  }
 
   const contaAberta = contas?.find((c) => c.user_id === editando) ?? null
 
@@ -211,6 +233,7 @@ export function ContasPage() {
             options={[
               { id: 'todas', label: 'Todas' },
               { id: 'online', label: painel ? `Online (${onlineAgora})` : 'Online' },
+              { id: 'ia', label: `Com IA (${comIA.size})` },
               { id: 'teste', label: 'Teste' },
               { id: 'pagantes', label: 'Pagantes' },
               { id: 'vitalicio', label: 'Vitalício' },
@@ -268,6 +291,8 @@ export function ContasPage() {
                 wa={painel ? linhaDa(c, painel) : undefined}
                 online={estaOnline(c, painel, now)}
                 visto={painel?.vistos[c.user_id] ?? null}
+                ia={comIA.has(c.user_id) || c.admin}
+                onIA={c.admin ? undefined : () => void alternarIA(c)}
                 onEditar={() => setEditando(c.user_id)}
               />
             ))}
@@ -362,6 +387,8 @@ function ContaRow({
   wa,
   online,
   visto,
+  ia,
+  onIA,
   onEditar,
 }: {
   conta: Conta
@@ -370,6 +397,10 @@ function ContaRow({
   wa: LinhaWa | null | undefined
   online: boolean
   visto: string | null
+  /** Tem a IA no WhatsApp liberada */
+  ia: boolean
+  /** Liga ou tira a IA (o dono não tem botão: sempre tem) */
+  onIA?: () => void
   onEditar: () => void
 }) {
   const legacy = isLegacyEmail(conta.email)
@@ -386,6 +417,19 @@ function ContaRow({
           {[conta.usuario && `@${conta.usuario}`, legacy ? 'sem e-mail' : conta.email].filter(Boolean).join(' · ')}
           {conta.cidade ? ` · ${conta.cidade}` : ''}
         </p>
+        <button
+          type="button"
+          disabled={!onIA}
+          onClick={onIA}
+          title={onIA ? (ia ? 'Tirar a IA no WhatsApp desta conta' : 'Liberar a IA no WhatsApp para esta conta') : 'O dono sempre tem a IA'}
+          className={clsx(
+            'mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold ring-1 ring-inset transition-colors',
+            ia ? 'bg-gold/15 text-gold ring-gold/30' : 'text-fg-4 ring-line hover:text-fg-2',
+            onIA ? 'cursor-pointer' : 'cursor-default',
+          )}
+        >
+          <Bot className="size-3" aria-hidden /> {ia ? 'IA liberada' : 'Sem IA'}
+        </button>
       </div>
       <div>
         <PlanoBadge conta={conta} now={now} />

@@ -75,6 +75,18 @@ export async function listarContas(db: SupabaseClient): Promise<Conta[]> {
   return (data ?? []) as Conta[]
 }
 
+/** Contas com a IA no WhatsApp liberada (recurso "ia"). */
+export async function listarIA(db: SupabaseClient): Promise<Set<string>> {
+  const { data, error } = await db.rpc('admin_contas_ia')
+  if (error) throw new Error(error.message)
+  return new Set(((data ?? []) as { user_id: string; ia: boolean }[]).filter((r) => r.ia).map((r) => r.user_id))
+}
+
+export async function definirIA(db: SupabaseClient, alvo: string, ligar: boolean): Promise<void> {
+  const { error } = await db.rpc('admin_definir_ia', { alvo, ligar })
+  if (error) throw new Error(error.message)
+}
+
 export async function definirEmail(db: SupabaseClient, alvo: string, email: string): Promise<void> {
   const { error } = await db.rpc('admin_definir_email', { alvo, novo: email })
   if (error) throw new Error(error.message)

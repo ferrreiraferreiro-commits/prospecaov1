@@ -5,6 +5,7 @@ import { knownKeys, mapsToParsed, type MapsResult } from './mapsSearch'
 import { restantes, semTeto, SEM_TETO, useGoogleKey } from '../store/useGoogleKey'
 import { useWaServico, waFetch } from './waServico'
 import type { StatusId } from './types'
+import { useHasIA } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
 /**
@@ -416,7 +417,8 @@ async function sincronizarGoogle() {
 
 /** A cada 1 min, com a aba aberta e o agente disponível. */
 export function useAgenteSync() {
-  const disponivel = useWaServico((s) => !!s.online && !!s.health?.agente)
+  const temIA = useHasIA()
+  const disponivel = useWaServico((s) => !!s.online && !!s.health?.agente) && temIA
   useEffect(() => {
     if (!disponivel) return
     let busy = false

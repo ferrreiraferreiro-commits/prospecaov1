@@ -38,7 +38,7 @@ import { useAgenteSync } from '../lib/agente'
 import { useDisparoSync } from '../lib/disparo'
 import { useWaServico, useWaPolling } from '../lib/waServico'
 import { formatDateTime } from '../lib/dates'
-import { accessOf, planInfo, useAccount, useHasWhatsApp, useIsAdmin } from '../store/useAccount'
+import { accessOf, planInfo, useAccount, useHasIA, useHasWhatsApp } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -58,15 +58,15 @@ interface NavItem {
   end?: boolean
   /** Só aparece para contas com o WhatsApp da XS (recurso "motor") */
   whatsapp?: boolean
-  /** Só para o dono da XS (o Agente IA roda no WhatsApp dele) */
-  dono?: boolean
+  /** Só para contas com a IA liberada (recurso "ia", em Contas) */
+  ia?: boolean
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Assistente',
     items: [
-      { to: '/agente', label: 'IA no WhatsApp', icon: Bot, whatsapp: true },
+      { to: '/agente', label: 'IA no WhatsApp', icon: Bot, whatsapp: true, ia: true },
     ],
   },
   {
@@ -111,8 +111,8 @@ const MOBILE: NavItem[] = [
 /** Menu da conta: sem o WhatsApp da XS, somem os itens que dependem dele (e grupos vazios). */
 function useGroups() {
   const temWhatsApp = useHasWhatsApp()
-  const dono = useIsAdmin()
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (dono || !i.dono)) })).filter((g) => g.items.length)
+  const temIA = useHasIA()
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (temIA || !i.ia)) })).filter((g) => g.items.length)
 }
 
 /** Status do WhatsApp da conta e resultados dos disparos (e do Agente IA) para o histórico dos leads. */

@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { ag, ESTADO, type ConversaDoAgente, type MapaAgente } from '../../lib/agente'
 import { phoneKeyBr } from '../../lib/disparo'
 import { useWaServico } from '../../lib/waServico'
+import { useHasIA } from '../../store/useAccount'
 import { useApp } from '../../store/useApp'
 import { erroTexto } from './comum'
 import { RascunhoPendente } from './PrecisaDeVoce'
@@ -17,7 +18,9 @@ import { RascunhoPendente } from './PrecisaDeVoce'
 
 /** O vendedor está disponível nesta conta? */
 export function useAgenteNasConversas(): boolean {
-  return useWaServico((s) => !!s.online && !!s.health?.agente)
+  const temIA = useHasIA()
+  const disponivel = useWaServico((s) => !!s.online && !!s.health?.agente)
+  return temIA && disponivel
 }
 
 /** Quais números estão com o vendedor (confere a cada 15 s com a aba visível). */

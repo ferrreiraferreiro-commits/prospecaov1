@@ -118,6 +118,8 @@ export interface Conta {
   podeUsar: boolean
   /** Dono da XS (profiles.admin): vê o painel */
   admin?: boolean
+  /** Tem a IA no WhatsApp liberada (recurso "ia"; o dono sempre tem) */
+  ia?: boolean
 }
 
 /** Mesma regra do app (src/store/useAccount.ts → accessOf) + o recurso "motor". */
@@ -323,7 +325,7 @@ async function verificarNoSupabase(token: string): Promise<Conta | null> {
   })
   if (!perfil.ok) throw new Error(`supabase perfil ${perfil.status}`)
   const [p] = (await perfil.json()) as Perfil[]
-  return { id: user.id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p), admin: p?.admin === true }
+  return { id: user.id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p), admin: p?.admin === true, ia: p?.admin === true || (Array.isArray(p?.recursos) && p.recursos.includes('ia')) }
 }
 
 let verificar: Verificador = verificarNoSupabase
@@ -444,11 +446,12 @@ async function desligarMotor(s: Sessao, motivo: string) {
   await controle.desligar(s.nome).catch((err) => log(`não consegui desligar ${s.nome}: ${(err as Error).message}`))
 }
 
-async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: Sessao, caminho: string) {
+async function repassar(req: http.IncomingMessage, res: http.ServerResponse, s: Sessao, caminho: string, ia = false) {
   const method = (req.method ?? 'GET').toUpperCase()
   if (!METODOS.has(method) || !CAMINHO_OK.test(caminho)) return send(res, 404, { error: 'Não encontrado.' })
   // O vendedor (Agente IA) roda no WhatsApp de cada conta; o Xico é só do dono (sessão fixa)
   if (caminho.startsWith('/agente/xico') && !s.fixa) return send(res, 404, { error: 'Não encontrado.' })
+  if (caminho.startsWith('/agente/') && !s.fixa && !ia) return send(res, 404, { error: 'A IA ainda não está liberada na sua conta.' })
   const corpo = method === 'GET' ? undefined : await lerCorpo(req)
   const leitura = method === 'GET' && Object.hasOwn(SEM_WHATSAPP, caminho)
   // Só olhar o status não liga o Motor de ninguém: quem nunca conectou (ou desconectou) não ocupa vaga
@@ -667,7 +670,7 @@ export const server = http.createServer(async (req, res) => {
     const sem = url.pathname.startsWith('/motor/') ? url.pathname.slice('/motor'.length) : ''
     if (!s && conta.podeUsar && req.method === 'GET' && Object.hasOwn(SEM_WHATSAPP, sem)) return send(res, 200, SEM_WHATSAPP[sem])
     if (!s) return send(res, 403, { error: 'Sua conta não usa o WhatsApp na nuvem.' })
-    if (url.pathname.startsWith('/motor/')) return await repassar(req, res, s, url.pathname.slice('/motor'.length))
+    if (url.pathname.startsWith('/motor/')) return await repassar(req, res, s, url.pathname.slice('/motor'.length), conta.ia === true)
     return send(res, 404, { error: 'Não encontrado.' })
   } catch (err) {
     send(res, 400, { error: limparMensagem((err as Error).message) ?? 'Pedido inválido.' })

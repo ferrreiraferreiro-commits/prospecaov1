@@ -17,6 +17,7 @@ import { PrecisaDeVoce } from '../components/agente/PrecisaDeVoce'
 import { Seguranca } from '../components/agente/Seguranca'
 import { Treino } from '../components/agente/Treino'
 import { ag, type EstadoAgente } from '../lib/agente'
+import { useHasIA } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty, Segmented, Spinner } from '../components/ui'
@@ -42,6 +43,20 @@ const ABAS: { id: Aba; label: string }[] = [
  * acompanha as conversas, treina o jeito de vender e escolhe onde ele procura empresas.
  */
 export function AgentePage() {
+  const temIA = useHasIA()
+  if (!temIA)
+    return (
+      <div className="space-y-4">
+        <PageHeader title="IA no WhatsApp" />
+        <Empty icon={<Bot />} title="A IA ainda não está liberada na sua conta">
+          Ela chega em breve. Quando for liberada, aparece aqui no menu.
+        </Empty>
+      </div>
+    )
+  return <AgenteLiberado />
+}
+
+function AgenteLiberado() {
   const dados = useAgente()
   const [params, setParams] = useSearchParams()
   const aba = (ABAS.some((a) => a.id === params.get('aba')) ? params.get('aba') : 'painel') as Aba

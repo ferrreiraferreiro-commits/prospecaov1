@@ -111,6 +111,11 @@ export function useHasWhatsApp(): boolean {
   return useAccount((s) => !s.profile || s.profile.recursos.includes('motor'))
 }
 
+/** A conta tem a IA no WhatsApp liberada (recurso "ia", o dono da XS liga em Contas)? O dono sempre tem. */
+export function useHasIA(): boolean {
+  return useAccount((s) => !!s.profile && (s.profile.admin || s.profile.recursos.includes('ia')))
+}
+
 /** É o dono da XS (tela Contas)? O banco confere de novo em cada chamada. */
 export function useIsAdmin(): boolean {
   return useAccount((s) => !!s.profile?.admin)

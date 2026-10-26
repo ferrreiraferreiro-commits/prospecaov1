@@ -33,6 +33,8 @@ const DAVI = 'eeeeeeee-0000-4000-8000-000000000005'
 const contas: Record<string, Conta> = {
   'token-dono-aaaaaaaaaaaaaaaa': { id: DONO, usuario: 'gabriel', podeUsar: true, admin: true },
   'token-ana-aaaaaaaaaaaaaaaaa': { id: ANA, usuario: 'ana.web', podeUsar: true },
+  // A mesma conta depois que o dono liberou a IA em Contas
+  'token-ana-com-ia-aaaaaaaaaa': { id: ANA, usuario: 'ana.web', podeUsar: true, ia: true },
   'token-bruno-aaaaaaaaaaaaaaa': { id: BRUNO, usuario: 'bruno', podeUsar: true },
   'token-carla-aaaaaaaaaaaaaaa': { id: CARLA, usuario: 'carla', podeUsar: true },
   'token-vencida-aaaaaaaaaaaaa': { id: VENCIDA, usuario: 'vencida', podeUsar: false },
@@ -216,7 +218,7 @@ test('repassa método, caminho e corpo; não repassa a origem nem o token', asyn
   assert.equal(ultimo.origin, undefined)
 })
 
-test('Agente IA: o vendedor chega para todas as contas; o Xico só para o dono (sessão fixa)', async () => {
+test('Agente IA: só com a IA liberada em Contas; o Xico só para o dono (sessão fixa)', async () => {
   const dono = await pedir('token-dono-aaaaaaaaaaaaaaaa', '/motor/agente/xico')
   assert.equal(dono.status, 200)
   assert.equal(recebidos.at(-1)!.url, '/agente/xico')
@@ -225,7 +227,10 @@ test('Agente IA: o vendedor chega para todas as contas; o Xico só para o dono (
   const ana = await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/motor/agente/xico')
   assert.equal(ana.status, 404)
   assert.equal(recebidos.length, antes)
-  const vendedor = await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/motor/agente/estado')
+  const semIA = await pedir('token-ana-aaaaaaaaaaaaaaaaa', '/motor/agente/estado')
+  assert.equal(semIA.status, 404)
+  assert.equal(recebidos.length, antes)
+  const vendedor = await pedir('token-ana-com-ia-aaaaaaaaaa', '/motor/agente/estado')
   assert.equal(vendedor.status, 200)
   assert.equal(recebidos.at(-1)!.url, '/agente/estado')
 })
