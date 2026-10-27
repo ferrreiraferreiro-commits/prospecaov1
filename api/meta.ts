@@ -224,8 +224,8 @@ async function exigirAcesso(authorization: string | undefined): Promise<{ userId
   return { userId: p?.conta ?? user.id, authorization }
 }
 
-async function credenciais(authorization: string) {
-  const [c] = await rpc<{ numero_id: string; waba_id: string; token: string }[]>('meta_credenciais', {}, authorization)
+async function credenciais(authorization: string, numeroId: string | null) {
+  const [c] = await rpc<{ numero_id: string; waba_id: string; token: string }[]>('meta_credenciais', { p_numero_id: numeroId }, authorization)
   if (!c) throw new HttpError(409, 'Conecte a API oficial primeiro (API oficial → Conexão).')
   return c
 }
@@ -271,6 +271,7 @@ async function enviarModelo(
     json: payloadModelo(e.para, e.modelo, e.idioma, e.nomes, e.valores, e.nomeadas),
   })
   return gravarEnvio(acesso.authorization, acesso.userId, {
+    numero_id: cred.numero_id,
     // A Meta devolve o número como o WhatsApp guarda (com ou sem o nono dígito): a conversa fica junta
     telefone: r.contacts?.[0]?.wa_id ?? numeroMeta(e.para),
     nome: e.nome ?? null,
@@ -316,6 +317,47 @@ async function corpoBruto(req: Req): Promise<string> {
   return req.body ? JSON.stringify(req.body) : ''
 }
 
+interface ItemFila {
+  id: string
+  numero_id: string
+  token: string
+  telefone: string
+  tipo: 'texto' | 'modelo'
+  texto: string
+  modelo: string | null
+  idioma: string | null
+  nomes: string[]
+  valores: string[]
+  nomeadas: boolean
+  /** O contato escreveu nas últimas 24 h (texto livre só vale assim) */
+  janela: boolean
+}
+
+/** Manda o que está na hora na fila de todas as contas, de 5 em 5. */
+async function rodarFila(chave: string) {
+  const itens = await rpc<ItemFila[]>('meta_fila_pegar', { p_chave: chave })
+  let enviadas = 0
+  const um = async (it: ItemFila) => {
+    const resultado = (status: string, extra: { wamid?: string | null; wa_id?: string | null; erro?: string | null } = {}) =>
+      rpc('meta_fila_resultado', { p_chave: chave, p_id: it.id, p_status: status, p_wamid: extra.wamid ?? null, p_wa_id: extra.wa_id ?? null, p_numero_id: it.numero_id, p_erro: extra.erro ?? null })
+    if (it.tipo === 'texto' && !it.janela) return resultado('fora_janela', { erro: 'O contato não respondeu nas últimas 24 h: texto livre só vai com a conversa aberta.' })
+    try {
+      const para = numeroMeta(it.telefone)
+      const json =
+        it.tipo === 'modelo'
+          ? payloadModelo(para, it.modelo ?? '', it.idioma || 'pt_BR', it.nomes ?? [], it.valores ?? [], it.nomeadas)
+          : { messaging_product: 'whatsapp', to: para, type: 'text', text: { body: it.texto.slice(0, 4096), preview_url: false } }
+      const r = await graph<EnvioMeta>(it.token, `/${it.numero_id}/messages`, { method: 'POST', json })
+      enviadas++
+      await resultado('enviada', { wamid: r.messages?.[0]?.id ?? null, wa_id: r.contacts?.[0]?.wa_id ?? null })
+    } catch (err) {
+      await resultado('falhou', { erro: err instanceof Error ? err.message : 'Falhou.' }).catch(() => undefined)
+    }
+  }
+  for (let i = 0; i < itens.length; i += 5) await Promise.all(itens.slice(i, i + 5).map(um))
+  return { ok: true, itens: itens.length, enviadas }
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export default async function handler(req: Req, res: Res) {
@@ -345,6 +387,17 @@ export default async function handler(req: Req, res: Res) {
   }
 
   // ---- App da XS
+  // Fila no servidor (agendadas e funis): o pg_cron do Supabase chama a cada minuto com a chave da fila
+  if (q.get('fila') === '1') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST.' })
+    try {
+      return res.status(200).json(await rodarFila(header(req, 'x-xs-fila') ?? ''))
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 500
+      return res.status(status).json({ error: err instanceof Error ? err.message : 'Falha.' })
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST.' })
   try {
     const acesso = await exigirAcesso(header(req, 'authorization'))
@@ -368,7 +421,7 @@ export default async function handler(req: Req, res: Res) {
       return res.status(200).json({ ok: true, numero: numero.display_phone_number ?? null, nome: numero.verified_name ?? null })
     }
 
-    const cred = await credenciais(acesso.authorization)
+    const cred = await credenciais(acesso.authorization, /^\d{6,25}$/.test(texto(body.conexao, 40)) ? texto(body.conexao, 40) : null)
 
     if (body.acao === 'modelos') {
       const r = await graph<{ data?: Parameters<typeof lerModelo>[0][] }>(cred.token, `/${cred.waba_id}/message_templates?fields=name,language,status,category,components,parameter_format&limit=200`)
@@ -385,7 +438,7 @@ export default async function handler(req: Req, res: Res) {
         method: 'POST',
         json: { messaging_product: 'whatsapp', to: para, type: 'text', text: { body: msg, preview_url: false } },
       })
-      const linha = await gravarEnvio(acesso.authorization, acesso.userId, { telefone: r.contacts?.[0]?.wa_id ?? para, texto: msg, wamid: r.messages?.[0]?.id ?? null })
+      const linha = await gravarEnvio(acesso.authorization, acesso.userId, { numero_id: cred.numero_id, telefone: r.contacts?.[0]?.wa_id ?? para, texto: msg, wamid: r.messages?.[0]?.id ?? null })
       return res.status(200).json(paraApp(linha))
     }
 
@@ -414,8 +467,17 @@ export default async function handler(req: Req, res: Res) {
       const itens = (Array.isArray(body.itens) ? body.itens : []).slice(0, 20) as Record<string, unknown>[]
       const base = { modelo, idioma: texto(body.idioma, 15) || 'pt_BR', nomes: lista(body.nomes, 20), nomeadas: body.nomeadas === true, campanhaId }
       const resultados: { para: string; ok: boolean; erro?: string }[] = []
+      // Quem respondeu "SAIR" não recebe mais disparo
+      const { url, anon } = supa()
+      const bl = await fetch(`${url}/rest/v1/meta_bloqueados?select=telefone`, { headers: { apikey: anon, Authorization: acesso.authorization }, signal: AbortSignal.timeout(6000) })
+      const bloqueados = bl.ok ? ((await bl.json()) as { telefone: string }[]).map((b) => b.telefone) : []
+      const saiu = (tel: string) => bloqueados.some((b) => b === tel || (b.slice(0, 4) === tel.slice(0, 4) && b.slice(-8) === tel.slice(-8)))
       for (const it of itens) {
         const para = texto(it.para, 30)
+        if (saiu(numeroMeta(para))) {
+          resultados.push({ para, ok: false, erro: 'Pediu para sair (respondeu SAIR).' })
+          continue
+        }
         try {
           await enviarModelo(cred, acesso, { ...base, para, valores: lista(it.valores, 20), texto: texto(it.texto, 4096), nome: texto(it.nome, 120) || undefined })
           resultados.push({ para, ok: true })
@@ -423,7 +485,7 @@ export default async function handler(req: Req, res: Res) {
           const erro = err instanceof Error ? err.message : 'Falhou.'
           resultados.push({ para, ok: false, erro })
           // Fica registrado na campanha (e na conversa) para não tentar de novo sem querer
-          await gravarEnvio(acesso.authorization, acesso.userId, { telefone: numeroMeta(para), nome: texto(it.nome, 120) || null, texto: texto(it.texto, 4096), modelo, campanha_id: campanhaId, status: 'failed', erro }).catch(() => undefined)
+          await gravarEnvio(acesso.authorization, acesso.userId, { numero_id: cred.numero_id, telefone: numeroMeta(para), nome: texto(it.nome, 120) || null, texto: texto(it.texto, 4096), modelo, campanha_id: campanhaId, status: 'failed', erro }).catch(() => undefined)
           // Token vencido ou conta bloqueada: não adianta continuar o lote
           if (err instanceof HttpError && /token|bloqueou|pagamento|limitou/.test(err.message)) break
         }

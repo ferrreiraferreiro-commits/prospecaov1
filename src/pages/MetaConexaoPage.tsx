@@ -1,6 +1,6 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import clsx from 'clsx'
-import { BadgeCheck, Copy, ExternalLink, KeyRound, LogOut, MessageCircle, Pencil, Send, Webhook } from 'lucide-react'
+import { BadgeCheck, Copy, ExternalLink, KeyRound, LogOut, MessageCircle, Pencil, Send, Webhook, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Field } from '../components/kit'
@@ -16,7 +16,8 @@ import { useApp } from '../store/useApp'
  * a pessoa cola as credenciais do próprio app da Meta e o webhook da XS no painel da Meta.
  */
 export function MetaConexaoPage() {
-  const { carregado, conexao, carregar } = useMetaConexao()
+  const { carregado, conexao, conexoes, carregar } = useMetaConexao()
+  const [novo, setNovo] = useState(false)
   const toast = useApp((s) => s.toast)
   const [editando, setEditando] = useState(false)
   const [saindo, setSaindo] = useState(false)
@@ -31,10 +32,10 @@ export function MetaConexaoPage() {
   }, [carregar])
 
   const desconectar = async () => {
-    if (!window.confirm('Desconectar a API oficial? As credenciais saem da XS. As conversas e campanhas continuam aqui.')) return
+    if (!window.confirm('Desconectar este número da API oficial? As credenciais dele saem da XS. As conversas e campanhas continuam aqui.')) return
     setSaindo(true)
     try {
-      const { error } = (await supabase?.rpc('meta_desconectar')) ?? { error: null }
+      const { error } = (await supabase?.rpc('meta_desconectar', { p_numero_id: conexao?.numero_id ?? null })) ?? { error: null }
       if (error) throw new Error(error.message)
       await carregar()
       toast('API oficial desconectada.')
@@ -60,12 +61,15 @@ export function MetaConexaoPage() {
         <div className="flex justify-center py-10">
           <Spinner />
         </div>
-      ) : conexao && !editando ? (
+      ) : conexao && !editando && !novo ? (
         <>
           <Card
-            title="Conectada"
+            title={conexoes.length > 1 ? `Conectada · ${conexoes.length} números` : 'Conectada'}
             actions={
               <>
+                <Button size="sm" variant="ghost" icon={<Plus className="size-3.5" />} onClick={() => setNovo(true)}>
+                  Adicionar número
+                </Button>
                 <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" />} onClick={() => setEditando(true)}>
                   Trocar credenciais
                 </Button>
@@ -137,11 +141,12 @@ export function MetaConexaoPage() {
       ) : (
         <>
           <Formulario
-            trocando={!!conexao}
-            onCancelar={conexao ? () => setEditando(false) : undefined}
+            trocando={!!conexao && !novo}
+            onCancelar={conexao ? () => (setEditando(false), setNovo(false)) : undefined}
             onConectou={async () => {
               await carregar()
               setEditando(false)
+              setNovo(false)
             }}
           />
           <Regras />

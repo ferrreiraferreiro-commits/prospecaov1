@@ -9,6 +9,7 @@ import { formatPhone } from '../lib/contact'
 import { telefoneConversa, type ConversaAberta, type MensagemConversa, type ResumoConversa } from '../lib/conversas'
 import { leadPhone, phoneKeyBr } from '../lib/disparo'
 import { janelaAberta, metaConversasApi as api, metaFetch, textoDoModelo, useMetaConexao, valoresParaLead } from '../lib/meta'
+import { fillMessage, getMessages, pickVariation } from '../lib/messages'
 import type { Lead } from '../lib/types'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
@@ -266,6 +267,7 @@ function Composer({
 }) {
   const settings = useApp((s) => s.settings)
   const toast = useApp((s) => s.toast)
+  const respostas = useMemo(() => getMessages(settings).filter((m) => m.variacoes.some((v) => v.trim())), [settings])
   const livre = janelaAberta(conversa.msgs)
   const [usarModelo, setUsarModelo] = useState(false)
   const [escolha, setEscolha] = useState<EscolhaModelo>({ modelo: null, campos: [] })
@@ -361,6 +363,28 @@ function Composer({
               >
                 <FileText className="size-3.5" /> <span className="hidden sm:inline">Modelo</span>
               </button>
+              {respostas.length > 0 && (
+                <select
+                  className="input h-10 w-10 shrink-0 cursor-pointer px-1 text-xs sm:w-auto sm:pr-7"
+                  value=""
+                  onChange={(e) => {
+                    const t = respostas.find((r) => r.id === e.target.value)
+                    if (!t) return
+                    const v = pickVariation(t, lead?.id ?? telefone)
+                    setTexto(lead ? fillMessage(v, lead, settings) : v)
+                    ref.current?.focus()
+                  }}
+                  title="Respostas rápidas (seus Modelos de mensagem)"
+                  aria-label="Resposta rápida"
+                >
+                  <option value="">Rápidas</option>
+                  {respostas.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.nome}
+                    </option>
+                  ))}
+                </select>
+              )}
               <div className="flex min-h-10 flex-1 items-end rounded-lg border border-line bg-ink transition-colors focus-within:border-blue-500/50">
                 <textarea
                   ref={ref}

@@ -56,6 +56,7 @@ function lazyPage<T extends ComponentType>(load: () => Promise<{ default: T }>) 
 }
 
 // Telas carregadas sob demanda (o mapa e a gestão não pesam na abertura do app)
+const MetaAgendaPage = lazyPage(() => import('./pages/MetaAgendaPage').then((m) => ({ default: m.MetaAgendaPage })))
 const EquipePage = lazyPage(() => import('./pages/EquipePage').then((m) => ({ default: m.EquipePage })))
 const ClientesPage = lazyPage(() => import('./pages/ClientesPage').then((m) => ({ default: m.ClientesPage })))
 const ConversasPage = lazyPage(() => import('./pages/ConversasPage').then((m) => ({ default: m.ConversasPage })))
@@ -122,6 +123,7 @@ function Routed() {
           <Route path="api-oficial" element={m(<MetaConexaoPage />)} />
           <Route path="api-oficial/conversas" element={m(<MetaConversasPage />)} />
           <Route path="api-oficial/disparo" element={m(<MetaDisparoPage />)} />
+          <Route path="api-oficial/agenda" element={m(<MetaAgendaPage />)} />
           <Route path="agente" element={temIA ? m(<AgentePage />) : <Navigate to="/" replace />} />
           <Route path="xico" element={admin ? m(<XicoPage />) : <Navigate to="/" replace />} />
           <Route path="equipe" element={<EquipePage />} />

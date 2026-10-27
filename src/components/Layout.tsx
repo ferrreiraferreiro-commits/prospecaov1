@@ -29,6 +29,7 @@ import {
   Workflow,
   Users,
   UsersRound,
+  CalendarClock,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -52,6 +53,7 @@ import { EscolherPlano } from './Planos'
 import { TopBar } from './TopBar'
 import { Spinner } from './ui'
 import { useReminders } from './useReminders'
+import { useMetaConexao } from '../lib/meta'
 import { usePrivacyMode } from '../lib/privacy'
 
 interface NavItem {
@@ -109,6 +111,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/api-oficial/conversas', label: 'Conversas', icon: MessageSquareText, whatsapp: true },
       { to: '/api-oficial/disparo', label: 'Disparo', icon: Megaphone, whatsapp: true },
+      { to: '/api-oficial/agenda', label: 'Agendadas e funis', icon: CalendarClock, whatsapp: true },
       { to: '/api-oficial', label: 'Conexão', icon: BadgeCheck, whatsapp: true, end: true },
     ],
   },
@@ -126,6 +129,25 @@ function useGroups() {
   const temWhatsApp = useHasWhatsApp()
   const temIA = useHasIA()
   return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (temIA || !i.ia)) })).filter((g) => g.items.length)
+}
+
+/** Com mais de um número na API oficial: escolhe por qual número as telas da API oficial trabalham. */
+function SeletorNumeroMeta() {
+  const { conexoes, conexao, escolher } = useMetaConexao()
+  if (conexoes.length < 2 || !conexao) return null
+  return (
+    <div className="mb-3 flex items-center gap-2 text-xs text-fg-3">
+      <BadgeCheck className="size-3.5 text-blue-300" />
+      Número:
+      <select className="input pv h-7 w-auto cursor-pointer pr-7 text-xs" value={conexao.numero_id} onChange={(e) => escolher(e.target.value)}>
+        {conexoes.map((c) => (
+          <option key={c.numero_id} value={c.numero_id}>
+            {[c.apelido, c.numero ?? c.numero_id, c.nome_verificado].filter(Boolean).join(' · ')}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
 }
 
 /** Aviso no topo quando alguém convidou a pessoa para uma equipe (plano Times). */
@@ -255,6 +277,7 @@ export function Layout() {
           }
         >
           <ConviteEquipe />
+          {pathname.startsWith('/api-oficial') && <SeletorNumeroMeta />}
           <Outlet />
         </Suspense>
       </main>

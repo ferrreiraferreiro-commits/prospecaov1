@@ -12,6 +12,8 @@ import type { Lead, Settings } from './types'
  */
 
 export interface MetaConexao {
+  id: string
+  apelido: string | null
   gancho: string
   verificacao: string
   numero_id: string
@@ -44,6 +46,9 @@ export async function metaFetch<T>(json: Record<string, unknown>, timeoutMs = 30
   const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } }
   const token = data.session?.access_token
   if (!token) throw new Error('Entre na sua conta da XS.')
+  // Vários números: tudo sai pelo número escolhido no topo das telas da API oficial
+  const ativa = useMetaConexao.getState().conexao?.numero_id
+  if (ativa && json.conexao === undefined && json.acao !== 'conectar') json = { ...json, conexao: ativa }
   let r: Response
   try {
     r = await fetch('/api/meta', {
@@ -60,24 +65,59 @@ export async function metaFetch<T>(json: Record<string, unknown>, timeoutMs = 30
   return corpo
 }
 
-const COLUNAS = 'gancho,verificacao,numero_id,waba_id,numero,nome_verificado,webhook_ok_em,atualizado_em'
+const COLUNAS = 'id,apelido,gancho,verificacao,numero_id,waba_id,numero,nome_verificado,webhook_ok_em,atualizado_em'
 
 interface MetaState {
   carregado: boolean
+  /** Todos os números da API oficial da conta */
+  conexoes: MetaConexao[]
+  /** Número escolhido (null = ainda não conectou) */
   conexao: MetaConexao | null
   carregar(): Promise<void>
+  escolher(numeroId: string): void
 }
 
-/** Conexão da API oficial da conta logada (null = ainda não conectou). */
-export const useMetaConexao = create<MetaState>((set) => ({
+const ATIVA_KEY = 'xs-prospeccao:meta-numero'
+
+function lerAtiva(): string | null {
+  try {
+    return localStorage.getItem(ATIVA_KEY)
+  } catch {
+    return null
+  }
+}
+
+/** Números da API oficial da conta e qual está em uso nas telas. */
+export const useMetaConexao = create<MetaState>((set, get) => ({
   carregado: false,
+  conexoes: [],
   conexao: null,
   async carregar() {
-    if (!supabase) return set({ carregado: true, conexao: null })
-    const { data } = await supabase.from('meta_conexoes').select(COLUNAS).maybeSingle()
-    set({ carregado: true, conexao: (data as MetaConexao | null) ?? null })
+    if (!supabase) return set({ carregado: true, conexoes: [], conexao: null })
+    const { data } = await supabase.from('meta_conexoes').select(COLUNAS).order('criado_em')
+    const conexoes = (data ?? []) as MetaConexao[]
+    const quero = get().conexao?.numero_id ?? lerAtiva()
+    set({ carregado: true, conexoes, conexao: conexoes.find((c) => c.numero_id === quero) ?? conexoes[0] ?? null })
+  },
+  escolher(numeroId) {
+    const conexao = get().conexoes.find((c) => c.numero_id === numeroId)
+    if (!conexao) return
+    try {
+      localStorage.setItem(ATIVA_KEY, numeroId)
+    } catch {
+      /* sem armazenamento */
+    }
+    set({ conexao })
+    // Outro número pode ser de outra conta Business, com outros modelos
+    useModelosMeta.setState({ modelos: null, erro: null })
   },
 }))
+
+/** Só as mensagens do número escolhido (as antigas, sem número, aparecem em todos). */
+function doNumero<T extends { or(filtro: string): T }>(q: T): T {
+  const { conexoes, conexao } = useMetaConexao.getState()
+  return conexoes.length > 1 && conexao ? q.or(`numero_id.eq.${conexao.numero_id},numero_id.is.null`) : q
+}
 
 // ---------------------------------------------------------------------------
 // Modelos: variáveis e prévia
@@ -143,7 +183,7 @@ export const metaConversasApi: ConversasApi = {
   demo: false,
   async listar(): Promise<ListaConversas> {
     if (!supabase) return { versao: 0, conversas: [] }
-    const { data, error } = await supabase.from('meta_mensagens').select('id,telefone,nome,de_mim,texto,midia,status,lida,em').order('em', { ascending: false }).limit(3000)
+    const { data, error } = await doNumero(supabase.from('meta_mensagens').select('id,telefone,nome,de_mim,texto,midia,status,lida,em')).order('em', { ascending: false }).limit(3000)
     if (error) throw new Error(error.message)
     const linhas = (data ?? []) as LinhaMsg[]
     const porTel = new Map<string, ResumoConversa>()
@@ -160,9 +200,7 @@ export const metaConversasApi: ConversasApi = {
   },
   async abrir(telefone: string): Promise<ConversaAberta> {
     if (!supabase) return { versao: 0, telefone, nome: null, naoLidas: 0, msgs: [] }
-    const { data, error } = await supabase
-      .from('meta_mensagens')
-      .select('id,telefone,nome,de_mim,texto,midia,status,lida,em')
+    const { data, error } = await doNumero(supabase.from('meta_mensagens').select('id,telefone,nome,de_mim,texto,midia,status,lida,em'))
       .eq('telefone', telefone)
       .order('em', { ascending: false })
       .limit(500)
