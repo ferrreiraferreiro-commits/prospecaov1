@@ -215,12 +215,13 @@ async function exigirAcesso(authorization: string | undefined): Promise<{ userId
   const userRes = await fetch(`${url}/auth/v1/user`, { headers, signal: AbortSignal.timeout(6000) })
   if (!userRes.ok) throw new HttpError(401, 'Sua sessão expirou. Entre de novo.')
   const user = (await userRes.json()) as { id: string }
-  const profRes = await fetch(`${url}/rest/v1/profiles?select=plano,teste_ate,plano_ate&user_id=eq.${user.id}`, { headers, signal: AbortSignal.timeout(6000) })
-  const [p] = profRes.ok ? ((await profRes.json()) as { plano: string; teste_ate: string; plano_ate?: string | null }[]) : []
+  // Plano e conta que valem (os do dono, se a pessoa está numa equipe)
+  const profRes = await fetch(`${url}/rest/v1/rpc/meu_acesso`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(6000) })
+  const [p] = profRes.ok ? ((await profRes.json()) as { conta: string; plano: string; teste_ate: string; plano_ate?: string | null }[]) : []
   if (p?.plano === 'cancelado') throw new HttpError(403, 'Sua assinatura está pausada.')
   if (p?.plano === 'teste' && Date.parse(p.teste_ate) <= Date.now()) throw new HttpError(403, 'Seu teste grátis terminou.')
   if (p?.plano === 'ativo' && p.plano_ate && Date.parse(p.plano_ate) <= Date.now()) throw new HttpError(403, 'Seu plano venceu.')
-  return { userId: user.id, authorization }
+  return { userId: p?.conta ?? user.id, authorization }
 }
 
 async function credenciais(authorization: string) {

@@ -87,6 +87,18 @@ export async function definirIA(db: SupabaseClient, alvo: string, ligar: boolean
   if (error) throw new Error(error.message)
 }
 
+/** Contas com o plano Times (recurso "times") e quantas pessoas já entraram na equipe. */
+export async function listarTimes(db: SupabaseClient): Promise<Map<string, number>> {
+  const { data, error } = await db.rpc('admin_contas_times')
+  if (error) throw new Error(error.message)
+  return new Map(((data ?? []) as { user_id: string; times: boolean; membros: number }[]).filter((r) => r.times).map((r) => [r.user_id, r.membros]))
+}
+
+export async function definirTimes(db: SupabaseClient, alvo: string, ligar: boolean): Promise<void> {
+  const { error } = await db.rpc('admin_definir_times', { alvo, ligar })
+  if (error) throw new Error(error.message)
+}
+
 export async function definirEmail(db: SupabaseClient, alvo: string, email: string): Promise<void> {
   const { error } = await db.rpc('admin_definir_email', { alvo, novo: email })
   if (error) throw new Error(error.message)

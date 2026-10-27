@@ -26,15 +26,47 @@ export interface Profile {
   avisos_vistos_em?: string | null
 }
 
+/** Papel na equipe (plano Times). Quem não está em equipe é 'dono' da própria conta. */
+export type PapelEquipe = 'dono' | 'gestor' | 'vendedor'
+
+export interface MembroEquipe {
+  id: string
+  nome: string | null
+  usuario: string | null
+  /** Só o dono vê */
+  email: string | null
+  papel: Exclude<PapelEquipe, 'dono'>
+  ve_todos: boolean
+  aceito: boolean
+}
+
+/** Equipe da pessoa logada (RPC minha_equipe). */
+export interface Equipe {
+  /** Conta dona dos dados que a pessoa usa (ela mesma ou o dono da equipe) */
+  conta: string
+  papel: PapelEquipe
+  /** A própria conta tem o plano Times (pode montar equipe) */
+  times: boolean
+  limite: number
+  /** Dono da equipe em que a pessoa trabalha (null = é dona da própria conta) */
+  dono: { id: string; nome: string | null } | null
+  /** Convite esperando resposta */
+  convite: { dono: string | null; papel: string } | null
+  membros: MembroEquipe[]
+}
+
 type EditableProfile = Partial<Pick<Profile, 'nome' | 'cidade' | 'boas_vindas_feitas'>>
 
 interface AccountState {
   profile: Profile | null
+  equipe: Equipe | null
   ready: boolean
   init(client: SupabaseClient | null, userId?: string): Promise<void>
   save(patch: EditableProfile): Promise<void>
   /** Lê o perfil de novo sem tela de carregando (ex.: acabou de pagar o plano). */
   recarregar(): Promise<void>
+  /** Lê a equipe de novo (depois de convidar, tirar ou mudar o papel de alguém). */
+  recarregarEquipe(): Promise<void>
 }
 
 // Modo local (sem Supabase): uma conta completa guardada no navegador
@@ -62,8 +94,23 @@ function localProfile(): Profile {
 
 let db: SupabaseClient | null = null
 
+/** Quem trabalha na equipe de outra pessoa usa o plano e os recursos do dono. */
+async function comPlanoDoDono(client: SupabaseClient, profile: Profile | null, equipe: Equipe | null): Promise<Profile | null> {
+  if (!profile || !equipe || equipe.conta === profile.user_id) return profile
+  const { data } = await client.rpc('meu_acesso')
+  const a = (data as Pick<Profile, 'plano' | 'plano_ate' | 'teste_ate' | 'recursos'>[] | null)?.[0]
+  if (!a) return profile
+  return { ...profile, plano: a.plano, plano_ate: a.plano_ate, teste_ate: a.teste_ate, ciclo: null, recursos: a.recursos.filter((r) => r !== 'times'), admin: false }
+}
+
+async function lerEquipe(client: SupabaseClient): Promise<Equipe | null> {
+  const { data, error } = await client.rpc('minha_equipe')
+  return error ? null : (data as Equipe)
+}
+
 export const useAccount = create<AccountState>()((set, get) => ({
   profile: null,
+  equipe: null,
   ready: false,
 
   async init(client, userId) {
@@ -73,16 +120,22 @@ export const useAccount = create<AccountState>()((set, get) => ({
       set({ profile: localProfile(), ready: true })
       return
     }
-    const { data } = await client.from('profiles').select('*').eq('user_id', userId).maybeSingle()
+    const [{ data }, equipe] = await Promise.all([client.from('profiles').select('*').eq('user_id', userId).maybeSingle(), lerEquipe(client)])
     // Sem perfil (não deveria acontecer): não bloqueia o uso
-    set({ profile: (data as Profile | null) ?? null, ready: true })
+    set({ profile: await comPlanoDoDono(client, (data as Profile | null) ?? null, equipe), equipe, ready: true })
   },
 
   async recarregar() {
     const current = get().profile
     if (!db || !current) return
     const { data } = await db.from('profiles').select('*').eq('user_id', current.user_id).maybeSingle()
-    if (data) set({ profile: data as Profile })
+    if (data) set({ profile: await comPlanoDoDono(db, data as Profile, get().equipe) })
+  },
+
+  async recarregarEquipe() {
+    if (!db) return
+    const equipe = await lerEquipe(db)
+    if (equipe) set({ equipe })
   },
 
   async save(patch) {
@@ -114,6 +167,11 @@ export function useHasWhatsApp(): boolean {
 /** A conta tem a IA no WhatsApp liberada (recurso "ia", o dono da XS liga em Contas)? O dono sempre tem. */
 export function useHasIA(): boolean {
   return useAccount((s) => !!s.profile && (s.profile.admin || s.profile.recursos.includes('ia')))
+}
+
+/** Papel na equipe; sem equipe (ou no modo local), 'dono'. */
+export function usePapel(): PapelEquipe {
+  return useAccount((s) => s.equipe?.papel ?? 'dono')
 }
 
 /** É o dono da XS (tela Contas)? O banco confere de novo em cada chamada. */

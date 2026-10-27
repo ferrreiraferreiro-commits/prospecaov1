@@ -75,6 +75,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Gestão',
     items: [
+      { to: '/equipe', label: 'Equipe', icon: UsersRound },
       { to: '/clientes', label: 'Clientes', icon: Users },
       { to: '/projetos', label: 'Projetos', icon: FolderKanban },
       { to: '/financeiro', label: 'Financeiro', icon: BadgeDollarSign },
@@ -125,6 +126,19 @@ function useGroups() {
   const temWhatsApp = useHasWhatsApp()
   const temIA = useHasIA()
   return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (temIA || !i.ia)) })).filter((g) => g.items.length)
+}
+
+/** Aviso no topo quando alguém convidou a pessoa para uma equipe (plano Times). */
+function ConviteEquipe() {
+  const convite = useAccount((s) => s.equipe?.convite)
+  const { pathname } = useLocation()
+  if (!convite || pathname === '/equipe') return null
+  return (
+    <NavLink to="/equipe" className="mb-4 flex items-center gap-2 rounded-md border border-gold/30 bg-gold/10 px-3 py-2 text-[13px] text-fg hover:bg-gold/15">
+      <UsersRound className="h-4 w-4 text-gold" />
+      <span className="pv">{convite.dono ?? 'Uma conta'}</span> chamou você para a equipe. Ver convite
+    </NavLink>
+  )
 }
 
 /** Status do WhatsApp da conta e resultados dos disparos (e do Agente IA) para o histórico dos leads. */
@@ -240,6 +254,7 @@ export function Layout() {
             </div>
           }
         >
+          <ConviteEquipe />
           <Outlet />
         </Suspense>
       </main>

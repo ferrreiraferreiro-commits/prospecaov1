@@ -318,14 +318,18 @@ async function verificarNoSupabase(token: string): Promise<Conta | null> {
   if (!res.ok) throw new Error(`supabase ${res.status}`)
   const user = (await res.json()) as { id?: unknown }
   if (typeof user.id !== 'string' || !UUID_OK.test(user.id)) return null
-  // O próprio perfil, lido com o login da pessoa (a regra do banco só deixa cada um ler o seu)
-  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=usuario,recursos,plano,plano_ate,teste_ate,admin&user_id=eq.${user.id}`, {
-    headers,
+  // Conta e plano que valem para a pessoa: os do dono, se ela está numa equipe (plano Times).
+  // Assim todo mundo da equipe usa o mesmo WhatsApp.
+  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/rpc/meu_acesso`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: '{}',
     signal: AbortSignal.timeout(8000),
   })
   if (!perfil.ok) throw new Error(`supabase perfil ${perfil.status}`)
-  const [p] = (await perfil.json()) as Perfil[]
-  return { id: user.id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p), admin: p?.admin === true, ia: p?.admin === true || (Array.isArray(p?.recursos) && p.recursos.includes('ia')) }
+  const [p] = (await perfil.json()) as (Perfil & { conta?: unknown })[]
+  const id = typeof p?.conta === 'string' && UUID_OK.test(p.conta) ? p.conta : user.id
+  return { id, usuario: typeof p?.usuario === 'string' ? p.usuario : null, podeUsar: contaPodeUsar(p), admin: p?.admin === true, ia: p?.admin === true || (Array.isArray(p?.recursos) && p.recursos.includes('ia')) }
 }
 
 let verificar: Verificador = verificarNoSupabase

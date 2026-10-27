@@ -131,11 +131,16 @@ export class SupabaseRepository implements Repository {
     check(await this.db.from('settings').upsert({ ...settings, updated_at: new Date().toISOString() }))
   }
 
+  /** Conta dona dos dados: a própria pessoa ou o dono da equipe dela. */
+  private async conta(): Promise<string> {
+    const { data, error } = await this.db.rpc('conta_atual')
+    if (error || typeof data !== 'string') throw new Error('Sessão expirada. Entre novamente.')
+    return data
+  }
+
   async replaceAll(snapshot: Snapshot) {
     // Apagar leads remove interações, follow-ups e reuniões em cascata.
-    const { data: userData } = await this.db.auth.getUser()
-    const uid = userData.user?.id
-    if (!uid) throw new Error('Sessão expirada. Entre novamente.')
+    const uid = await this.conta()
     check(await this.db.from('leads').delete().eq('user_id', uid))
     check(await this.db.from('imports').delete().eq('user_id', uid))
     for (const part of chunks(snapshot.imports)) check(await this.db.from('imports').insert(part))
@@ -164,9 +169,7 @@ export class SupabaseRepository implements Repository {
   }
 
   async replaceBiz(biz: BizSnapshot) {
-    const { data: userData } = await this.db.auth.getUser()
-    const uid = userData.user?.id
-    if (!uid) throw new Error('Sessão expirada. Entre novamente.')
+    const uid = await this.conta()
     // Apaga na ordem inversa das chaves estrangeiras e insere na ordem direta
     for (const t of [...BIZ_TABLES].reverse()) check(await this.db.from(t).delete().eq('user_id', uid))
     for (const t of BIZ_TABLES) await this.upsertRows(t, (biz[t] ?? []) as BizRow<typeof t>[])

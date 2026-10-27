@@ -683,9 +683,8 @@ async function requireAccess(authorization: string | undefined) {
     signal: AbortSignal.timeout(6000),
   })
   if (!userRes.ok) throw new HttpError(401, 'Sua sessão expirou. Entre de novo.')
-  const user = (await userRes.json()) as { id: string }
-  // RLS: com o token do próprio usuário, só a linha dele volta
-  const profRes = await fetch(`${url}/rest/v1/profiles?select=*&user_id=eq.${user.id}`, { headers, signal: AbortSignal.timeout(6000) })
+  // Plano que vale para a pessoa (o do dono, se ela está numa equipe)
+  const profRes = await fetch(`${url}/rest/v1/rpc/meu_acesso`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(6000) })
   const [profile] = profRes.ok
     ? ((await profRes.json()) as {
         plano: string

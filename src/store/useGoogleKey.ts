@@ -86,8 +86,8 @@ export const useGoogleKey = create<Store>()((set, get) => ({
       const { data: s } = await supabase.auth.getSession()
       const uid = s.session?.user.id
       if (!uid) throw new Error('Entre na sua conta para salvar a chave.')
+      // user_id fica com o banco: é a conta (a do dono, se a pessoa está numa equipe)
       const { error } = await supabase.from('busca_google').upsert({
-        user_id: uid,
         ...next,
         updated_at: new Date().toISOString(),
       })

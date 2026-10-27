@@ -222,7 +222,7 @@ beforeEach(() => {
         })
       const headers = (init?.headers ?? {}) as Record<string, string>
       if (url === 'https://sb.test/auth/v1/user') return headers.Authorization === 'Bearer ok' ? json({ id: 'u1' }) : json({}, 401)
-      if (url.startsWith('https://sb.test/rest/v1/profiles')) return json([profile])
+      if (url.startsWith('https://sb.test/rest/v1/rpc/meu_acesso')) return json([profile])
       if (url === 'https://places.googleapis.com/v1/places:searchText') {
         const body = JSON.parse(String(init?.body))
         googleCalls.push({

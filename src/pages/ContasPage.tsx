@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { BadgeDollarSign, Bot, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Smartphone, Trash2, Users } from 'lucide-react'
+import { BadgeDollarSign, Bot, Check, Copy, Crown, KeyRound, RefreshCw, ShieldCheck, Smartphone, Trash2, Users, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, NumberInput, SearchInput, Stat } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
@@ -15,6 +15,8 @@ import {
   gerarSenha,
   isCiclo,
   definirIA,
+  definirTimes,
+  listarTimes,
   listarContas,
   listarIA,
   listarPagamentos,
@@ -115,16 +117,18 @@ export function ContasPage() {
   const [editando, setEditando] = useState<string | null>(null)
   const [eu, setEu] = useState<string | null>(null)
   const [comIA, setComIA] = useState<Set<string>>(new Set())
+  const [comTimes, setComTimes] = useState<Map<string, number>>(new Map())
   const { painel, falhou } = usePainelWhatsApp()
 
   const carregar = useCallback(async () => {
     if (!supabase) return
     setErro(null)
     try {
-      const [c, p, ia] = await Promise.all([listarContas(supabase), listarPagamentos(supabase), listarIA(supabase)])
+      const [c, p, ia, times] = await Promise.all([listarContas(supabase), listarPagamentos(supabase), listarIA(supabase), listarTimes(supabase)])
       setContas(c)
       setPagamentos(p)
       setComIA(ia)
+      setComTimes(times)
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível carregar as contas.')
     }
@@ -183,6 +187,24 @@ export function ContasPage() {
       useApp.getState().toast(ligar ? `IA liberada para ${nomeDe(c)}. Aparece no menu dela em até 1 minuto.` : `IA tirada de ${nomeDe(c)}.`)
     } catch (err) {
       useApp.getState().toast(err instanceof Error ? err.message : 'Não deu para mudar a IA agora.', 'error')
+    }
+  }
+
+  async function alternarTimes(c: Conta) {
+    if (!supabase) return
+    const ligar = !comTimes.has(c.user_id)
+    if (!ligar && !confirm(`Tirar o plano Times de ${nomeDe(c)}? A equipe dela volta cada um para a própria conta.`)) return
+    try {
+      await definirTimes(supabase, c.user_id, ligar)
+      setComTimes((s) => {
+        const n = new Map(s)
+        if (ligar) n.set(c.user_id, 0)
+        else n.delete(c.user_id)
+        return n
+      })
+      useApp.getState().toast(ligar ? `Plano Times liberado para ${nomeDe(c)}. Ela monta a equipe em Equipe.` : `Plano Times tirado de ${nomeDe(c)}.`)
+    } catch (err) {
+      useApp.getState().toast(err instanceof Error ? err.message : 'Não deu para mudar o Times agora.', 'error')
     }
   }
 
@@ -293,6 +315,8 @@ export function ContasPage() {
                 visto={painel?.vistos[c.user_id] ?? null}
                 ia={comIA.has(c.user_id) || c.admin}
                 onIA={c.admin ? undefined : () => void alternarIA(c)}
+                times={comTimes.get(c.user_id) ?? null}
+                onTimes={() => void alternarTimes(c)}
                 onEditar={() => setEditando(c.user_id)}
               />
             ))}
@@ -389,6 +413,8 @@ function ContaRow({
   visto,
   ia,
   onIA,
+  times,
+  onTimes,
   onEditar,
 }: {
   conta: Conta
@@ -401,6 +427,9 @@ function ContaRow({
   ia: boolean
   /** Liga ou tira a IA (o dono não tem botão: sempre tem) */
   onIA?: () => void
+  /** Plano Times: quantas pessoas na equipe (null = sem Times) */
+  times: number | null
+  onTimes: () => void
   onEditar: () => void
 }) {
   const legacy = isLegacyEmail(conta.email)
@@ -429,6 +458,17 @@ function ContaRow({
           )}
         >
           <Bot className="size-3" aria-hidden /> {ia ? 'IA liberada' : 'Sem IA'}
+        </button>
+        <button
+          type="button"
+          onClick={onTimes}
+          title={times !== null ? 'Tirar o plano Times desta conta' : 'Liberar o plano Times (equipe de até 10 pessoas)'}
+          className={clsx(
+            'mt-1 ml-1 inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold ring-1 ring-inset transition-colors',
+            times !== null ? 'bg-blue-500/15 text-blue-300 ring-blue-500/30' : 'text-fg-4 ring-line hover:text-fg-2',
+          )}
+        >
+          <UsersRound className="size-3" aria-hidden /> {times !== null ? `Times · ${times}/10` : 'Sem Times'}
         </button>
       </div>
       <div>
