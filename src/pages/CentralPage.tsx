@@ -31,7 +31,7 @@ export function CentralPage() {
   // Plano Times: ver só os leads de alguém da equipe ('' = todos, '-' = sem responsável)
   const pessoas = usePessoasEquipe()
   const eu = useAccount((s) => s.profile?.user_id)
-  const [resp, setResp] = useState('')
+  const [resp, setResp] = useState(() => new URLSearchParams(window.location.search).get('resp') ?? '')
   const leads = useMemo(
     () => (resp ? todosLeads.filter((l) => (resp === '-' ? !l.responsavel : l.responsavel === resp)) : todosLeads),
     [todosLeads, resp],

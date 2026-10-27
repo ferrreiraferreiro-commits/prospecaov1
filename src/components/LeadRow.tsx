@@ -7,6 +7,7 @@ import { formatRelative } from '../lib/dates'
 import type { NextAction } from '../lib/selectors'
 import { STATUS_MAP, TONE_CLASSES } from '../lib/statuses'
 import type { Interaction, Lead } from '../lib/types'
+import { usePapel, usePessoasEquipe } from '../store/useAccount'
 import { useUi } from '../store/useUi'
 import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
 import { useLiguei } from './OutcomeModal'
@@ -55,6 +56,23 @@ interface LeadRowProps {
   onToggle?: (leadId: string) => void
 }
 
+/** Plano Times (dono e gestor): de quem é o lead. Cinza = ninguém ainda; azul = com alguém da equipe. */
+function RespTag({ responsavel }: { responsavel: string | null }) {
+  const pessoas = usePessoasEquipe()
+  const papel = usePapel()
+  if (!pessoas.length || papel === 'vendedor') return null
+  const nome = responsavel ? pessoas.find((p) => p.id === responsavel)?.nome : null
+  return nome ? (
+    <span className="pv inline-flex max-w-[120px] shrink-0 truncate rounded bg-blue-500/12 px-1.5 text-[10px] leading-4 font-medium text-blue-300 ring-1 ring-blue-500/25 ring-inset" title={`Com ${nome}`}>
+      {nome}
+    </span>
+  ) : (
+    <span className="inline-flex shrink-0 rounded bg-tint/[0.05] px-1.5 text-[10px] leading-4 font-medium text-fg-4 ring-1 ring-line ring-inset" title="Ainda não foi passado para ninguém">
+      Sem responsável
+    </span>
+  )
+}
+
 export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onCallMode, checked, onToggle }: LeadRowProps) {
   const openLead = useUi((s) => s.openLead)
   const openOutcome = useUi((s) => s.openOutcome)
@@ -97,6 +115,7 @@ export const LeadRow = memo(function LeadRow({ lead, next, calls, duplicate, onC
             {lead.empresa}
           </span>
           <HotTag lead={lead} />
+          <RespTag responsavel={lead.responsavel ?? null} />
           {duplicate && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-orange-400/10 px-1.5 text-[10px] leading-4 font-medium text-orange-300" title="Possível duplicado — abra o lead para decidir">
               <Copy className="size-2.5" /> Possível duplicado

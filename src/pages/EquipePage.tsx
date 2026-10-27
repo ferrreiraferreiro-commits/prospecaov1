@@ -6,7 +6,9 @@ import { Card, confirmAction } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty } from '../components/ui'
 import { supabase } from '../data/supabaseClient'
-import { STATUS_MAP } from '../lib/statuses'
+import clsx from 'clsx'
+import { Link } from 'react-router-dom'
+import { STATUS_MAP, STATUSES, TONE_CLASSES } from '../lib/statuses'
 import { useAccount, usePessoasEquipe, type MembroEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
@@ -312,6 +314,7 @@ function Desempenho() {
         valor: vendas.reduce((t, m) => t + (m.valor ?? 0), 0),
         carteira: carteira.length,
         parados: carteira.filter((l) => !l.ultima_ligacao || Date.parse(l.ultima_ligacao) < semana).length,
+        porStatus: STATUSES.map((st) => ({ st, n: carteira.filter((l) => l.status === st.id).length })).filter((x) => x.n > 0),
         metaContatos: membro?.meta_contatos ?? null,
         metaVendas: membro?.meta_vendas ?? null,
       }
@@ -353,13 +356,34 @@ function Desempenho() {
               </td>
               <td className="pv num px-2 py-2 text-right">{l.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
               <td className="num px-4 py-2 text-right">
-                {l.carteira}
+                <Link to={`/leads?resp=${l.id}`} className="underline-offset-2 hover:underline" title="Ver os leads dessa pessoa">
+                  {l.carteira}
+                </Link>
                 {l.parados > 0 && <span className="ml-1 text-gold" title="Sem ligação há mais de 7 dias">· {l.parados} parados</span>}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <div className="space-y-2 border-t border-line-soft px-4 py-3">
+        <p className="text-2xs font-medium text-fg-3">Status dos leads de cada pessoa</p>
+        {ordem.map((l) => (
+          <div key={l.id} className="flex flex-wrap items-center gap-1.5 text-2xs">
+            <Link to={`/leads?resp=${l.id}`} className="pv mr-1 font-medium text-fg hover:underline">
+              {l.nome}
+            </Link>
+            {l.porStatus.length ? (
+              l.porStatus.map(({ st, n }) => (
+                <span key={st.id} className={clsx('rounded px-1.5 leading-4 ring-1 ring-inset', TONE_CLASSES[st.tone].chip)}>
+                  {st.label} <span className="num">{n}</span>
+                </span>
+              ))
+            ) : (
+              <span className="text-fg-4">Nenhum lead com essa pessoa</span>
+            )}
+          </div>
+        ))}
+      </div>
     </Card>
   )
 }

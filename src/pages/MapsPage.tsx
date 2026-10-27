@@ -10,10 +10,12 @@ import { PageHeader } from '../components/PageHeader'
 import { Button, InstagramIcon, Progress } from '../components/ui'
 import { CATEGORIAS, GRUPOS, POPULARES, categoriaDe } from '../lib/categorias'
 import { formatPhone } from '../lib/contact'
-import { formatElapsed, PHASE_LABEL, type Mode, type SearchSource } from '../lib/mapsSearch'
+import { mapsKey, phoneKey } from '../lib/duplicates'
+import { formatElapsed, PHASE_LABEL, type MapsResult, type Mode, type SearchSource } from '../lib/mapsSearch'
 import { normalizeKey } from '../lib/statuses'
 import { restantes, semTeto, usadasNoMes, useGoogleKey } from '../store/useGoogleKey'
 import { nominatim, useMapsSearch, type SearchArea } from '../store/useMapsSearch'
+import { usePapel, usePessoasEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
 const FORM_KEY = 'xs-prospeccao:busca-empresas'
@@ -131,6 +133,11 @@ export function MapsPage() {
 
   const center: MapPoint | null = form.point ?? state?.center ?? null
   const results = state?.results ?? []
+  // Plano Times: o dono escolhe para quem vão as empresas achadas (marcadas, ou todas)
+  const pessoasEquipe = usePessoasEquipe()
+  const papel = usePapel()
+  const temEquipe = pessoasEquipe.length > 0 && papel !== 'vendedor'
+  const [marcados, setMarcados] = useState<Set<string>>(new Set())
   // Normalmente vai sozinho para os leads; isto cobre uma falha ao salvar
   const pendingSave = !!state && !state.active && !state.imported && results.length > 0
 
@@ -653,19 +660,33 @@ export function MapsPage() {
                     Salvar nos leads
                   </Button>
                 ) : (
+                  <>
+                    <MandarPara results={results} marcados={marcados} onFeito={() => setMarcados(new Set())} />
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
                     <Check className="size-3.5" /> Já estão nos seus leads ·{' '}
                     <Link to="/leads" className="underline underline-offset-2">
                       ver leads
                     </Link>
                   </span>
+                  </>
                 )}
               </header>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-xs">
                   <thead>
                     <tr className="border-b border-line-soft text-left text-2xs text-fg-3">
-                      <th className="py-2 pl-4 font-medium">Empresa</th>
+                      <th className="py-2 pl-4 font-medium">
+                        {temEquipe && !active && !pendingSave && (
+                          <input
+                            type="checkbox"
+                            className="mr-2 align-middle"
+                            checked={marcados.size > 0 && marcados.size === results.filter((r) => !r.recurring).length}
+                            onChange={(e) => setMarcados(e.target.checked ? new Set(results.filter((r) => !r.recurring).map((r) => r.id)) : new Set())}
+                            aria-label="Marcar todas"
+                          />
+                        )}
+                        Empresa
+                      </th>
                       <th className="px-2 py-2 font-medium">Contato</th>
                       <th className="px-2 py-2 font-medium">Site</th>
                       <th className="px-2 py-2 font-medium">Google</th>
@@ -676,6 +697,22 @@ export function MapsPage() {
                     {results.map((r) => (
                       <tr key={r.id} className={clsx('align-top', r.recurring && 'opacity-55')}>
                         <td className="py-2.5 pr-2 pl-4">
+                          {temEquipe && !active && !pendingSave && !r.recurring && (
+                            <input
+                              type="checkbox"
+                              className="mr-2 align-middle"
+                              checked={marcados.has(r.id)}
+                              onChange={() =>
+                                setMarcados((s) => {
+                                  const n = new Set(s)
+                                  if (n.has(r.id)) n.delete(r.id)
+                                  else n.add(r.id)
+                                  return n
+                                })
+                              }
+                              aria-label={`Marcar ${r.name}`}
+                            />
+                          )}
                           <span className="pv font-medium text-fg">{r.name}</span>
                           <p className="text-2xs text-fg-3">
                             {r.niche}
@@ -834,5 +871,46 @@ function Metric({ label, value, tone }: { label: string; value: React.ReactNode;
       <dt className="text-[10px] text-fg-4">{label}</dt>
       <dd className={clsx('num text-sm font-semibold', tone ?? 'text-fg')}>{value}</dd>
     </div>
+  )
+}
+
+/** Passa as empresas achadas (as marcadas, ou todas as novas) para alguém da equipe. */
+function MandarPara({ results, marcados, onFeito }: { results: MapsResult[]; marcados: Set<string>; onFeito: () => void }) {
+  const pessoas = usePessoasEquipe()
+  const papel = usePapel()
+  const leads = useApp((s) => s.leads)
+  const setResponsavel = useApp((s) => s.setResponsavel)
+  const toast = useApp((s) => s.toast)
+  const [busy, setBusy] = useState(false)
+  if (!pessoas.length || papel === 'vendedor') return null
+
+  const mandar = async (destino: string) => {
+    const escolhidos = results.filter((r) => !r.recurring && (!marcados.size || marcados.has(r.id)))
+    const phones = new Set(escolhidos.map((r) => phoneKey(r.phone)).filter(Boolean))
+    const maps = new Set(escolhidos.map((r) => mapsKey(r.mapsUrl)).filter(Boolean))
+    const ids = leads.filter((l) => (l.maps_url && maps.has(mapsKey(l.maps_url))) || [l.telefone, l.whatsapp].some((t) => t && phones.has(phoneKey(t)))).map((l) => l.id)
+    if (!ids.length) return toast('Não achei essas empresas nos leads. Abra os Leads e passe por lá.', 'error')
+    const nome = pessoas.find((p) => p.id === destino)?.nome ?? 'a pessoa'
+    setBusy(true)
+    try {
+      await setResponsavel(ids, destino)
+      toast(`${ids.length} lead(s) com ${nome}.`)
+      onFeito()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não deu para passar os leads.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <select className="input h-8 w-auto cursor-pointer pr-7 text-xs" value="" disabled={busy} onChange={(e) => e.target.value && void mandar(e.target.value)} aria-label="Mandar para alguém da equipe">
+      <option value="">{marcados.size ? `Mandar ${marcados.size} marcada(s) para…` : 'Mandar todas para…'}</option>
+      {pessoas.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.nome}
+        </option>
+      ))}
+    </select>
   )
 }
