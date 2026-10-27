@@ -1,5 +1,6 @@
 // Plano Times no gateway: quem está numa equipe usa o WhatsApp (e o plano) do dono da equipe.
-// Troca só o trecho que lê o perfil (pela RPC meu_acesso do Supabase); não mexe no resto, como a regra das 24 h da VPS.
+// Troca só a leitura do perfil (pela RPC meu_acesso do Supabase); não mexe no resto, como a regra das 24 h da VPS.
+// Procura os trechos com folga (a VPS pode ter espaços e comentários diferentes) e só grava se achar os três.
 // Uso: node times.mjs /opt/xs-whatsapp/gateway.ts
 import fs from 'node:fs'
 
@@ -10,12 +11,27 @@ if (s.includes('rest/v1/rpc/meu_acesso')) {
   process.exit(0)
 }
 
-const antes = "  // O próprio perfil, lido com o login da pessoa (a regra do banco só deixa cada um ler o seu)\n  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=usuario,recursos,plano,plano_ate,teste_ate,admin&user_id=eq.${user.id}`, {\n    headers,\n    signal: AbortSignal.timeout(8000),\n  })\n  if (!perfil.ok) throw new Error(`supabase perfil ${perfil.status}`)\n  const [p] = (await perfil.json()) as Perfil[]\n  return { id: user.id, usuario"
-const depois = "  // Conta e plano que valem para a pessoa: os do dono, se ela está numa equipe (plano Times).\n  // Assim todo mundo da equipe usa o mesmo WhatsApp.\n  const perfil = await fetch(`${SUPABASE_URL}/rest/v1/rpc/meu_acesso`, {\n    method: 'POST',\n    headers: { ...headers, 'Content-Type': 'application/json' },\n    body: '{}',\n    signal: AbortSignal.timeout(8000),\n  })\n  if (!perfil.ok) throw new Error(`supabase perfil ${perfil.status}`)\n  const [p] = (await perfil.json()) as (Perfil & { conta?: unknown })[]\n  const id = typeof p?.conta === 'string' && UUID_OK.test(p.conta) ? p.conta : user.id\n  return { id, usuario"
-if (!s.includes(antes)) {
-  console.error('Não achei o trecho do perfil no gateway. Nada foi mudado.')
-  process.exit(1)
+const trocas = [
+  [
+    'leitura do perfil',
+    /fetch\(`\$\{SUPABASE_URL\}\/rest\/v1\/profiles\?select=[^`]*`,\s*\{\s*headers,/,
+    "fetch(`${SUPABASE_URL}/rest/v1/rpc/meu_acesso`, {\n    method: 'POST',\n    headers: { ...headers, 'Content-Type': 'application/json' },\n    body: '{}',",
+  ],
+  [
+    'perfil lido',
+    /const \[p\] = \(await (\w+)\.json\(\)\) as Perfil\[\]/,
+    (_, v) =>
+      `const [p] = (await ${v}.json()) as (Perfil & { conta?: unknown })[]\n  // Plano Times: quem está numa equipe usa a conta (e o WhatsApp) do dono\n  const id = typeof p?.conta === 'string' && UUID_OK.test(p.conta) ? p.conta : user.id`,
+  ],
+  ['conta devolvida', /return \{ id: user\.id,/, 'return { id,'],
+]
+
+for (const [nome, de, para] of trocas) {
+  if (!de.test(s)) {
+    console.error(`Não achei o trecho "${nome}" no gateway. Nada foi mudado.`)
+    process.exit(1)
+  }
+  s = s.replace(de, para)
 }
-s = s.replace(antes, depois)
 fs.writeFileSync(arquivo, s)
 console.log('Pronto: membros de equipe usam o WhatsApp do dono.')
