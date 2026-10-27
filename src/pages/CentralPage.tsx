@@ -20,13 +20,22 @@ import {
 } from '../lib/selectors'
 import { useDuplicates, useIndex, useMetrics, useToday } from '../store/derived'
 import { BulkBar } from '../components/BulkBar'
+import { useAccount, usePessoasEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 
 const PAGE_SIZE = 60
 
 export function CentralPage() {
-  const leads = useApp((s) => s.leads)
+  const todosLeads = useApp((s) => s.leads)
+  // Plano Times: ver só os leads de alguém da equipe ('' = todos, '-' = sem responsável)
+  const pessoas = usePessoasEquipe()
+  const eu = useAccount((s) => s.profile?.user_id)
+  const [resp, setResp] = useState('')
+  const leads = useMemo(
+    () => (resp ? todosLeads.filter((l) => (resp === '-' ? !l.responsavel : l.responsavel === resp)) : todosLeads),
+    [todosLeads, resp],
+  )
   const settings = useApp((s) => s.settings)
   const view = useApp((s) => s.central)
   const setCentral = useApp((s) => s.setCentral)
@@ -192,6 +201,20 @@ export function CentralPage() {
             )}
           </div>
           <FiltersPopover leads={leads} value={view.advanced} onChange={(advanced) => setCentral({ advanced })} />
+          {pessoas.length > 0 && (
+            <select className="input h-8 w-auto cursor-pointer pr-7" value={resp} onChange={(e) => setResp(e.target.value)} aria-label="Leads de quem">
+              <option value="">Todos da equipe</option>
+              {eu && <option value={eu}>Meus leads</option>}
+              {pessoas
+                .filter((p) => p.id !== eu)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ))}
+              <option value="-">Sem responsável</option>
+            </select>
+          )}
           <select
             className="input h-8 w-auto cursor-pointer pr-7"
             value={view.sort}

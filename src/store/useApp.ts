@@ -84,6 +84,8 @@ interface AppState extends Snapshot {
   discardCall(callId: string): Promise<void>
   saveOutcome(input: OutcomeInput): Promise<void>
   setStatus2(leadId: string, value: string | null): Promise<void>
+  /** Plano Times: passa os leads para uma pessoa da equipe (null = sem responsável). */
+  setResponsavel(leadIds: string[], responsavel: string | null): Promise<void>
   updateLeadWork(leadId: string, patch: Partial<Pick<Lead, 'falei_com' | 'cargo' | 'anotacoes' | 'proxima_acao'>>): Promise<void>
   addNote(leadId: string, text: string): Promise<void>
   scheduleFollowup(leadId: string, input: FollowupInput): Promise<void>
@@ -395,6 +397,13 @@ export const useApp = create<AppState>()((set, get) => {
       await persist(async (repo) => {
         await repo.updateLead(leadId, { status2: next })
         await repo.insertInteractions([log])
+      })
+    },
+
+    async setResponsavel(leadIds, responsavel) {
+      for (const id of leadIds) patchLead(id, { responsavel })
+      await persist(async (repo) => {
+        for (const id of leadIds) await repo.updateLead(id, { responsavel })
       })
     },
 

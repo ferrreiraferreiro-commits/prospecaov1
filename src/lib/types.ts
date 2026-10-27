@@ -48,6 +48,8 @@ export interface Lead {
   cargo: string | null
   anotacoes: string | null
   proxima_acao: string | null
+  /** Plano Times: pessoa da equipe que cuida do lead (null = ninguém) */
+  responsavel?: string | null
   ultima_ligacao: string | null
   duplicado_ignorado: boolean
   created_at: string
@@ -67,6 +69,8 @@ export interface Interaction {
   observacao: string | null
   /** Roteiro ativo quando a ligação foi registrada (para comparar roteiros) */
   roteiro_id?: string | null
+  /** Quem registrou (plano Times; o banco preenche) */
+  autor?: string | null
   created_at: string
 }
 
@@ -96,6 +100,8 @@ export interface Meeting {
   resultado?: MeetingResultado | null
   /** Valor fechado em reais, quando `resultado = 'fechou'` */
   valor?: number | null
+  /** Quem marcou (plano Times; o banco preenche) */
+  autor?: string | null
   resultado_em?: string | null
   created_at: string
 }

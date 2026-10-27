@@ -3,6 +3,7 @@ import { CalendarCheck, CalendarClock, FileDown, MessageCircle, PencilLine, Phon
 import { formatDateTime } from '../lib/dates'
 import { STATUS_MAP } from '../lib/statuses'
 import type { ImportRecord, Interaction, Lead } from '../lib/types'
+import { usePessoasEquipe } from '../store/useAccount'
 import { useUi } from '../store/useUi'
 import { StatusBadge } from './ui'
 
@@ -30,6 +31,9 @@ const TITLES = {
 
 export function Timeline({ lead, items, importRecord }: { lead: Lead; items: Interaction[]; importRecord?: ImportRecord }) {
   const openOutcome = useUi((s) => s.openOutcome)
+  // Plano Times: mostra quem fez cada coisa
+  const pessoas = usePessoasEquipe()
+  const nomes = new Map(pessoas.map((p) => [p.id, p.nome]))
   const sorted = [...items].sort((a, b) => b.created_at.localeCompare(a.created_at))
 
   return (
@@ -50,7 +54,10 @@ export function Timeline({ lead, items, importRecord }: { lead: Lead; items: Int
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="num text-2xs text-fg-3">{formatDateTime(it.created_at)}</span>
+                <span className="num text-2xs text-fg-3">
+                  {formatDateTime(it.created_at)}
+                  {it.autor && nomes.get(it.autor) && <span className="pv"> · {nomes.get(it.autor)}</span>}
+                </span>
                 <span className="text-xs font-medium text-fg">{TITLES[it.tipo]}</span>
                 {it.tipo === 'ligacao' && it.status && <StatusBadge status={it.status} />}
                 {it.tipo === 'status' && it.status && STATUS_MAP[it.status] && <StatusBadge status={it.status} />}

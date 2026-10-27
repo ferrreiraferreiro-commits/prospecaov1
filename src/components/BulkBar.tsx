@@ -2,6 +2,7 @@ import { Headphones, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { STATUS_MAP, STATUSES } from '../lib/statuses'
 import type { StatusId } from '../lib/types'
+import { usePessoasEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { Button } from './ui'
 
@@ -13,6 +14,8 @@ export function BulkBar({ ids, onClear, onCall }: { ids: string[]; onClear: () =
   const saveOutcome = useApp((s) => s.saveOutcome)
   const deleteLeads = useApp((s) => s.deleteLeads)
   const toast = useApp((s) => s.toast)
+  const setResponsavel = useApp((s) => s.setResponsavel)
+  const pessoas = usePessoasEquipe()
   const [busy, setBusy] = useState(false)
   const n = ids.length
   const plural = n === 1 ? 'lead' : 'leads'
@@ -23,6 +26,30 @@ export function BulkBar({ ids, onClear, onCall }: { ids: string[]; onClear: () =
       for (const id of ids) await saveOutcome({ leadId: id, mode: 'status', status })
       toast(`${n} ${plural} em “${STATUS_MAP[status].label}”.`)
       onClear()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Passa para uma pessoa, ou "todos" = reparte em rodízio entre quem é da equipe (menos o dono). */
+  async function passar(destino: string) {
+    setBusy(true)
+    try {
+      if (destino === '*') {
+        const fila = pessoas.slice(1)
+        if (!fila.length) return
+        for (let i = 0; i < fila.length; i++) {
+          const parte = ids.filter((_, j) => j % fila.length === i)
+          if (parte.length) await setResponsavel(parte, fila[i].id)
+        }
+        toast(`${n} ${plural} repartidos entre ${fila.length} pessoas.`)
+      } else {
+        await setResponsavel(ids, destino === '-' ? null : destino)
+        toast(destino === '-' ? `${n} ${plural} sem responsável.` : `${n} ${plural} com ${pessoas.find((p) => p.id === destino)?.nome ?? 'a pessoa'}.`)
+      }
+      onClear()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Não deu para passar os leads.', 'error')
     } finally {
       setBusy(false)
     }
@@ -61,6 +88,24 @@ export function BulkBar({ ids, onClear, onCall }: { ids: string[]; onClear: () =
           </option>
         ))}
       </select>
+      {pessoas.length > 0 && (
+        <select
+          className="input h-8 w-auto cursor-pointer pr-7 text-xs"
+          value=""
+          disabled={busy}
+          onChange={(e) => e.target.value && void passar(e.target.value)}
+          aria-label="Passar os selecionados para alguém da equipe"
+        >
+          <option value="">Passar para…</option>
+          {pessoas.length > 2 && <option value="*">Repartir entre a equipe</option>}
+          {pessoas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
+            </option>
+          ))}
+          <option value="-">Sem responsável</option>
+        </select>
+      )}
       <Button size="sm" variant="secondary" icon={<Headphones className="size-3.5" />} disabled={busy} onClick={() => onCall(ids)}>
         Ligar em sequência
       </Button>

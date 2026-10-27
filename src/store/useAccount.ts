@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { useMemo } from 'react'
 import { create } from 'zustand'
 
 /** De quanto em quanto tempo o plano pago renova. */
@@ -38,6 +39,9 @@ export interface MembroEquipe {
   papel: Exclude<PapelEquipe, 'dono'>
   ve_todos: boolean
   aceito: boolean
+  /** Metas do mês (null = sem meta) */
+  meta_contatos: number | null
+  meta_vendas: number | null
 }
 
 /** Equipe da pessoa logada (RPC minha_equipe). */
@@ -48,6 +52,10 @@ export interface Equipe {
   /** A própria conta tem o plano Times (pode montar equipe) */
   times: boolean
   limite: number
+  /** Vê todos os leads da conta (vendedor pode ver só os dele) */
+  ve_todos: boolean
+  /** Leads novos vão um para cada vendedor, em rodízio */
+  roleta: boolean
   /** Dono da equipe em que a pessoa trabalha (null = é dona da própria conta) */
   dono: { id: string; nome: string | null } | null
   /** Convite esperando resposta */
@@ -172,6 +180,19 @@ export function useHasIA(): boolean {
 /** Papel na equipe; sem equipe (ou no modo local), 'dono'. */
 export function usePapel(): PapelEquipe {
   return useAccount((s) => s.equipe?.papel ?? 'dono')
+}
+
+/** Pessoas da equipe (dono + membros que aceitaram), para escolher responsável e mostrar quem fez. Vazio sem equipe. */
+export function usePessoasEquipe(): { id: string; nome: string }[] {
+  const equipe = useAccount((s) => s.equipe)
+  const profile = useAccount((s) => s.profile)
+  return useMemo(() => {
+    if (!equipe || !profile) return []
+    const membros = equipe.membros.filter((m) => m.aceito)
+    if (!membros.length) return []
+    const dono = equipe.dono ? { id: equipe.dono.id, nome: equipe.dono.nome ?? 'Dono' } : { id: profile.user_id, nome: profile.nome || profile.usuario || 'Eu' }
+    return [dono, ...membros.map((m) => ({ id: m.id, nome: m.nome ?? m.usuario ?? 'Sem nome' }))]
+  }, [equipe, profile])
 }
 
 /** É o dono da XS (tela Contas)? O banco confere de novo em cada chamada. */

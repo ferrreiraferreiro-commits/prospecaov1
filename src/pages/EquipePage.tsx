@@ -1,12 +1,13 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
 // Plano Times: o dono convida até 10 pessoas, que trabalham no CRM dele com o próprio login.
 import { Crown, LogOut, Trash2, UserPlus, Users } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Card, confirmAction } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty } from '../components/ui'
 import { supabase } from '../data/supabaseClient'
-import { useAccount, type MembroEquipe } from '../store/useAccount'
+import { STATUS_MAP } from '../lib/statuses'
+import { useAccount, usePessoasEquipe, type MembroEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
 const PAPEIS = {
@@ -122,6 +123,7 @@ function SouMembro() {
           ))}
         </ul>
       </Card>
+      <Desempenho />
       <Button variant="danger" icon={<LogOut className="h-3.5 w-3.5" />} loading={busy} onClick={() => void sair()}>
         Sair da equipe
       </Button>
@@ -137,6 +139,15 @@ function SouDono() {
   const [busy, setBusy] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const cheia = equipe.membros.length >= equipe.limite
+
+  const alternarRoleta = async () => {
+    try {
+      await chamar('equipe_roleta', { p_ligar: !equipe.roleta })
+      await recarregar()
+    } catch (e) {
+      useApp.getState().toast((e as Error).message, 'error')
+    }
+  }
 
   const convidar = async (e: FormEvent) => {
     e.preventDefault()
@@ -172,6 +183,20 @@ function SouDono() {
         </form>
         <p className="mt-2 text-xs text-fg-3">{SOBRE_PAPEL[papel]}</p>
         {erro && <p className="mt-2 text-xs text-red-300">{erro}</p>}
+      </Card>
+
+      <Desempenho />
+
+      <Card
+        title="Roleta de leads"
+        description="Ligada, cada lead novo (busca, importação ou cadastro) vai para um vendedor, um de cada vez."
+        actions={
+          <Button size="sm" variant={equipe.roleta ? 'go' : 'secondary'} onClick={() => void alternarRoleta()}>
+            {equipe.roleta ? 'Ligada' : 'Desligada'}
+          </Button>
+        }
+      >
+        <p className="text-xs text-fg-3">Para passar leads que já existem, selecione na lista de Leads e use “Passar para…” ou “Repartir entre a equipe”.</p>
       </Card>
 
       <Card title="Pessoas da equipe" bodyClass="px-4 py-1">
@@ -215,6 +240,19 @@ function Membro({ m, onMudou }: { m: MembroEquipe; onMudou: () => Promise<void> 
           {!m.aceito && <span className="ml-1.5 text-gold">Convite enviado</span>}
         </p>
       </div>
+      {m.papel === 'vendedor' && (
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2" title="Desmarcado: a pessoa só vê os leads que estão com ela">
+          <input
+            type="checkbox"
+            checked={m.ve_todos}
+            disabled={busy}
+            onChange={(e) => void agir(() => chamar('equipe_definir', { p_membro: m.id, p_papel: m.papel, p_ve_todos: e.target.checked }))}
+          />
+          Vê todos os leads
+        </label>
+      )}
+      <MetaInput label="Contatos/mês" valor={m.meta_contatos} disabled={busy} onSalvar={(v) => void agir(() => chamar('equipe_metas', { p_membro: m.id, p_contatos: v, p_vendas: m.meta_vendas }))} />
+      <MetaInput label="Vendas/mês" valor={m.meta_vendas} disabled={busy} onSalvar={(v) => void agir(() => chamar('equipe_metas', { p_membro: m.id, p_contatos: m.meta_contatos, p_vendas: v }))} />
       <select
         className="input w-auto"
         value={m.papel}
@@ -226,5 +264,102 @@ function Membro({ m, onMudou }: { m: MembroEquipe; onMudou: () => Promise<void> 
       </select>
       <Button variant="ghost" size="sm" icon={<Trash2 className="h-3.5 w-3.5" />} disabled={busy} onClick={remover} aria-label="Tirar da equipe" />
     </li>
+  )
+}
+
+function MetaInput({ label, valor, disabled, onSalvar }: { label: string; valor: number | null; disabled: boolean; onSalvar: (v: number | null) => void }) {
+  const [v, setV] = useState(valor ? String(valor) : '')
+  const salvar = () => {
+    const n = Number(v) || null
+    if (n !== valor) onSalvar(n)
+  }
+  return (
+    <label className="flex items-center gap-1 text-2xs text-fg-3">
+      {label}
+      <input className="input h-7 w-14 px-1.5 text-xs" inputMode="numeric" value={v} disabled={disabled} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} onBlur={salvar} />
+    </label>
+  )
+}
+
+/** Números do mês de cada pessoa: dono e gestor veem todos; vendedor vê só os dele. */
+function Desempenho() {
+  const equipe = useAccount((s) => s.equipe)!
+  const eu = useAccount((s) => s.profile?.user_id)
+  const pessoas = usePessoasEquipe()
+  const interactions = useApp((s) => s.interactions)
+  const meetings = useApp((s) => s.meetings)
+  const leads = useApp((s) => s.leads)
+
+  const linhas = useMemo(() => {
+    const inicio = new Date()
+    inicio.setDate(1)
+    inicio.setHours(0, 0, 0, 0)
+    const desde = inicio.toISOString()
+    const semana = Date.now() - 7 * 86_400_000
+    const respDe = new Map(leads.map((l) => [l.id, l.responsavel ?? null]))
+    const visiveis = equipe.papel === 'vendedor' ? pessoas.filter((p) => p.id === eu) : pessoas
+    return visiveis.map((p) => {
+      const minhas = interactions.filter((i) => i.autor === p.id && i.created_at >= desde)
+      const vendas = meetings.filter((m) => m.resultado === 'fechou' && m.data >= desde.slice(0, 10) && (respDe.get(m.lead_id) ?? m.autor) === p.id)
+      const carteira = leads.filter((l) => l.responsavel === p.id)
+      const membro = equipe.membros.find((m) => m.id === p.id)
+      return {
+        ...p,
+        ligacoes: minhas.filter((i) => i.tipo === 'ligacao').length,
+        contatos: minhas.filter((i) => i.status && STATUS_MAP[i.status]?.contato).length,
+        reunioes: minhas.filter((i) => i.status === 'agendou_reuniao').length,
+        vendas: vendas.length,
+        valor: vendas.reduce((t, m) => t + (m.valor ?? 0), 0),
+        carteira: carteira.length,
+        parados: carteira.filter((l) => !l.ultima_ligacao || Date.parse(l.ultima_ligacao) < semana).length,
+        metaContatos: membro?.meta_contatos ?? null,
+        metaVendas: membro?.meta_vendas ?? null,
+      }
+    })
+  }, [equipe, eu, pessoas, interactions, meetings, leads])
+
+  if (!linhas.length) return null
+  const ordem = [...linhas].sort((a, b) => b.vendas - a.vendas || b.contatos - a.contatos)
+  return (
+    <Card title="Desempenho do mês" description="Ligações, contatos, reuniões e vendas de cada pessoa. Vendas = reuniões com resultado “Fechou”, contadas para quem cuida do lead." bodyClass="overflow-x-auto px-0 py-0">
+      <table className="w-full min-w-[560px] text-xs">
+        <thead className="text-2xs text-fg-3">
+          <tr className="border-b border-line-soft text-left">
+            <th className="px-4 py-2 font-medium">Pessoa</th>
+            <th className="px-2 py-2 text-right font-medium">Ligações</th>
+            <th className="px-2 py-2 text-right font-medium">Contatos</th>
+            <th className="px-2 py-2 text-right font-medium">Reuniões</th>
+            <th className="px-2 py-2 text-right font-medium">Vendas</th>
+            <th className="px-2 py-2 text-right font-medium">Valor</th>
+            <th className="px-4 py-2 text-right font-medium">Carteira</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ordem.map((l, i) => (
+            <tr key={l.id} className="border-b border-line-soft last:border-0">
+              <td className="px-4 py-2">
+                <span className="num mr-1.5 text-fg-4">{i + 1}º</span>
+                <span className="pv font-medium">{l.nome}</span>
+              </td>
+              <td className="num px-2 py-2 text-right">{l.ligacoes}</td>
+              <td className="num px-2 py-2 text-right">
+                {l.contatos}
+                {l.metaContatos && <span className={l.contatos >= l.metaContatos ? 'text-go' : 'text-fg-4'}>/{l.metaContatos}</span>}
+              </td>
+              <td className="num px-2 py-2 text-right">{l.reunioes}</td>
+              <td className="num px-2 py-2 text-right">
+                {l.vendas}
+                {l.metaVendas && <span className={l.vendas >= l.metaVendas ? 'text-go' : 'text-fg-4'}>/{l.metaVendas}</span>}
+              </td>
+              <td className="pv num px-2 py-2 text-right">{l.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
+              <td className="num px-4 py-2 text-right">
+                {l.carteira}
+                {l.parados > 0 && <span className="ml-1 text-gold" title="Sem ligação há mais de 7 dias">· {l.parados} parados</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
   )
 }

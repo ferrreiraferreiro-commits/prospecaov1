@@ -9,7 +9,7 @@ import { nextAction } from '../lib/selectors'
 import type { Lead } from '../lib/types'
 import { useDuplicates, useIndex, useLead } from '../store/derived'
 import { useApp } from '../store/useApp'
-import { useHasWhatsApp } from '../store/useAccount'
+import { useHasWhatsApp, usePessoasEquipe } from '../store/useAccount'
 import { useUi } from '../store/useUi'
 import { defaultFollowup, draftToInput, FollowupPicker } from './FollowupPicker'
 import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
@@ -118,6 +118,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const next = nextAction(lead, index)
   const extras = lead.dados_extras ? Object.entries(lead.dados_extras) : []
 
+  const pessoas = usePessoasEquipe()
   const save = (field: 'falei_com' | 'cargo' | 'anotacoes' | 'proxima_acao') => (v: string) => void updateLeadWork(lead.id, { [field]: v })
 
   return (
@@ -330,6 +331,23 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             <Row label="Próxima ação">
               <InlineField value={lead.proxima_acao} placeholder="Ex.: mandar exemplo" onSave={save('proxima_acao')} />
             </Row>
+            {pessoas.length > 0 && (
+              <Row label="Responsável">
+                <select
+                  className="input h-7 w-auto cursor-pointer pr-7 text-xs"
+                  value={lead.responsavel ?? ''}
+                  onChange={(e) => void useApp.getState().setResponsavel([lead.id], e.target.value || null)}
+                  aria-label="Responsável pelo lead"
+                >
+                  <option value="">Ninguém</option>
+                  {pessoas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+              </Row>
+            )}
           </dl>
         </Section>
 
