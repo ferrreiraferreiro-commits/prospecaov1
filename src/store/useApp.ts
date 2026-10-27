@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { responsaveisParaNovos } from './useAccount'
 import { newId, nowIso, type Repository } from '../data/repository'
 import { formatDateKey, periodoLabel } from '../lib/dates'
 import { getActiveRoteiro } from '../lib/script'
@@ -183,6 +184,7 @@ export const useApp = create<AppState>()((set, get) => {
     async importLeads(parsed, arquivo) {
       const now = Date.now()
       const record: ImportRecord = { id: newId(), arquivo, quantidade_leads: parsed.length, data_importacao: new Date(now).toISOString() }
+      const responsaveis = responsaveisParaNovos(parsed.length)
       // created_at escalonado em 1ms preserva a ordem do arquivo
       const leads: Lead[] = parsed.map((p, i) => {
         const ts = new Date(now + i).toISOString()
@@ -213,6 +215,7 @@ export const useApp = create<AppState>()((set, get) => {
           proxima_acao: null,
           ultima_ligacao: null,
           duplicado_ignorado: false,
+          responsavel: responsaveis[i],
           created_at: ts,
           updated_at: ts,
         }

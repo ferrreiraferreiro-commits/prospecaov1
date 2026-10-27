@@ -195,6 +195,21 @@ export function usePessoasEquipe(): { id: string; nome: string }[] {
   }, [equipe, profile])
 }
 
+/**
+ * Plano Times: responsável de cada lead novo, igual ao que o banco faria (assim a tela já mostra certo).
+ * Vendedor que só vê os dele fica com o lead; com a roleta ligada, um vendedor de cada vez; senão, ninguém.
+ */
+export function responsaveisParaNovos(n: number): (string | null)[] {
+  const { equipe, profile } = useAccount.getState()
+  const todos = (id: string | null) => Array.from({ length: n }, () => id)
+  if (!equipe || !profile) return todos(null)
+  if (equipe.papel === 'vendedor' && !equipe.ve_todos) return todos(profile.user_id)
+  const vendedores = equipe.roleta ? equipe.membros.filter((m) => m.aceito && m.papel === 'vendedor') : []
+  if (!vendedores.length) return todos(null)
+  const inicio = Math.floor(Math.random() * vendedores.length)
+  return Array.from({ length: n }, (_, i) => vendedores[(inicio + i) % vendedores.length].id)
+}
+
 /** É o dono da XS (tela Contas)? O banco confere de novo em cada chamada. */
 export function useIsAdmin(): boolean {
   return useAccount((s) => !!s.profile?.admin)

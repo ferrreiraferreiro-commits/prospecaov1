@@ -191,7 +191,7 @@ function SouDono() {
 
       <Card
         title="Roleta de leads"
-        description="Ligada, cada lead novo (busca, importação ou cadastro) vai para um vendedor, um de cada vez."
+        description="Automático. Ligada, CADA lead novo (busca, importação ou cadastro) vai sozinho para um vendedor, um de cada vez. Desligada, os leads novos ficam só com você até você passar para alguém."
         actions={
           <Button size="sm" variant={equipe.roleta ? 'go' : 'secondary'} onClick={() => void alternarRoleta()}>
             {equipe.roleta ? 'Ligada' : 'Desligada'}
