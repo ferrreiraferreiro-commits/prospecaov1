@@ -1,13 +1,14 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
 // Plano Times: o dono convida até 10 pessoas, que trabalham no CRM dele com o próprio login.
 import { Crown, LogOut, Trash2, UserPlus, Users } from 'lucide-react'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Card, confirmAction } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty } from '../components/ui'
 import { supabase } from '../data/supabaseClient'
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
+import { formatarHoras, inicioDeHoje, tempoEmServico, turnoAberto, useNumeros, useTurnos } from '../lib/equipe'
 import { STATUS_MAP, STATUSES, TONE_CLASSES } from '../lib/statuses'
 import { useAccount, usePessoasEquipe, type MembroEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
@@ -110,6 +111,7 @@ function SouMembro() {
   }
   return (
     <>
+      <Servico />
       <Card title="Sua equipe" description={`Seu papel: ${PAPEIS[equipe.papel as keyof typeof PAPEIS] ?? 'Dono'}.`}>
         <ul className="divide-y divide-line-soft">
           <li className="flex items-center gap-2 py-2 text-[13px]">
@@ -187,6 +189,7 @@ function SouDono() {
         {erro && <p className="mt-2 text-xs text-red-300">{erro}</p>}
       </Card>
 
+      <Agora />
       <Desempenho />
 
       <Card
@@ -236,7 +239,15 @@ function Membro({ m, onMudou }: { m: MembroEquipe; onMudou: () => Promise<void> 
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className="pv truncate text-[13px] font-medium">{m.nome ?? m.usuario}</p>
+        <p className="pv truncate text-[13px] font-medium">
+          {m.aceito ? (
+            <Link to={`/equipe/${m.id}`} className="hover:underline">
+              {m.nome ?? m.usuario}
+            </Link>
+          ) : (
+            (m.nome ?? m.usuario)
+          )}
+        </p>
         <p className="pv truncate text-xs text-fg-3">
           {[m.usuario && `@${m.usuario}`, m.email].filter(Boolean).join(' · ')}
           {!m.aceito && <span className="ml-1.5 text-gold">Convite enviado</span>}
@@ -385,5 +396,119 @@ function Desempenho() {
         ))}
       </div>
     </Card>
+  )
+}
+
+/** Quem é da equipe: entrar e sair de serviço, e os números do dia. */
+function Servico() {
+  const eu = useAccount((s) => s.profile)
+  const { turnos, carregado, entrar, sair } = useTurnos()
+  const aberto = turnoAberto(turnos, eu?.user_id ?? null)
+  const hoje = useNumeros(eu?.user_id ?? '', inicioDeHoje())
+  const [busy, setBusy] = useState(false)
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  if (!eu) return null
+
+  const agir = async (fn: () => Promise<void>) => {
+    setBusy(true)
+    try {
+      await fn()
+    } catch (e) {
+      useApp.getState().toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const hora = new Date().getHours()
+  const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
+
+  return (
+    <section className={clsx('panel overflow-hidden', aberto && 'ring-1 ring-go/30')}>
+      <div className="flex flex-wrap items-center gap-4 px-5 py-5">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-fg-3">
+            {saudacao}, <span className="pv">{eu.nome || eu.usuario}</span>
+          </p>
+          {aberto ? (
+            <p className="mt-1 flex items-center gap-2 text-lg font-semibold">
+              <span className="size-2 rounded-full bg-go" /> Em serviço há {formatarHoras(Date.now() - Date.parse(aberto.inicio))}
+            </p>
+          ) : (
+            <p className="mt-1 text-lg font-semibold">Pronto para começar?</p>
+          )}
+          <p className="mt-0.5 text-xs text-fg-3">
+            {aberto ? 'Seus leads, as conversas e o WhatsApp da equipe estão no menu.' : 'Entre em serviço para abrir seus leads e o WhatsApp da equipe. O dono vê quem está trabalhando.'}
+          </p>
+        </div>
+        {aberto ? (
+          <Button variant="secondary" loading={busy} onClick={() => void agir(sair)}>
+            Sair de serviço
+          </Button>
+        ) : (
+          <Button variant="go" size="lg" loading={busy || !carregado} onClick={() => void agir(entrar)}>
+            Entrar em serviço
+          </Button>
+        )}
+      </div>
+      <div className="grid grid-cols-3 border-t border-line-soft sm:grid-cols-6">
+        {[
+          ['Prospectados', hoje.prospectados],
+          ['Ligações', hoje.ligacoes],
+          ['Mensagens', hoje.mensagens],
+          ['Respostas', hoje.respostas],
+          ['Reuniões', hoje.reunioes],
+          ['Vendas', hoje.vendas],
+        ].map(([rotulo, n]) => (
+          <div key={rotulo} className="border-line-soft px-4 py-3 not-last:border-r">
+            <p className="text-2xs text-fg-3">{rotulo} hoje</p>
+            <p className="num text-lg font-semibold">{n}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** Dono: quem está trabalhando agora e quanto cada um fez hoje. */
+function Agora() {
+  const equipe = useAccount((s) => s.equipe)!
+  const turnos = useTurnos((s) => s.turnos)
+  const membros = equipe.membros.filter((m) => m.aceito)
+  if (!membros.length) return null
+  const emServico = membros.filter((m) => turnoAberto(turnos, m.id)).length
+  return (
+    <Card title="Equipe agora" description={`${emServico} de ${membros.length} em serviço. Clique em alguém para ver tudo o que a pessoa fez.`} bodyClass="px-0 py-0">
+      <ul className="divide-y divide-line-soft">
+        {membros.map((m) => (
+          <LinhaAgora key={m.id} id={m.id} nome={m.nome ?? m.usuario ?? 'Sem nome'} papel={PAPEIS[m.papel]} />
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+function LinhaAgora({ id, nome, papel }: { id: string; nome: string; papel: string }) {
+  const turnos = useTurnos((s) => s.turnos)
+  const aberto = turnoAberto(turnos, id)
+  const hoje = useNumeros(id, inicioDeHoje())
+  const horas = tempoEmServico(turnos, id, inicioDeHoje())
+  return (
+    <li>
+      <Link to={`/equipe/${id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-xs hover:bg-hover">
+        <span className="flex min-w-[160px] flex-1 items-center gap-2">
+          <span className={clsx('size-2 shrink-0 rounded-full', aberto ? 'bg-go' : 'bg-fg-4/40')} title={aberto ? 'Em serviço' : 'Fora de serviço'} />
+          <span className="pv truncate text-[13px] font-medium text-fg">{nome}</span>
+          <span className="text-2xs text-fg-4">{papel}</span>
+        </span>
+        <span className={aberto ? 'text-go' : 'text-fg-4'}>{aberto ? 'Em serviço' : 'Fora'} · {formatarHoras(horas)} hoje</span>
+        <span className="num text-fg-2">
+          {hoje.prospectados} prospectados · {hoje.ligacoes} ligações · {hoje.respostas} respostas
+        </span>
+      </Link>
+    </li>
   )
 }

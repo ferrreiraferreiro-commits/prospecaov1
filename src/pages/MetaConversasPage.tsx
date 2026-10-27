@@ -9,6 +9,7 @@ import { formatPhone } from '../lib/contact'
 import { telefoneConversa, type ConversaAberta, type MensagemConversa, type ResumoConversa } from '../lib/conversas'
 import { leadPhone, phoneKeyBr } from '../lib/disparo'
 import { janelaAberta, metaConversasApi as api, metaFetch, textoDoModelo, useMetaConexao, valoresParaLead } from '../lib/meta'
+import { useAtendenteDe, useAtendentes } from '../lib/equipe'
 import { fillMessage, getMessages, pickVariation } from '../lib/messages'
 import type { Lead } from '../lib/types'
 import { useApp } from '../store/useApp'
@@ -22,6 +23,7 @@ const NENHUMA = new Set<string>()
 
 /** Conversas da API oficial (Meta): mesmas telas da XS, com a regra das 24 h e os modelos aprovados. */
 export function MetaConversasPage() {
+  const atendenteDe = useAtendenteDe('meta')
   const { carregado, conexao, carregar } = useMetaConexao()
   const leads = useApp((s) => s.leads)
   const [params, setParams] = useSearchParams()
@@ -163,7 +165,7 @@ export function MetaConversasPage() {
               ]}
             />
           </div>
-          <ListaConversas lista={conexao ? lista : []} filtro={filtro} busca={busca} selecionada={selecionada} leadDe={leadDe} agenteDe={SEM_AGENTE} leads={leads} onAbrir={abrir} />
+          <ListaConversas atendenteDe={atendenteDe} lista={conexao ? lista : []} filtro={filtro} busca={busca} selecionada={selecionada} leadDe={leadDe} agenteDe={SEM_AGENTE} leads={leads} onAbrir={abrir} />
         </aside>
 
         <section className={clsx('min-w-0 flex-1 flex-col', selecionada ? 'flex' : 'hidden md:flex')}>
@@ -177,6 +179,7 @@ export function MetaConversasPage() {
               podeEnviar={!!conexao}
               onVoltar={() => setSelecionada(null)}
               onEnviou={(msg) => {
+                useAtendentes.getState().marcar('meta', (msg as MensagemConversa & { telefone?: string }).telefone ?? selecionada)
                 // A Meta pode devolver o número de outro jeito (sem o nono dígito): a conversa segue o dela
                 const tel = (msg as MensagemConversa & { telefone?: string }).telefone
                 if (tel && tel !== selecionada) {

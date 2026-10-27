@@ -34,7 +34,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Suspense, useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAtendentes, useEmServico, useSouMembro, useTurnos } from '../lib/equipe'
 import { useAvisos } from '../lib/avisos'
 import { useComunidade } from '../lib/comunidade'
 import { CANAL_TUTORIAIS } from '../lib/tutoriais'
@@ -125,10 +126,18 @@ const MOBILE: NavItem[] = [
 ]
 
 /** Menu da conta: sem o WhatsApp da XS, somem os itens que dependem dele (e grupos vazios). */
+/** Modo trabalho (quem é da equipe de outra pessoa): somem as telas do dono (gestão e conexões). */
+const SO_DO_DONO = ['/clientes', '/projetos', '/financeiro', '/precificacao', '/whatsapp', '/api-oficial', '/agente', '/xico', '/contas']
+const soDoDono = (to: string) => SO_DO_DONO.some((p) => to === p || (p !== '/api-oficial' && to.startsWith(`${p}/`)))
+
 function useGroups() {
   const temWhatsApp = useHasWhatsApp()
   const temIA = useHasIA()
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (temIA || !i.ia)) })).filter((g) => g.items.length)
+  const membro = useSouMembro()
+  const emServico = useEmServico()
+  // Fora de serviço, a pessoa da equipe só vê a tela Equipe (para entrar em serviço)
+  const pode = (to: string) => !membro || (emServico ? !soDoDono(to) : to === '/equipe')
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (temIA || !i.ia) && pode(i.to)) })).filter((g) => g.items.length)
 }
 
 /** Com mais de um número na API oficial: escolhe por qual número as telas da API oficial trabalham. */
@@ -188,6 +197,20 @@ export function Layout() {
   const [sheet, setSheet] = useState(false)
   const temWhatsApp = useHasWhatsApp()
   const groups = useGroups()
+  const membro = useSouMembro()
+  const emServico = useEmServico()
+  const turnosProntos = useTurnos((s) => s.carregado)
+  const temEquipe = useAccount((s) => !!s.equipe && (!!s.equipe.dono || s.equipe.membros.length > 0))
+  useEffect(() => {
+    if (!temEquipe) return
+    void useTurnos.getState().carregar()
+    void useAtendentes.getState().carregar()
+    const t = setInterval(() => {
+      void useTurnos.getState().carregar()
+      void useAtendentes.getState().carregar()
+    }, 60_000)
+    return () => clearInterval(t)
+  }, [temEquipe])
   useReminders()
   useAvisos()
   usePrivacyMode()
@@ -278,7 +301,7 @@ export function Layout() {
         >
           <ConviteEquipe />
           {pathname.startsWith('/api-oficial') && <SeletorNumeroMeta />}
-          <Outlet />
+          {membro && turnosProntos && pathname !== '/equipe' && (!emServico || soDoDono(pathname)) ? <Navigate to="/equipe" replace /> : <Outlet />}
         </Suspense>
       </main>
 

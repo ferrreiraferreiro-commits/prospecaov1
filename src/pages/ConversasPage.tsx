@@ -1,5 +1,6 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados. Uso sob a licença em LICENSE.
 import clsx from 'clsx'
+import { useAtendenteDe, useAtendentes } from '../lib/equipe'
 import {
   ArrowLeft,
   Bot,
@@ -53,6 +54,7 @@ export type Filtro = 'todas' | 'naoLidas' | 'leads'
 const INTERVALO_MS = 4000
 
 export function ConversasPage() {
+  const atendenteDe = useAtendenteDe('qr')
   const online = useWaServico((s) => s.online)
   const health = useWaServico((s) => s.health)
   const leads = useApp((s) => s.leads)
@@ -196,7 +198,7 @@ export function ConversasPage() {
               ]}
             />
           </div>
-          <ListaConversas lista={lista} filtro={filtro} busca={busca} selecionada={selecionada} leadDe={leadDe} agenteDe={agenteDe} leads={leads} onAbrir={abrir} />
+          <ListaConversas atendenteDe={atendenteDe} lista={lista} filtro={filtro} busca={busca} selecionada={selecionada} leadDe={leadDe} agenteDe={agenteDe} leads={leads} onAbrir={abrir} />
         </aside>
 
         {/* Conversa aberta */}
@@ -240,7 +242,10 @@ export function ListaConversas({
   agenteDe,
   leads,
   onAbrir,
+  atendenteDe,
 }: {
+  /** Plano Times: nome de quem da equipe respondeu por último */
+  atendenteDe?: (tel: string) => string | null
   lista: ResumoConversa[] | null
   filtro: Filtro
   busca: string
@@ -302,7 +307,7 @@ export function ListaConversas({
       )}
       <ul className="space-y-px">
         {visiveis.map((c) => (
-          <ItemConversa key={c.telefone} c={c} lead={leadDe(c.telefone)} agente={agenteDe(c.telefone)} ativa={c.telefone === selecionada} onClick={() => onAbrir(c.telefone)} />
+          <ItemConversa key={c.telefone} c={c} lead={leadDe(c.telefone)} agente={agenteDe(c.telefone)} atendente={atendenteDe?.(c.telefone) ?? null} ativa={c.telefone === selecionada} onClick={() => onAbrir(c.telefone)} />
         ))}
       </ul>
       {novos.length > 0 && (
@@ -339,7 +344,7 @@ export function ListaConversas({
   )
 }
 
-function ItemConversa({ c, lead, agente, ativa, onClick }: { c: ResumoConversa; lead: Lead | null; agente?: MapaAgente; ativa: boolean; onClick: () => void }) {
+function ItemConversa({ c, lead, agente, atendente, ativa, onClick }: { c: ResumoConversa; lead: Lead | null; agente?: MapaAgente; atendente: string | null; ativa: boolean; onClick: () => void }) {
   const titulo = lead?.empresa ?? c.nome ?? formatPhone(c.telefone)
   const novo = c.naoLidas > 0
   return (
@@ -357,6 +362,11 @@ function ItemConversa({ c, lead, agente, ativa, onClick }: { c: ResumoConversa; 
           <span className="flex items-baseline gap-2">
             <span className={clsx('pv min-w-0 flex-1 truncate text-[13px]', novo ? 'font-semibold text-fg' : 'font-medium text-fg')}>{titulo}</span>
             <SeloAgente m={agente} />
+            {atendente && (
+              <span className="pv max-w-[90px] shrink-0 truncate rounded bg-blue-500/12 px-1.5 text-[10px] leading-4 font-medium text-blue-300" title={`Quem está atendendo: ${atendente}`}>
+                {atendente}
+              </span>
+            )}
             <span className={clsx('num shrink-0 text-[10px]', novo ? 'font-semibold text-emerald-300' : 'text-fg-4')}>{horaCurta(c.atualizadaEm)}</span>
           </span>
           <span className="mt-0.5 flex items-center gap-1.5">
@@ -590,6 +600,7 @@ function Composer({
     try {
       const msg = await api.enviar(telefone, t)
       setTexto('')
+      useAtendentes.getState().marcar('qr', telefone)
       onEnviou(msg)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Não foi possível enviar.', 'error')
