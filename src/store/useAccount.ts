@@ -195,6 +195,16 @@ export function usePessoasEquipe(): { id: string; nome: string }[] {
   }, [equipe, profile])
 }
 
+/** Quem pode ficar com leads: a equipe menos os desenvolvedores (eles só recebem sites para fazer). */
+export function usePessoasQueRecebem(): { id: string; nome: string }[] {
+  const pessoas = usePessoasEquipe()
+  const membros = useAccount((s) => s.equipe?.membros)
+  return useMemo(() => {
+    const devs = new Set((membros ?? []).filter((m) => m.papel === 'desenvolvedor').map((m) => m.id))
+    return pessoas.filter((p) => !devs.has(p.id))
+  }, [pessoas, membros])
+}
+
 /**
  * Plano Times: responsável de cada lead novo, igual ao que o banco faria (assim a tela já mostra certo).
  * Vendedor que só vê os dele fica com o lead; com a roleta ligada, um vendedor de cada vez; senão, ninguém.

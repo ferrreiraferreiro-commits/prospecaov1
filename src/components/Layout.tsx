@@ -150,13 +150,17 @@ const soDoDono = (to: string) => SO_DO_DONO.some((p) => to === p || (p !== '/api
 
 /** Desenvolvedor (faz os sites) vê quase nada: painel, leads da fila de sites, conversas e a equipe. */
 const DO_DESENVOLVEDOR = ['/', '/leads', '/conversas', '/api-oficial/conversas']
+/** Vendedor em serviço não usa o WhatsApp da conta (QR) nem busca empresas: trabalha os leads que recebe. */
+const FORA_DO_VENDEDOR = ['/conversas', '/disparo', '/funis', '/agendamentos', '/maps']
 const daEquipe = (to: string) => to === '/equipe' || to.startsWith('/equipe/')
 
 /** A pessoa pode abrir essa tela? Fora de serviço, quem é da equipe só vê a parte Equipe (para entrar em serviço). */
 function liberado(to: string, membro: boolean, emServico: boolean, papel: PapelEquipe): boolean {
   if (!membro || daEquipe(to)) return true
   if (!emServico) return false
-  return papel === 'desenvolvedor' ? DO_DESENVOLVEDOR.includes(to) : !soDoDono(to)
+  if (papel === 'desenvolvedor') return DO_DESENVOLVEDOR.includes(to)
+  if (papel === 'vendedor' && FORA_DO_VENDEDOR.includes(to)) return false
+  return !soDoDono(to)
 }
 
 function useLiberado() {

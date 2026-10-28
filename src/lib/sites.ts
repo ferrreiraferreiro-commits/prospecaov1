@@ -41,7 +41,8 @@ interface SitesState {
   carregado: boolean
   pedidos: SitePedido[]
   carregar(): Promise<void>
-  pedir(leadId: string, briefing: string, prazo: string | null): Promise<void>
+  /** Manda leads para fazer o site: para a fila, ou direto para um desenvolvedor (`dev`) */
+  pedir(leadIds: string[], briefing: string, prazo: string | null, dev?: string | null): Promise<void>
   editar(id: string, campos: Partial<Pick<SitePedido, 'briefing' | 'prazo' | 'link'>>): Promise<void>
   pegar(id: string): Promise<void>
   devolver(id: string): Promise<void>
@@ -70,14 +71,25 @@ export const useSites = create<SitesState>((set, get) => {
       const { data } = await supabase.from('sites_pedidos').select(CAMPOS).order('pedido_em', { ascending: false }).limit(500)
       set({ carregado: true, pedidos: (data ?? []) as unknown as SitePedido[] })
     },
-    async pedir(leadId, briefing, prazo) {
-      const { data, error } = await db()
-        .from('sites_pedidos')
-        .upsert({ lead_id: leadId, briefing: briefing.trim() || null, prazo, status: 'fila', dev: null, pego_em: null, link: null, pronto_em: null, pedido_por: eu(), pedido_em: new Date().toISOString() }, { onConflict: 'conta,lead_id' })
-        .select(CAMPOS)
-        .single()
+    async pedir(leadIds, briefing, prazo, dev = null) {
+      const agora = new Date().toISOString()
+      const linhas = leadIds.map((lead_id) => ({
+        lead_id,
+        briefing: briefing.trim() || null,
+        prazo,
+        // Com um desenvolvedor escolhido, o site já vai direto para ele; sem, fica na fila para quem pegar
+        status: dev ? 'fazendo' : 'fila',
+        dev,
+        pego_em: dev ? agora : null,
+        link: null,
+        pronto_em: null,
+        pedido_por: eu(),
+        pedido_em: agora,
+      }))
+      const { data, error } = await db().from('sites_pedidos').upsert(linhas, { onConflict: 'conta,lead_id' }).select(CAMPOS)
       if (error) throw new Error(error.message)
-      set((s) => ({ pedidos: [data as unknown as SitePedido, ...s.pedidos.filter((p) => p.lead_id !== leadId)] }))
+      const novos = (data ?? []) as unknown as SitePedido[]
+      set((s) => ({ pedidos: [...novos, ...s.pedidos.filter((p) => !leadIds.includes(p.lead_id))] }))
     },
     editar: (id, campos) => trocar(id, campos),
     pegar: (id) => trocar(id, { dev: eu(), status: 'fazendo', pego_em: new Date().toISOString() }, true),
@@ -108,6 +120,15 @@ export function useQuem(): Map<string, Pessoa> {
     for (const m of equipe?.membros ?? []) mapa.set(m.id, { nome: m.nome ?? m.usuario ?? 'Sem nome', papel: m.papel })
     return mapa
   }, [equipe, profile])
+}
+
+/** Desenvolvedores da equipe (para mandar um site direto para um deles). */
+export function useDesenvolvedores(): { id: string; nome: string }[] {
+  const membros = useAccount((s) => s.equipe?.membros)
+  return useMemo(
+    () => (membros ?? []).filter((m) => m.aceito && m.papel === 'desenvolvedor').map((m) => ({ id: m.id, nome: m.nome ?? m.usuario ?? 'Sem nome' })),
+    [membros],
+  )
 }
 
 /** Pedido de site de um lead (null = não está na fila). */

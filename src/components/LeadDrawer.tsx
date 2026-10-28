@@ -9,7 +9,7 @@ import { nextAction } from '../lib/selectors'
 import type { Lead } from '../lib/types'
 import { useDuplicates, useIndex, useLead } from '../store/derived'
 import { useApp } from '../store/useApp'
-import { useHasWhatsApp, usePessoasEquipe } from '../store/useAccount'
+import { useHasWhatsApp, usePessoasQueRecebem } from '../store/useAccount'
 import { useUi } from '../store/useUi'
 import { defaultFollowup, draftToInput, FollowupPicker } from './FollowupPicker'
 import { HotTag, NextActionText, QuickActions, Rating, SiteTag, Status2Menu, StatusMenu } from './leadBits'
@@ -119,7 +119,7 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const next = nextAction(lead, index)
   const extras = lead.dados_extras ? Object.entries(lead.dados_extras) : []
 
-  const pessoas = usePessoasEquipe()
+  const pessoas = usePessoasQueRecebem()
   const save = (field: 'falei_com' | 'cargo' | 'anotacoes' | 'proxima_acao') => (v: string) => void updateLeadWork(lead.id, { [field]: v })
 
   return (

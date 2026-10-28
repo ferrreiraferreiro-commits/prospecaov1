@@ -1,10 +1,11 @@
-import { Headphones, Trash2, X } from 'lucide-react'
+import { Code, Headphones, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { STATUS_MAP, STATUSES } from '../lib/statuses'
 import type { StatusId } from '../lib/types'
-import { usePessoasEquipe } from '../store/useAccount'
+import { usePapel, usePessoasQueRecebem } from '../store/useAccount'
 import { useApp } from '../store/useApp'
-import { Button } from './ui'
+import { MandarSiteForm, usePodeMandarSite } from './SiteNoLead'
+import { Button, Modal } from './ui'
 
 // Retorno e reunião pedem data/hora de cada lead: ficam fora da troca em massa
 const BULK_STATUSES = STATUSES.filter((s) => s.id !== 'follow_up' && s.id !== 'agendou_reuniao')
@@ -15,7 +16,10 @@ export function BulkBar({ ids, onClear, onCall }: { ids: string[]; onClear: () =
   const deleteLeads = useApp((s) => s.deleteLeads)
   const toast = useApp((s) => s.toast)
   const setResponsavel = useApp((s) => s.setResponsavel)
-  const pessoas = usePessoasEquipe()
+  const pessoas = usePessoasQueRecebem()
+  const dev = usePapel() === 'desenvolvedor'
+  const podeMandarSite = usePodeMandarSite()
+  const [site, setSite] = useState(false)
   const [busy, setBusy] = useState(false)
   const n = ids.length
   const plural = n === 1 ? 'lead' : 'leads'
@@ -88,7 +92,12 @@ export function BulkBar({ ids, onClear, onCall }: { ids: string[]; onClear: () =
           </option>
         ))}
       </select>
-      {pessoas.length > 0 && (
+      {podeMandarSite && (
+        <Button size="sm" variant="secondary" icon={<Code className="size-3.5 text-emerald-300" />} disabled={busy} onClick={() => setSite(true)}>
+          Mandar para fazer o site
+        </Button>
+      )}
+      {pessoas.length > 0 && !dev && (
         <select
           className="input h-8 w-auto cursor-pointer pr-7 text-xs"
           value=""
@@ -109,12 +118,31 @@ export function BulkBar({ ids, onClear, onCall }: { ids: string[]; onClear: () =
       <Button size="sm" variant="secondary" icon={<Headphones className="size-3.5" />} disabled={busy} onClick={() => onCall(ids)}>
         Ligar em sequência
       </Button>
-      <Button size="sm" variant="danger" icon={<Trash2 className="size-3.5" />} disabled={busy} onClick={() => void remove()}>
-        Excluir
-      </Button>
+      {!dev && (
+        <Button size="sm" variant="danger" icon={<Trash2 className="size-3.5" />} disabled={busy} onClick={() => void remove()}>
+          Excluir
+        </Button>
+      )}
       <button onClick={onClear} className="ml-auto rounded-md p-1.5 text-fg-3 hover:bg-hover hover:text-fg" aria-label="Limpar seleção">
         <X className="size-4" />
       </button>
+      <Modal
+        open={site}
+        onClose={() => setSite(false)}
+        title={`Mandar ${n} ${plural} para fazer o site`}
+        subtitle="Os sites entram em Sites para fazer. Escolha a fila ou um desenvolvedor."
+      >
+        <div className="px-5 py-4">
+          <MandarSiteForm
+            leadIds={ids}
+            onCancelar={() => setSite(false)}
+            onFeito={() => {
+              setSite(false)
+              onClear()
+            }}
+          />
+        </div>
+      </Modal>
     </div>
   )
 }

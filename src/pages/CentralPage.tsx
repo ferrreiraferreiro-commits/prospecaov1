@@ -20,7 +20,7 @@ import {
 } from '../lib/selectors'
 import { useDuplicates, useIndex, useMetrics, useToday } from '../store/derived'
 import { BulkBar } from '../components/BulkBar'
-import { useAccount, usePessoasEquipe } from '../store/useAccount'
+import { useAccount, usePessoasQueRecebem } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { useUi } from '../store/useUi'
 
@@ -29,7 +29,7 @@ const PAGE_SIZE = 60
 export function CentralPage() {
   const todosLeads = useApp((s) => s.leads)
   // Plano Times: ver só os leads de alguém da equipe ('' = todos, '-' = sem responsável)
-  const pessoas = usePessoasEquipe()
+  const pessoas = usePessoasQueRecebem()
   const eu = useAccount((s) => s.profile?.user_id)
   const [resp, setResp] = useState(() => new URLSearchParams(window.location.search).get('resp') ?? '')
   const leads = useMemo(

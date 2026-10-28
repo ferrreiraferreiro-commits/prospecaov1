@@ -15,7 +15,7 @@ import { formatElapsed, PHASE_LABEL, type MapsResult, type Mode, type SearchSour
 import { normalizeKey } from '../lib/statuses'
 import { restantes, semTeto, usadasNoMes, useGoogleKey } from '../store/useGoogleKey'
 import { nominatim, useMapsSearch, type SearchArea } from '../store/useMapsSearch'
-import { usePapel, usePessoasEquipe } from '../store/useAccount'
+import { usePapel, usePessoasEquipe, usePessoasQueRecebem } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 
 const FORM_KEY = 'xs-prospeccao:busca-empresas'
@@ -876,7 +876,7 @@ function Metric({ label, value, tone }: { label: string; value: React.ReactNode;
 
 /** Passa as empresas achadas (as marcadas, ou todas as novas) para alguém da equipe. */
 function MandarPara({ results, marcados, onFeito }: { results: MapsResult[]; marcados: Set<string>; onFeito: () => void }) {
-  const pessoas = usePessoasEquipe()
+  const pessoas = usePessoasQueRecebem()
   const papel = usePapel()
   const leads = useApp((s) => s.leads)
   const setResponsavel = useApp((s) => s.setResponsavel)
