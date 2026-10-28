@@ -59,6 +59,9 @@ function lazyPage<T extends ComponentType>(load: () => Promise<{ default: T }>) 
 const MetaAgendaPage = lazyPage(() => import('./pages/MetaAgendaPage').then((m) => ({ default: m.MetaAgendaPage })))
 const EquipePage = lazyPage(() => import('./pages/EquipePage').then((m) => ({ default: m.EquipePage })))
 const MembroPerfilPage = lazyPage(() => import('./pages/MembroPerfilPage').then((m) => ({ default: m.MembroPerfilPage })))
+const EquipePessoasPage = lazyPage(() => import('./pages/EquipePessoasPage').then((m) => ({ default: m.EquipePessoasPage })))
+const SitesPage = lazyPage(() => import('./pages/SitesPage').then((m) => ({ default: m.SitesPage })))
+const ChatPage = lazyPage(() => import('./pages/ChatPage').then((m) => ({ default: m.ChatPage })))
 const ClientesPage = lazyPage(() => import('./pages/ClientesPage').then((m) => ({ default: m.ClientesPage })))
 const ConversasPage = lazyPage(() => import('./pages/ConversasPage').then((m) => ({ default: m.ConversasPage })))
 const DisparoPage = lazyPage(() => import('./pages/DisparoPage').then((m) => ({ default: m.DisparoPage })))
@@ -128,6 +131,9 @@ function Routed() {
           <Route path="agente" element={temIA ? m(<AgentePage />) : <Navigate to="/" replace />} />
           <Route path="xico" element={admin ? m(<XicoPage />) : <Navigate to="/" replace />} />
           <Route path="equipe" element={<EquipePage />} />
+          <Route path="equipe/pessoas" element={<EquipePessoasPage />} />
+          <Route path="equipe/sites" element={<SitesPage />} />
+          <Route path="equipe/chat" element={<ChatPage />} />
           <Route path="equipe/:id" element={<MembroPerfilPage />} />
           <Route path="clientes" element={<ClientesPage />} />
           <Route path="projetos" element={<ProjetosPage />} />

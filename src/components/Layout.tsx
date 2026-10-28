@@ -6,6 +6,7 @@ import {
   Bot,
   Calculator,
   CheckCircle2,
+  Code,
   ChevronsLeft,
   ChevronsRight,
   ExternalLink,
@@ -18,6 +19,7 @@ import {
   Megaphone,
   Menu,
   MessageCircle,
+  MessageSquare,
   PlayCircle,
   MessagesSquare,
   MessageSquareText,
@@ -27,6 +29,7 @@ import {
   Sparkles,
   TriangleAlert,
   Workflow,
+  UserCog,
   Users,
   UsersRound,
   CalendarClock,
@@ -36,6 +39,7 @@ import {
 import { Suspense, useEffect, useState } from 'react'
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAtendentes, useEmServico, useSouMembro, useTurnos } from '../lib/equipe'
+import { useChat, useChatNaoLidas, useSites } from '../lib/sites'
 import { useAvisos } from '../lib/avisos'
 import { useComunidade } from '../lib/comunidade'
 import { CANAL_TUTORIAIS } from '../lib/tutoriais'
@@ -43,7 +47,7 @@ import { useAgenteSync } from '../lib/agente'
 import { useDisparoSync } from '../lib/disparo'
 import { useWaServico, useWaPolling } from '../lib/waServico'
 import { formatDateTime } from '../lib/dates'
-import { accessOf, planInfo, useAccount, useHasIA, useHasWhatsApp } from '../store/useAccount'
+import { accessOf, planInfo, useAccount, useHasIA, useHasWhatsApp, usePapel, type PapelEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
 import { LogoMark, Wordmark } from './Brand'
 import { ImportModal } from './ImportModal'
@@ -66,9 +70,24 @@ interface NavItem {
   whatsapp?: boolean
   /** Só para contas com a IA liberada (recurso "ia", em Contas) */
   ia?: boolean
+  /** Só para quem tem equipe (plano Times ou trabalha na equipe de alguém) */
+  time?: boolean
+  /** Só o dono da equipe */
+  dono?: boolean
+  /** Número ao lado (mensagens novas no chat) */
+  badge?: 'chat'
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'Equipe',
+    items: [
+      { to: '/equipe', label: 'Painel da equipe', icon: UsersRound, end: true },
+      { to: '/equipe/sites', label: 'Sites para fazer', icon: Code, time: true },
+      { to: '/equipe/chat', label: 'Chat da equipe', icon: MessageSquare, time: true, badge: 'chat' },
+      { to: '/equipe/pessoas', label: 'Pessoas e cargos', icon: UserCog, time: true, dono: true },
+    ],
+  },
   {
     title: 'Assistente',
     items: [
@@ -78,7 +97,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Gestão',
     items: [
-      { to: '/equipe', label: 'Equipe', icon: UsersRound },
       { to: '/clientes', label: 'Clientes', icon: Users },
       { to: '/projetos', label: 'Projetos', icon: FolderKanban },
       { to: '/financeiro', label: 'Financeiro', icon: BadgeDollarSign },
@@ -130,14 +148,40 @@ const MOBILE: NavItem[] = [
 const SO_DO_DONO = ['/clientes', '/projetos', '/financeiro', '/precificacao', '/whatsapp', '/api-oficial', '/agente', '/xico', '/contas']
 const soDoDono = (to: string) => SO_DO_DONO.some((p) => to === p || (p !== '/api-oficial' && to.startsWith(`${p}/`)))
 
+/** Desenvolvedor (faz os sites) vê quase nada: painel, leads da fila de sites, conversas e a equipe. */
+const DO_DESENVOLVEDOR = ['/', '/leads', '/conversas', '/api-oficial/conversas']
+const daEquipe = (to: string) => to === '/equipe' || to.startsWith('/equipe/')
+
+/** A pessoa pode abrir essa tela? Fora de serviço, quem é da equipe só vê a parte Equipe (para entrar em serviço). */
+function liberado(to: string, membro: boolean, emServico: boolean, papel: PapelEquipe): boolean {
+  if (!membro || daEquipe(to)) return true
+  if (!emServico) return false
+  return papel === 'desenvolvedor' ? DO_DESENVOLVEDOR.includes(to) : !soDoDono(to)
+}
+
+function useLiberado() {
+  const membro = useSouMembro()
+  const emServico = useEmServico()
+  const papel = usePapel()
+  return (to: string) => liberado(to, membro, emServico, papel)
+}
+
 function useGroups() {
   const temWhatsApp = useHasWhatsApp()
   const temIA = useHasIA()
-  const membro = useSouMembro()
-  const emServico = useEmServico()
-  // Fora de serviço, a pessoa da equipe só vê a tela Equipe (para entrar em serviço)
-  const pode = (to: string) => !membro || (emServico ? !soDoDono(to) : to === '/equipe')
-  return GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => (temWhatsApp || !i.whatsapp) && (temIA || !i.ia) && pode(i.to)) })).filter((g) => g.items.length)
+  const papel = usePapel()
+  const temEquipe = useAccount((s) => !!s.equipe && (s.equipe.times || !!s.equipe.dono))
+  // Desenvolvedor: Conversas da API oficial só se a conta usa a API oficial
+  const temMeta = useMetaConexao((s) => s.conexoes.length > 0)
+  const pode = useLiberado()
+  const mostra = (i: NavItem) =>
+    (temWhatsApp || !i.whatsapp) &&
+    (temIA || !i.ia) &&
+    (temEquipe || !i.time) &&
+    (papel === 'dono' || !i.dono) &&
+    (papel !== 'desenvolvedor' || i.to !== '/api-oficial/conversas' || temMeta) &&
+    pode(i.to)
+  return GROUPS.map((g) => ({ ...g, items: g.items.filter(mostra) })).filter((g) => g.items.length)
 }
 
 /** Com mais de um número na API oficial: escolhe por qual número as telas da API oficial trabalham. */
@@ -197,20 +241,27 @@ export function Layout() {
   const [sheet, setSheet] = useState(false)
   const temWhatsApp = useHasWhatsApp()
   const groups = useGroups()
+  const pode = useLiberado()
+  const papel = usePapel()
   const membro = useSouMembro()
-  const emServico = useEmServico()
   const turnosProntos = useTurnos((s) => s.carregado)
   const temEquipe = useAccount((s) => !!s.equipe && (!!s.equipe.dono || s.equipe.membros.length > 0))
   useEffect(() => {
     if (!temEquipe) return
-    void useTurnos.getState().carregar()
-    void useAtendentes.getState().carregar()
-    const t = setInterval(() => {
+    const tudo = () => {
       void useTurnos.getState().carregar()
       void useAtendentes.getState().carregar()
-    }, 60_000)
+      void useSites.getState().carregar()
+      void useChat.getState().carregar()
+    }
+    tudo()
+    const t = setInterval(tudo, 60_000)
     return () => clearInterval(t)
   }, [temEquipe])
+  // O desenvolvedor só vê as Conversas da API oficial se a conta usa a API oficial
+  useEffect(() => {
+    if (papel === 'desenvolvedor') void useMetaConexao.getState().carregar()
+  }, [papel])
   useReminders()
   useAvisos()
   usePrivacyMode()
@@ -301,13 +352,13 @@ export function Layout() {
         >
           <ConviteEquipe />
           {pathname.startsWith('/api-oficial') && <SeletorNumeroMeta />}
-          {membro && turnosProntos && pathname !== '/equipe' && (!emServico || soDoDono(pathname)) ? <Navigate to="/equipe" replace /> : <Outlet />}
+          {membro && turnosProntos && !pode(pathname) ? <Navigate to="/equipe" replace /> : <Outlet />}
         </Suspense>
       </main>
 
       {/* Barra inferior (mobile) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Navegação">
-        {MOBILE.map((item) => (
+        {MOBILE.filter((item) => pode(item.to)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -357,9 +408,21 @@ function SideLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
           {isActive && <span className="absolute top-2 bottom-2 -left-2.5 w-[3px] rounded-r bg-blue-500" />}
           <item.icon className={clsx('size-[17px] shrink-0', isActive && 'text-blue-400')} strokeWidth={1.75} />
           {!collapsed && <span className="truncate">{item.label}</span>}
+          {item.badge === 'chat' && <ChatBadge collapsed={collapsed} />}
         </>
       )}
     </NavLink>
+  )
+}
+
+/** Mensagens novas no chat da equipe. */
+function ChatBadge({ collapsed }: { collapsed: boolean }) {
+  const n = useChatNaoLidas()
+  if (!n) return null
+  return collapsed ? (
+    <span className="absolute top-1.5 right-2 size-2 rounded-full bg-gold" />
+  ) : (
+    <span className="num ml-auto rounded-full bg-gold px-1.5 text-2xs leading-4 font-semibold text-on-gold">{n > 99 ? '99+' : n}</span>
   )
 }
 

@@ -168,3 +168,15 @@ export function useAtendenteDe(canal: Canal): (tel: string) => string | null {
     }
   }, [mapa, equipe, profile, canal])
 }
+
+export const PAPEIS = {
+  gestor: 'Gestor',
+  vendedor: 'Vendedor',
+  desenvolvedor: 'Desenvolvedor',
+} as const
+
+export const SOBRE_PAPEL = {
+  gestor: 'Faz quase tudo na conta, menos mexer no plano e na equipe.',
+  vendedor: 'Prospecta e conversa com os leads. Manda para o desenvolvedor os leads que fecharam site.',
+  desenvolvedor: 'Faz os sites. Só vê os leads que estão na fila de sites, as conversas e a equipe.',
+} as const

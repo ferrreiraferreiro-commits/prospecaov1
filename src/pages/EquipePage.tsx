@@ -1,33 +1,19 @@
 // © 2026 Gabriel Yamashita Marcelino — XS Prospecção. Todos os direitos reservados.
-// Plano Times: o dono convida até 10 pessoas, que trabalham no CRM dele com o próprio login.
-import { Crown, LogOut, Trash2, UserPlus, Users } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+// Plano Times: painel da equipe — entrar em serviço, quem está trabalhando, sites, chat e desempenho do mês.
+import clsx from 'clsx'
+import { ArrowRight, Code, Crown, LogOut, MessageSquare, UserCog, Users } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { Avatar } from '../components/Avatar'
 import { Card, confirmAction } from '../components/kit'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Empty } from '../components/ui'
-import { supabase } from '../data/supabaseClient'
-import clsx from 'clsx'
-import { Link } from 'react-router-dom'
-import { formatarHoras, inicioDeHoje, tempoEmServico, turnoAberto, useNumeros, useTurnos } from '../lib/equipe'
+import { formatarHoras, inicioDeHoje, PAPEIS, tempoEmServico, turnoAberto, useNumeros, useTurnos } from '../lib/equipe'
+import { useChatNaoLidas, useSites } from '../lib/sites'
 import { STATUS_MAP, STATUSES, TONE_CLASSES } from '../lib/statuses'
-import { useAccount, usePessoasEquipe, type MembroEquipe } from '../store/useAccount'
+import { useAccount, usePessoasEquipe } from '../store/useAccount'
 import { useApp } from '../store/useApp'
-
-const PAPEIS = {
-  gestor: 'Gestor',
-  vendedor: 'Vendedor',
-} as const
-
-const SOBRE_PAPEL = {
-  gestor: 'Faz quase tudo na conta, menos mexer no plano e na equipe.',
-  vendedor: 'Trabalha nos leads e conversas da conta. Não muda a conexão da API oficial.',
-} as const
-
-async function chamar(nome: string, args: Record<string, unknown> = {}) {
-  if (!supabase) throw new Error('Equipe só funciona com a conta na nuvem.')
-  const { error } = await supabase.rpc(nome, args)
-  if (error) throw new Error(error.message)
-}
+import { CargoChip, chamar } from './EquipePessoasPage'
 
 export function EquipePage() {
   const equipe = useAccount((s) => s.equipe)
@@ -35,7 +21,7 @@ export function EquipePage() {
   if (!equipe) {
     return (
       <div className="space-y-5">
-        <PageHeader title="Equipe" />
+        <PageHeader title="Painel da equipe" />
         <Empty icon={<Users className="h-5 w-5" />} title="Equipe indisponível">
           Entre com a sua conta da XS para montar ou ver a sua equipe.
         </Empty>
@@ -44,10 +30,10 @@ export function EquipePage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-4xl space-y-5">
       <PageHeader
-        title="Equipe"
-        subtitle={equipe.dono ? `Você trabalha na conta de ${equipe.dono.nome ?? 'outra pessoa'}.` : 'Pessoas que trabalham no seu CRM, cada uma com o próprio login.'}
+        title="Painel da equipe"
+        subtitle={equipe.dono ? `Você trabalha na equipe de ${equipe.dono.nome ?? 'outra pessoa'}.` : 'Quem está trabalhando, os sites em andamento e os números do mês.'}
       />
       {equipe.convite && <Convite dono={equipe.convite.dono} papel={equipe.convite.papel} />}
       {equipe.dono ? <SouMembro /> : equipe.times ? <SouDono /> : !equipe.convite && <SemTimes />}
@@ -84,14 +70,49 @@ function Convite({ dono, papel }: { dono: string | null; papel: string }) {
 
 function SemTimes() {
   return (
-    <Card title="Plano Times" description="Para agências e equipes que prospectam juntas.">
+    <Card title="Plano Times" description="Para agências e equipes que prospectam e fazem sites juntas.">
       <ul className="space-y-1.5 text-[13px] text-fg-2">
         <li>Até 10 pessoas no seu CRM, cada uma com o próprio login e sem pagar nada.</li>
-        <li>Todos usam os mesmos leads, funis, modelos e números de WhatsApp.</li>
-        <li>Você escolhe quem é gestor e quem é vendedor.</li>
+        <li>Vendedores prospectam; desenvolvedores pegam os sites para fazer.</li>
+        <li>Chat da equipe, quem está em serviço e o desempenho de cada um.</li>
       </ul>
       <p className="mt-3 text-xs text-fg-3">Para liberar o plano Times na sua conta, fale com a XS pelo suporte.</p>
     </Card>
+  )
+}
+
+/** Atalhos grandes para as partes da equipe, com o que está esperando em cada uma. */
+function Atalhos({ dono }: { dono: boolean }) {
+  const pedidos = useSites((s) => s.pedidos)
+  const eu = useAccount((s) => s.profile?.user_id)
+  const chat = useChatNaoLidas()
+  const fila = pedidos.filter((p) => p.status === 'fila').length
+  const fazendo = pedidos.filter((p) => p.status === 'fazendo').length
+  const meus = pedidos.filter((p) => p.status === 'fazendo' && p.dev === eu).length
+  const itens: { to: string; icon: ReactNode; titulo: string; texto: string; destaque?: boolean }[] = [
+    {
+      to: '/equipe/sites',
+      icon: <Code className="size-4 text-emerald-300" />,
+      titulo: 'Sites para fazer',
+      texto: `${fila} na fila · ${meus ? `${meus} com você` : `${fazendo} sendo feitos`}`,
+      destaque: fila > 0,
+    },
+    { to: '/equipe/chat', icon: <MessageSquare className="size-4 text-blue-300" />, titulo: 'Chat da equipe', texto: chat ? `${chat} mensagens novas` : 'Converse com a equipe', destaque: chat > 0 },
+  ]
+  if (dono) itens.push({ to: '/equipe/pessoas', icon: <UserCog className="size-4 text-gold" />, titulo: 'Pessoas e cargos', texto: 'Convidar, cargos e metas' })
+  return (
+    <div className={clsx('grid gap-3', dono ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+      {itens.map((i) => (
+        <Link key={i.to} to={i.to} className="panel group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-hover">
+          <span className="flex size-9 items-center justify-center rounded-lg border border-line-soft bg-raised">{i.icon}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold">{i.titulo}</span>
+            <span className={clsx('block truncate text-xs', i.destaque ? 'text-gold' : 'text-fg-3')}>{i.texto}</span>
+          </span>
+          <ArrowRight className="size-4 text-fg-4 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ))}
+    </div>
   )
 }
 
@@ -112,22 +133,26 @@ function SouMembro() {
   return (
     <>
       <Servico />
-      <Card title="Sua equipe" description={`Seu papel: ${PAPEIS[equipe.papel as keyof typeof PAPEIS] ?? 'Dono'}.`}>
+      <Atalhos dono={false} />
+      <Card title="Sua equipe" bodyClass="px-0 py-0">
         <ul className="divide-y divide-line-soft">
-          <li className="flex items-center gap-2 py-2 text-[13px]">
-            <Crown className="h-3.5 w-3.5 text-gold" />
-            <span className="pv">{equipe.dono?.nome ?? 'Dono'}</span>
-            <span className="text-xs text-fg-3">Dono</span>
+          <li className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
+            <Avatar src={null} name={equipe.dono?.nome ?? 'Dono'} size={28} />
+            <span className="pv flex-1 font-medium">{equipe.dono?.nome ?? 'Dono'}</span>
+            <span className="inline-flex items-center gap-1 text-2xs text-gold">
+              <Crown className="size-3" /> Dono
+            </span>
           </li>
           {equipe.membros.map((m) => (
-            <li key={m.id} className="flex items-center gap-2 py-2 text-[13px]">
-              <span className="pv">{m.nome ?? m.usuario}</span>
-              <span className="text-xs text-fg-3">{PAPEIS[m.papel]}</span>
+            <li key={m.id} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
+              <Avatar src={null} name={m.nome ?? m.usuario ?? '?'} size={28} />
+              <span className="pv flex-1 font-medium">{m.nome ?? m.usuario}</span>
+              <CargoChip papel={m.papel} />
             </li>
           ))}
         </ul>
       </Card>
-      <Desempenho />
+      {equipe.papel !== 'desenvolvedor' && <Desempenho />}
       <Button variant="danger" icon={<LogOut className="h-3.5 w-3.5" />} loading={busy} onClick={() => void sair()}>
         Sair da equipe
       </Button>
@@ -136,161 +161,12 @@ function SouMembro() {
 }
 
 function SouDono() {
-  const equipe = useAccount((s) => s.equipe)!
-  const recarregar = useAccount((s) => s.recarregarEquipe)
-  const [login, setLogin] = useState('')
-  const [papel, setPapel] = useState<MembroEquipe['papel']>('vendedor')
-  const [busy, setBusy] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  const cheia = equipe.membros.length >= equipe.limite
-
-  const alternarRoleta = async () => {
-    try {
-      await chamar('equipe_roleta', { p_ligar: !equipe.roleta })
-      await recarregar()
-    } catch (e) {
-      useApp.getState().toast((e as Error).message, 'error')
-    }
-  }
-
-  const convidar = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!login.trim()) return
-    setBusy(true)
-    setErro(null)
-    try {
-      await chamar('equipe_convidar', { p_login: login.trim(), p_papel: papel })
-      setLogin('')
-      await recarregar()
-    } catch (err) {
-      setErro((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <>
-      <Card
-        title="Convidar pessoa"
-        description={`A pessoa cria a conta dela na XS (grátis) e você convida pelo usuário ou e-mail. ${equipe.membros.length} de ${equipe.limite} vagas usadas.`}
-      >
-        <form onSubmit={(e) => void convidar(e)} className="flex flex-wrap items-end gap-2">
-          <input className="input min-w-0 flex-1" placeholder="Usuário ou e-mail (ex.: flaviosites)" value={login} disabled={cheia} onChange={(e) => setLogin(e.target.value)} />
-          <select className="input w-auto" value={papel} disabled={cheia} onChange={(e) => setPapel(e.target.value as MembroEquipe['papel'])}>
-            <option value="vendedor">Vendedor</option>
-            <option value="gestor">Gestor</option>
-          </select>
-          <Button type="submit" variant="primary" icon={<UserPlus className="h-3.5 w-3.5" />} loading={busy} disabled={cheia || !login.trim()}>
-            Convidar
-          </Button>
-        </form>
-        <p className="mt-2 text-xs text-fg-3">{SOBRE_PAPEL[papel]}</p>
-        {erro && <p className="mt-2 text-xs text-red-300">{erro}</p>}
-      </Card>
-
+      <Atalhos dono />
       <Agora />
       <Desempenho />
-
-      <Card
-        title="Roleta de leads"
-        description="Automático. Ligada, CADA lead novo (busca, importação ou cadastro) vai sozinho para um vendedor, um de cada vez. Desligada, os leads novos ficam só com você até você passar para alguém."
-        actions={
-          <Button size="sm" variant={equipe.roleta ? 'go' : 'secondary'} onClick={() => void alternarRoleta()}>
-            {equipe.roleta ? 'Ligada' : 'Desligada'}
-          </Button>
-        }
-      >
-        <p className="text-xs text-fg-3">Para passar leads que já existem, selecione na lista de Leads e use “Passar para…” ou “Repartir entre a equipe”.</p>
-      </Card>
-
-      <Card title="Pessoas da equipe" bodyClass="px-4 py-1">
-        {equipe.membros.length === 0 ? (
-          <p className="py-3 text-[13px] text-fg-3">Ninguém ainda. Convide a primeira pessoa acima.</p>
-        ) : (
-          <ul className="divide-y divide-line-soft">
-            {equipe.membros.map((m) => (
-              <Membro key={m.id} m={m} onMudou={recarregar} />
-            ))}
-          </ul>
-        )}
-      </Card>
     </>
-  )
-}
-
-function Membro({ m, onMudou }: { m: MembroEquipe; onMudou: () => Promise<void> }) {
-  const [busy, setBusy] = useState(false)
-  const agir = async (fn: () => Promise<void>) => {
-    setBusy(true)
-    try {
-      await fn()
-      await onMudou()
-    } catch (e) {
-      useApp.getState().toast((e as Error).message, 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-  const remover = () => {
-    if (!confirmAction(m.aceito ? `Tirar ${m.nome ?? m.usuario} da equipe? O que essa pessoa fez fica na sua conta.` : 'Cancelar o convite?')) return
-    void agir(() => chamar('equipe_remover', { p_membro: m.id }))
-  }
-  return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
-      <div className="min-w-0 flex-1">
-        <p className="pv truncate text-[13px] font-medium">
-          {m.aceito ? (
-            <Link to={`/equipe/${m.id}`} className="hover:underline">
-              {m.nome ?? m.usuario}
-            </Link>
-          ) : (
-            (m.nome ?? m.usuario)
-          )}
-        </p>
-        <p className="pv truncate text-xs text-fg-3">
-          {[m.usuario && `@${m.usuario}`, m.email].filter(Boolean).join(' · ')}
-          {!m.aceito && <span className="ml-1.5 text-gold">Convite enviado</span>}
-        </p>
-      </div>
-      {m.papel === 'vendedor' && (
-        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2" title="Desmarcado: a pessoa só vê os leads que estão com ela">
-          <input
-            type="checkbox"
-            checked={m.ve_todos}
-            disabled={busy}
-            onChange={(e) => void agir(() => chamar('equipe_definir', { p_membro: m.id, p_papel: m.papel, p_ve_todos: e.target.checked }))}
-          />
-          Vê todos os leads
-        </label>
-      )}
-      <MetaInput label="Contatos/mês" valor={m.meta_contatos} disabled={busy} onSalvar={(v) => void agir(() => chamar('equipe_metas', { p_membro: m.id, p_contatos: v, p_vendas: m.meta_vendas }))} />
-      <MetaInput label="Vendas/mês" valor={m.meta_vendas} disabled={busy} onSalvar={(v) => void agir(() => chamar('equipe_metas', { p_membro: m.id, p_contatos: m.meta_contatos, p_vendas: v }))} />
-      <select
-        className="input w-auto"
-        value={m.papel}
-        disabled={busy}
-        onChange={(e) => void agir(() => chamar('equipe_definir', { p_membro: m.id, p_papel: e.target.value, p_ve_todos: m.ve_todos }))}
-      >
-        <option value="vendedor">Vendedor</option>
-        <option value="gestor">Gestor</option>
-      </select>
-      <Button variant="ghost" size="sm" icon={<Trash2 className="h-3.5 w-3.5" />} disabled={busy} onClick={remover} aria-label="Tirar da equipe" />
-    </li>
-  )
-}
-
-function MetaInput({ label, valor, disabled, onSalvar }: { label: string; valor: number | null; disabled: boolean; onSalvar: (v: number | null) => void }) {
-  const [v, setV] = useState(valor ? String(valor) : '')
-  const salvar = () => {
-    const n = Number(v) || null
-    if (n !== valor) onSalvar(n)
-  }
-  return (
-    <label className="flex items-center gap-1 text-2xs text-fg-3">
-      {label}
-      <input className="input h-7 w-14 px-1.5 text-xs" inputMode="numeric" value={v} disabled={disabled} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} onBlur={salvar} />
-    </label>
   )
 }
 
@@ -310,7 +186,8 @@ function Desempenho() {
     const desde = inicio.toISOString()
     const semana = Date.now() - 7 * 86_400_000
     const respDe = new Map(leads.map((l) => [l.id, l.responsavel ?? null]))
-    const visiveis = equipe.papel === 'vendedor' ? pessoas.filter((p) => p.id === eu) : pessoas
+    const devs = new Set(equipe.membros.filter((m) => m.papel === 'desenvolvedor').map((m) => m.id))
+    const visiveis = (equipe.papel === 'vendedor' ? pessoas.filter((p) => p.id === eu) : pessoas).filter((p) => !devs.has(p.id))
     return visiveis.map((p) => {
       const minhas = interactions.filter((i) => i.autor === p.id && i.created_at >= desde)
       const vendas = meetings.filter((m) => m.resultado === 'fechou' && m.data >= desde.slice(0, 10) && (respDe.get(m.lead_id) ?? m.autor) === p.id)
@@ -399,10 +276,12 @@ function Desempenho() {
   )
 }
 
-/** Quem é da equipe: entrar e sair de serviço, e os números do dia. */
+/** Quem é da equipe: entrar e sair de serviço, e os números do dia (do desenvolvedor: os sites). */
 function Servico() {
   const eu = useAccount((s) => s.profile)
+  const dev = useAccount((s) => s.equipe?.papel === 'desenvolvedor')
   const { turnos, carregado, entrar, sair } = useTurnos()
+  const pedidos = useSites((s) => s.pedidos)
   const aberto = turnoAberto(turnos, eu?.user_id ?? null)
   const hoje = useNumeros(eu?.user_id ?? '', inicioDeHoje())
   const [busy, setBusy] = useState(false)
@@ -425,6 +304,21 @@ function Servico() {
   }
   const hora = new Date().getHours()
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
+  const mes = new Date(inicioDeHoje()).toISOString().slice(0, 7)
+  const numeros: [string, number][] = dev
+    ? [
+        ['Na fila', pedidos.filter((p) => p.status === 'fila').length],
+        ['Fazendo agora', pedidos.filter((p) => p.status === 'fazendo' && p.dev === eu.user_id).length],
+        ['Prontos no mês', pedidos.filter((p) => p.status === 'pronto' && p.dev === eu.user_id && (p.pronto_em ?? '') >= mes).length],
+      ]
+    : [
+        ['Prospectados hoje', hoje.prospectados],
+        ['Ligações hoje', hoje.ligacoes],
+        ['Mensagens hoje', hoje.mensagens],
+        ['Respostas hoje', hoje.respostas],
+        ['Reuniões hoje', hoje.reunioes],
+        ['Vendas hoje', hoje.vendas],
+      ]
 
   return (
     <section className={clsx('panel overflow-hidden', aberto && 'ring-1 ring-go/30')}>
@@ -441,7 +335,11 @@ function Servico() {
             <p className="mt-1 text-lg font-semibold">Pronto para começar?</p>
           )}
           <p className="mt-0.5 text-xs text-fg-3">
-            {aberto ? 'Seus leads, as conversas e o WhatsApp da equipe estão no menu.' : 'Entre em serviço para abrir seus leads e o WhatsApp da equipe. O dono vê quem está trabalhando.'}
+            {aberto
+              ? dev
+                ? 'Pegue um site em “Sites para fazer”. Os leads e as conversas estão no menu.'
+                : 'Seus leads, as conversas e o WhatsApp da equipe estão no menu.'
+              : 'Entre em serviço para abrir o seu trabalho. O dono vê quem está trabalhando.'}
           </p>
         </div>
         {aberto ? (
@@ -454,17 +352,10 @@ function Servico() {
           </Button>
         )}
       </div>
-      <div className="grid grid-cols-3 border-t border-line-soft sm:grid-cols-6">
-        {[
-          ['Prospectados', hoje.prospectados],
-          ['Ligações', hoje.ligacoes],
-          ['Mensagens', hoje.mensagens],
-          ['Respostas', hoje.respostas],
-          ['Reuniões', hoje.reunioes],
-          ['Vendas', hoje.vendas],
-        ].map(([rotulo, n]) => (
+      <div className={clsx('grid border-t border-line-soft', dev ? 'grid-cols-3' : 'grid-cols-3 sm:grid-cols-6')}>
+        {numeros.map(([rotulo, n]) => (
           <div key={rotulo} className="border-line-soft px-4 py-3 not-last:border-r">
-            <p className="text-2xs text-fg-3">{rotulo} hoje</p>
+            <p className="text-2xs text-fg-3">{rotulo}</p>
             <p className="num text-lg font-semibold">{n}</p>
           </div>
         ))}

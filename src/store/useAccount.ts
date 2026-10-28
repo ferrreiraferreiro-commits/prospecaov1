@@ -28,7 +28,7 @@ export interface Profile {
 }
 
 /** Papel na equipe (plano Times). Quem não está em equipe é 'dono' da própria conta. */
-export type PapelEquipe = 'dono' | 'gestor' | 'vendedor'
+export type PapelEquipe = 'dono' | 'gestor' | 'vendedor' | 'desenvolvedor'
 
 export interface MembroEquipe {
   id: string

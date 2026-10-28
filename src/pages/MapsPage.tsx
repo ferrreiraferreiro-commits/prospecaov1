@@ -136,7 +136,7 @@ export function MapsPage() {
   // Plano Times: o dono escolhe para quem vão as empresas achadas (marcadas, ou todas)
   const pessoasEquipe = usePessoasEquipe()
   const papel = usePapel()
-  const temEquipe = pessoasEquipe.length > 0 && papel !== 'vendedor'
+  const temEquipe = pessoasEquipe.length > 0 && papel !== 'vendedor' && papel !== 'desenvolvedor'
   const [marcados, setMarcados] = useState<Set<string>>(new Set())
   // Normalmente vai sozinho para os leads; isto cobre uma falha ao salvar
   const pendingSave = !!state && !state.active && !state.imported && results.length > 0
@@ -882,7 +882,7 @@ function MandarPara({ results, marcados, onFeito }: { results: MapsResult[]; mar
   const setResponsavel = useApp((s) => s.setResponsavel)
   const toast = useApp((s) => s.toast)
   const [busy, setBusy] = useState(false)
-  if (!pessoas.length || papel === 'vendedor') return null
+  if (!pessoas.length || papel === 'vendedor' || papel === 'desenvolvedor') return null
 
   const mandar = async (destino: string) => {
     const escolhidos = results.filter((r) => !r.recurring && (!marcados.size || marcados.has(r.id)))

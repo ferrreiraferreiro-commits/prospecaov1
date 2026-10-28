@@ -23,7 +23,7 @@ const TIPO: Partial<Record<InteractionTipo, string>> = {
   mensagem: 'Mensagem no WhatsApp',
 }
 
-const PAPEIS = { gestor: 'Gestor', vendedor: 'Vendedor' } as const
+import { PAPEIS } from '../lib/equipe'
 
 function Numeros({ titulo, n }: { titulo: string; n: ReturnType<typeof useNumeros> & { horas: number } }) {
   const itens: [string, string | number][] = [
@@ -71,7 +71,7 @@ export function MembroPerfilPage() {
   )
   const ultimosTurnos = turnos.filter((t) => t.membro === id).slice(0, 8)
 
-  if (!membro || equipe?.papel === 'vendedor') {
+  if (!membro || equipe?.papel === 'vendedor' || equipe?.papel === 'desenvolvedor') {
     return (
       <div className="space-y-5">
         <PageHeader title="Pessoa da equipe" />

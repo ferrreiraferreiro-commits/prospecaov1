@@ -60,7 +60,7 @@ interface LeadRowProps {
 function RespTag({ responsavel }: { responsavel: string | null }) {
   const pessoas = usePessoasEquipe()
   const papel = usePapel()
-  if (!pessoas.length || papel === 'vendedor') return null
+  if (!pessoas.length || papel === 'vendedor' || papel === 'desenvolvedor') return null
   const nome = responsavel ? pessoas.find((p) => p.id === responsavel)?.nome : null
   return nome ? (
     <span className="pv inline-flex max-w-[120px] shrink-0 truncate rounded bg-blue-500/12 px-1.5 text-[10px] leading-4 font-medium text-blue-300 ring-1 ring-blue-500/25 ring-inset" title={`Com ${nome}`}>

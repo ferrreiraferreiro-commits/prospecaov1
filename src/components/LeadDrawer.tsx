@@ -17,6 +17,7 @@ import { useLiguei } from './OutcomeModal'
 import { ClientLink } from './ClientLink'
 import { CnpjSection } from './CnpjSection'
 import { MeetingResult } from './MeetingResult'
+import { SiteNoLead } from './SiteNoLead'
 import { Timeline } from './Timeline'
 import { Button, Drawer, Missing, WhatsAppIcon } from './ui'
 import { useCopyPhone, useWhatsApp } from './whatsapp'
@@ -350,6 +351,8 @@ function LeadDetail({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             )}
           </dl>
         </Section>
+
+        <SiteNoLead leadId={lead.id} />
 
         <Section
           title="Agenda"
