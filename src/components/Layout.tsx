@@ -148,8 +148,6 @@ const MOBILE: NavItem[] = [
 const SO_DO_DONO = ['/clientes', '/projetos', '/financeiro', '/precificacao', '/whatsapp', '/api-oficial', '/agente', '/xico', '/contas']
 const soDoDono = (to: string) => SO_DO_DONO.some((p) => to === p || (p !== '/api-oficial' && to.startsWith(`${p}/`)))
 
-/** Desenvolvedor (faz os sites) vê quase nada: painel, leads da fila de sites, conversas e a equipe. */
-const DO_DESENVOLVEDOR = ['/', '/leads', '/conversas', '/api-oficial/conversas']
 /** Vendedor em serviço não usa o WhatsApp da conta (QR) nem busca empresas: trabalha os leads que recebe. */
 const FORA_DO_VENDEDOR = ['/conversas', '/disparo', '/funis', '/agendamentos', '/maps']
 const daEquipe = (to: string) => to === '/equipe' || to.startsWith('/equipe/')
@@ -158,7 +156,8 @@ const daEquipe = (to: string) => to === '/equipe' || to.startsWith('/equipe/')
 function liberado(to: string, membro: boolean, emServico: boolean, papel: PapelEquipe): boolean {
   if (!membro || daEquipe(to)) return true
   if (!emServico) return false
-  if (papel === 'desenvolvedor') return DO_DESENVOLVEDOR.includes(to)
+  // Desenvolvedor (faz os sites) só usa a parte Equipe: os leads e a conversa vêm dentro de cada site
+  if (papel === 'desenvolvedor') return false
   if (papel === 'vendedor' && FORA_DO_VENDEDOR.includes(to)) return false
   return !soDoDono(to)
 }
@@ -175,16 +174,8 @@ function useGroups() {
   const temIA = useHasIA()
   const papel = usePapel()
   const temEquipe = useAccount((s) => !!s.equipe && (s.equipe.times || !!s.equipe.dono))
-  // Desenvolvedor: Conversas da API oficial só se a conta usa a API oficial
-  const temMeta = useMetaConexao((s) => s.conexoes.length > 0)
   const pode = useLiberado()
-  const mostra = (i: NavItem) =>
-    (temWhatsApp || !i.whatsapp) &&
-    (temIA || !i.ia) &&
-    (temEquipe || !i.time) &&
-    (papel === 'dono' || !i.dono) &&
-    (papel !== 'desenvolvedor' || i.to !== '/api-oficial/conversas' || temMeta) &&
-    pode(i.to)
+  const mostra = (i: NavItem) => (temWhatsApp || !i.whatsapp) && (temIA || !i.ia) && (temEquipe || !i.time) && (papel === 'dono' || !i.dono) && pode(i.to)
   return GROUPS.map((g) => ({ ...g, items: g.items.filter(mostra) })).filter((g) => g.items.length)
 }
 
@@ -262,7 +253,7 @@ export function Layout() {
     const t = setInterval(tudo, 60_000)
     return () => clearInterval(t)
   }, [temEquipe])
-  // O desenvolvedor só vê as Conversas da API oficial se a conta usa a API oficial
+  // O desenvolvedor lê a conversa da API oficial dentro de cada site
   useEffect(() => {
     if (papel === 'desenvolvedor') void useMetaConexao.getState().carregar()
   }, [papel])

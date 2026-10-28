@@ -246,7 +246,9 @@ function Conversa({ telefone }: { telefone: string }) {
     }
   }, [telefone, temWhatsApp, temMeta])
 
-  const abrir = estado && estado !== 'carregando' ? `${estado.canal === 'meta' ? '/api-oficial/conversas' : '/conversas'}?tel=${telefone}` : null
+  // O desenvolvedor não abre a tela Conversas: lê a conversa só aqui
+  const dev = usePapel() === 'desenvolvedor'
+  const abrir = !dev && estado && estado !== 'carregando' ?`${estado.canal === 'meta' ? '/api-oficial/conversas' : '/conversas'}?tel=${telefone}` : null
   return (
     <Bloco
       titulo="Conversa no WhatsApp"

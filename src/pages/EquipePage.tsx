@@ -337,7 +337,7 @@ function Servico() {
           <p className="mt-0.5 text-xs text-fg-3">
             {aberto
               ? dev
-                ? 'Pegue um site em “Sites para fazer”. Os leads e as conversas estão no menu.'
+                ? 'Pegue um site em “Sites para fazer”: os dados do cliente e a conversa estão dentro de cada site.'
                 : 'Seus leads, as conversas e o WhatsApp da equipe estão no menu.'
               : 'Entre em serviço para abrir o seu trabalho. O dono vê quem está trabalhando.'}
           </p>
